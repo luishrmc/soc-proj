@@ -1,0 +1,146 @@
+{
+  "project": "cora-z7-10-compression-crypto",
+  "version": 1,
+  "language": "en",
+  "paths": {
+    "hw": "cora7z/app/hw",
+    "sw": "cora7z/app/sw",
+    "esp32": "esp32",
+    "results": "cora7z/app/test_results",
+    "plan": "utils/plan",
+    "memory": "utils/memory",
+    "gates": "out/gates"
+  },
+  "limits": {
+    "max_iterations": 5,
+    "stagnation_cycles": 2,
+    "handoff_max_lines": 50,
+    "digest_max_lines": 60,
+    "index_max_lines": 40,
+    "lessons_max_lines": 80
+  },
+  "protected": [
+    "cora7z/app/hw/utils/*.xdc",
+    "cora7z/app/hw/src/INTERFACES.md",
+    "requirements.txt",
+    ".agents/manifest.json"
+  ],
+  "gates_by_phase": {
+    "1": [],
+    "2": ["vhdl-lint", "vhdl-sim"],
+    "3": ["vivado-build"],
+    "4": ["vitis-build"],
+    "5": ["bench-sanity"],
+    "6": ["deliverable-audit"]
+  },
+  "gates_by_task": {
+    "3.4": ["xdc-check"],
+    "3.3": ["address-map"],
+    "3.5": ["vivado-build", "address-map", "xdc-check"]
+  },
+  "agents": [
+    {
+      "name": "orchestrator-agent",
+      "definition": ".agents/agents/orchestrator-agent.md",
+      "role": "Supervisor, task DAG, loop guard, sole writer of utils/plan and utils/memory/decisions.md",
+      "model": "pro",
+      "tools_allowed": ["run_command", "send_message", "view_file", "invoke_subagent", "write_to_file", "replace_file_content"],
+      "run_scope": ["git (read-only and commit via git-safety-guard)", ".agents/hooks/*"],
+      "write": [
+        "utils/plan/*",
+        "utils/memory/INDEX.md",
+        "utils/memory/decisions.md",
+        "utils/memory/lessons.md",
+        "utils/memory/episodes/*"
+      ],
+      "skills": ["project-plan", "memory-protocol", "plan-agents", "plan-hooks", "git-branch-lifecycle", "git-commit-stager", "git-safety-guard"]
+    },
+    {
+      "name": "rtl-agent",
+      "definition": ".agents/agents/rtl-agent.md",
+      "role": "VHDL RTL and testbench author (SPI, RLE, LZ4, AES-CTR, ChaCha20)",
+      "model": "pro",
+      "tools_allowed": ["view_file", "write_to_file", "replace_file_content", "run_command"],
+      "run_scope": ["make -C cora7z/app/hw *", ".agents/hooks/vhdl-lint.sh", ".agents/hooks/vhdl-sim-gate.sh"],
+      "write": [
+        "cora7z/app/hw/src/**",
+        "cora7z/app/hw/test/**",
+        "cora7z/app/hw/waves/**",
+        "cora7z/app/hw/run.py",
+        "cora7z/app/hw/Makefile",
+        "utils/memory/modules/*",
+        "utils/memory/handoff/*"
+      ],
+      "skills": ["vhdl-rtl-author", "vunit-sim", "memory-protocol", "doc-lookup"]
+    },
+    {
+      "name": "vivado-integrator-agent",
+      "definition": ".agents/agents/vivado-integrator-agent.md",
+      "role": "Vivado batch flow: block design, AXI IP packaging, address map, XDC, XSA export",
+      "model": "pro",
+      "tools_allowed": ["view_file", "write_to_file", "replace_file_content", "run_command"],
+      "run_scope": ["vivado -mode batch", ".agents/hooks/vivado-gate.sh", ".agents/hooks/xdc-check.sh"],
+      "write": [
+        "cora7z/app/hw/scripts/**",
+        "cora7z/app/hw/utils/*.xdc",
+        "cora7z/app/hw/src/INTERFACES.md",
+        "utils/memory/modules/*",
+        "utils/memory/handoff/*"
+      ],
+      "skills": ["vivado-batch", "axi-ip-packager", "xdc-constraints", "cora-z7-reference", "memory-protocol", "doc-lookup"]
+    },
+    {
+      "name": "firmware-agent",
+      "definition": ".agents/agents/firmware-agent.md",
+      "role": "Bare-metal C/C++ on Cortex-A9 via Vitis: reference algorithms, AXI drivers, ARM PMU",
+      "model": "pro",
+      "tools_allowed": ["view_file", "write_to_file", "replace_file_content", "run_command"],
+      "run_scope": ["vitis", "cmake/ninja inside cora7z/app/sw", ".agents/hooks/vitis-gate.sh"],
+      "write": [
+        "cora7z/app/sw/**",
+        "utils/memory/modules/*",
+        "utils/memory/handoff/*"
+      ],
+      "skills": ["vitis-build", "bare-metal-c-author", "arm-pmu-profiling", "cora-z7-reference", "memory-protocol", "doc-lookup"]
+    },
+    {
+      "name": "test-bench-agent",
+      "definition": ".agents/agents/test-bench-agent.md",
+      "role": "Runs the test matrix, collects metrics, prepares result tables and plots",
+      "model": "flash",
+      "tools_allowed": ["view_file", "write_to_file", "replace_file_content", "run_command"],
+      "run_scope": ["xsdb/program_flash for board runs", "python3 cora7z/app/test_results/*.py"],
+      "write": [
+        "cora7z/app/test_results/**",
+        "utils/memory/handoff/*"
+      ],
+      "skills": ["benchmark-matrix", "memory-protocol"]
+    },
+    {
+      "name": "technical-critic-agent",
+      "definition": ".agents/agents/technical-critic-agent.md",
+      "role": "Adversarial reviewer of RTL, AXI integration, timing, measurement validity and spec conformance",
+      "model": "pro",
+      "tools_allowed": ["view_file"],
+      "run_scope": [],
+      "write": [],
+      "skills": ["doc-lookup"]
+    },
+    {
+      "name": "doc-agent",
+      "definition": ".agents/agents/doc-agent.md",
+      "role": "README, block diagram, final report and delivery package",
+      "model": "flash",
+      "tools_allowed": ["view_file", "write_to_file", "replace_file_content", "run_command"],
+      "run_scope": ["pdftotext", ".agents/hooks/deliverable-audit.sh"],
+      "write": [
+        "README.md",
+        "docs/report/**",
+        "docs/diagrams/**",
+        "utils/memory/handoff/*"
+      ],
+      "skills": ["deliverable-audit", "memory-protocol", "doc-lookup"]
+    }
+  ],
+  "pipeline_sequence": ["1", "2", "3", "4", "5", "6"]
+}

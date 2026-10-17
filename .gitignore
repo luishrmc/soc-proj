@@ -1,0 +1,88 @@
+# =====================================================================
+# Reproducibility policy: only sources, scripts, constraints, plans,
+# memory and docs are versioned. Everything a tool can regenerate from
+# them (Vivado project, Vitis workspace, simulation output) is ignored.
+# =====================================================================
+
+# ---- Python virtual environment (recreate with `make -C app/hw venv`)
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# ---- Generic outputs of agent hooks and scratch data
+/out/
+*.log
+*.jou
+*.str
+*.bak
+*.tmp
+*~
+.DS_Store
+Thumbs.db
+
+# ---- VUnit / GHDL simulation outputs
+cora7z/app/hw/build/
+cora7z/app/hw/vunit_out/
+cora7z/app/hw/vhdl_ls.toml
+*.ghw
+*.vcd
+*.fst
+*.o
+*.cf
+
+# ---- Vivado: the project is regenerated from app/hw/scripts/*.tcl
+cora7z/app/hw/vivado/*
+!cora7z/app/hw/vivado/.gitkeep
+*.xpr
+*.runs/
+*.cache/
+*.hw/
+*.ip_user_files/
+*.sim/
+*.gen/
+*.srcs/
+.Xil/
+xsim.dir/
+*.wdb
+*.dcp
+*.bit
+*.bin
+*.xsa
+*.sysdef
+*.hdf
+*.ltx
+*.prm
+*.pb
+*.rpt
+*.rpx
+vivado_pid*.str
+hs_err_pid*.log
+nlviewcommon.logfile
+
+# ---- Vitis: the workspace is regenerated from app/sw/scripts/*
+# Versioned: app/sw/vitis/<app>/src/** and the CMake user config.
+cora7z/app/sw/vitis/platform/
+cora7z/app/sw/vitis/_ide/
+cora7z/app/sw/vitis/.rigel_lopper/
+cora7z/app/sw/vitis/.vitisWorkspace.json
+cora7z/app/sw/vitis/**/build/
+cora7z/app/sw/vitis/**/export/
+cora7z/app/sw/vitis/**/logs/
+cora7z/app/sw/vitis/**/compile_commands.json
+cora7z/app/sw/vitis/**/.clangd
+*.elf
+*.elf.size
+*.map
+*.pdi
+*.lock
+.vitis*
+
+# ---- Raw benchmark dumps stay local; summarized CSVs are versioned
+cora7z/app/test_results/raw/
+
+# ---- Agent working state that must not be committed
+.agents/snapshots/
+.agent/
+utils/plan/.bak/
+utils/memory/handoff/done/

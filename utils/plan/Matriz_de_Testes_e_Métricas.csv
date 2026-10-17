@@ -1,0 +1,13 @@
+Cenário,Algoritmo / Cifra,Tamanho do Bloco,Perfil de Dados,Latência (ms),Ciclos ARM PMU,Vazão (MB/s),Recursos FPGA (LUTs/FFs/BRAMs)
+PS puro,RLE,64 B,Alta redundância,,,,N/A
+PS puro,LZ4,1 KB,Pseudoaleatório,,,,N/A
+PS puro,AES-CTR,64 KB,Telemetria,,,,N/A
+PL pura,RLE,64 B,Alta redundância,,,,
+PL pura,LZ4,1 KB,Pseudoaleatório,,,,
+PL pura,AES-CTR,64 KB,Telemetria,,,,
+Híbrido,RLE,64 B,Alta redundância,,,,
+Híbrido,LZ4,1 KB,Pseudoaleatório,,,,
+Híbrido,AES-CTR,64 KB,Telemetria,,,,
+Híbrido,ChaCha20,64 KB,Telemetria,,,,
+PL pura,ChaCha20,1 KB,Pseudoaleatório,,,,
+PS puro,ChaCha20,64 B,Alta redundância,,,,N/A
