@@ -88,8 +88,9 @@ def main():
     protected_ok = os.environ.get("ALLOW_PROTECTED") == "1"
     bad = []
     for p in sorted(set(delta)):
-        if matches(p, manifest["protected"]) and not protected_ok:
-            bad.append((p, "protected file"))
+        if matches(p, manifest["protected"]):
+            if not protected_ok:
+                bad.append((p, "protected file"))
         elif not matches(p, agent["write"]):
             bad.append((p, "outside agent write globs"))
     if bad:

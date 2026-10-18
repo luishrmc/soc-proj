@@ -51,7 +51,11 @@
         "utils/memory/INDEX.md",
         "utils/memory/decisions.md",
         "utils/memory/lessons.md",
-        "utils/memory/episodes/*"
+        "utils/memory/episodes/*",
+        "utils/memory/modules/*",
+        "utils/memory/handoff/*",
+        "docs/**",
+        ".agents/**"
       ],
       "skills": ["project-plan", "memory-protocol", "plan-agents", "plan-hooks", "git-branch-lifecycle", "git-commit-stager", "git-safety-guard"]
     },
@@ -135,8 +139,7 @@
       "run_scope": ["pdftotext", ".agents/hooks/deliverable-audit.sh"],
       "write": [
         "README.md",
-        "docs/report/**",
-        "docs/diagrams/**",
+        "docs/**",
         "utils/memory/handoff/*"
       ],
       "skills": ["deliverable-audit", "memory-protocol", "doc-lookup"]

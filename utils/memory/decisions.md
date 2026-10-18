@@ -22,3 +22,10 @@ Reason: user requirement. The CSVs are part of the course deliverable.
 
 ## ADR-007 | 2026-10-17 | setup | Toolchain root is `/home/luis/Xilinx/2026.1`, loaded by `.agents/env.sh`, never through the global PATH
 Reason: Vivado/Vitis/ARM GCC are installed but not on PATH.
+
+## ADR-008 | 2026-10-18 | 1.3 | Standardized AXI4-Lite memory map and registers in INTERFACES.md
+Reason: Task 1.3 formalizes the SoC architecture. Peripherals (`dma_controller`, `rle_engine`, `lz4_engine`, `aes_ctr_engine`, `chacha20_engine`, `spi_ingest_engine`) are assigned collision-free 4 KB / 64 KB ranges verified by `address-map-check.py`. Standard CSRs and crypto-specific registers are locked.
+
+## ADR-009 | 2026-10-18 | 1.3 | Extended manifest.json write globs to include docs/** for orchestrator and doc-agent
+Reason: System architecture specifications and diagrams reside under `docs/`. Manifest is updated to allow orchestrator and doc agents to maintain top-level documentation.
+

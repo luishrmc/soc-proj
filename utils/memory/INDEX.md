@@ -15,7 +15,7 @@ Protocol: `.agents/skills/memory-protocol/SKILL.md`. Limit: 40 lines.
 
 ## Active modules
 
-None yet. The first RTL block is task 2.1 (SPI slave).
+- `interfaces`: SPI ingest framing, AXI4-Lite CSR map, AXI4-Stream datapath (`modules/interfaces.md`)
 
 ## Active handoffs
 
