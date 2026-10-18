@@ -61,11 +61,11 @@ All accelerator cores and control endpoints instantiate an AXI4-Lite slave inter
 | Peripheral | Base Address | High Address | Size | Description |
 |---|---|---|---|---|
 | `dma_controller` | `0x40400000` | `0x4040FFFF` | 64 KB | AXI Direct Memory Access (Simple DMA Mode) |
+| `axi_quad_spi_0` | `0x41E00000` | `0x41E0FFFF` | 64 KB | AXI Quad SPI LogiCORE IP (Slave Mode) |
 | `rle_engine` | `0x43C00000` | `0x43C00FFF` | 4 KB | RLE Compression Accelerator |
 | `lz4_engine` | `0x43C10000` | `0x43C10FFF` | 4 KB | LZ4 Sliding Window Compression Accelerator |
 | `aes_ctr_engine` | `0x43C20000` | `0x43C20FFF` | 4 KB | AES-128-CTR Symmetric Crypto Accelerator |
 | `chacha20_engine` | `0x43C30000` | `0x43C30FFF` | 4 KB | ChaCha20 Stream Cipher Engine (RFC 8439) |
-| `spi_ingest_engine` | `0x43C40000` | `0x43C40FFF` | 4 KB | SPI Ingest Buffer & Status Controller |
 
 ---
 

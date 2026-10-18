@@ -58,7 +58,8 @@
         "utils/memory/modules/*",
         "utils/memory/handoff/*",
         "docs/**",
-        ".agents/**"
+        ".agents/**",
+        "cora7z/app/hw/scripts/**"
       ],
       "skills": ["project-plan", "memory-protocol", "plan-agents", "plan-hooks", "git-branch-lifecycle", "git-commit-stager", "git-safety-guard"]
     },
