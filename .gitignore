@@ -24,7 +24,7 @@ Thumbs.db
 # ---- VUnit / GHDL simulation outputs
 cora7z/app/hw/build/
 cora7z/app/hw/vunit_out/
-cora7z/app/hw/vhdl_ls.toml
+*vhdl_ls.toml
 *.ghw
 *.vcd
 *.fst

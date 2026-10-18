@@ -30,13 +30,13 @@ A bancada avalia o comportamento de ponta a ponta nas etapas de recepção, comp
 
 1. **Cenário PS Autônomo (Software puro):** O processador ARM recebe os bytes do periférico SPI, armazena o bloco bruto na memória, executa o algoritmo de compressão em software, criptografa a carga resultante e transmite os pacotes.
 2. **Cenário PL Autônomo (Hardware puro):** Uma máquina de estados em VHDL recebe os dados da interface SPI externa, alimenta um pipeline sincrono que comprime o fluxo em tempo real, encaminha os blocos ao núcleo criptográfico em hardware e despacha os dados cifrados sem intervenção do processador.
-3. **Cenário Híbrido (Co-projeto com canal AXI):** O processador gerencia os descritores de transferência e os buffers na memória DDR3, despachando blocos brutos para os aceleradores na PL via barramento AXI. A lógica programável executa as transformações e devolve o pacote finalizado para transmissão.
+3. **Cenário Híbrido (com canal AXI):** O processador gerencia os descritores de transferência e os buffers na memória DDR3, despachando blocos brutos para os aceleradores na PL via barramento AXI. A lógica programável executa as transformações e devolve o pacote finalizado para transmissão.
 
 ### Algoritmos Avaliados
 
 * **Compressão:**
   * *Run-Length Encoding (RLE):* algoritmo de baixa complexidade lógica e consumo reduzido de área em silicio. Avalia o desempenho em fluxos com sequências repetitivas contínuas.
-  * *LZ4 (ou LZSS simplificado com janela deslizante):* algoritmo baseado em dicionário que exige o uso de Block RAMs na FPGA para indexação de padrões. Oferece taxas superiores de compressão em dados estruturados e de telemetria textual.
+  * *LZ4:* algoritmo baseado em dicionário que exige o uso de Block RAMs na FPGA para indexação de padrões. Oferece taxas superiores de compressão em dados estruturados e de telemetria textual.
 * **Criptografia:**
   * *AES em modo Contador (AES-CTR):* cifra de bloco de alta segurança. O modo CTR transforma o algoritmo em uma cifra de fluxo paralelizável, permitindo preencher pipelines em hardware com tabelas de substituição (S-Box) em BRAM ou lógica combinacional.
   * *ChaCha20:* cifra de fluxo baseada em operações simples de adição, rotação e ou-exclusivo (ARX). Opera com elevada eficiência nativa em instruções de 32 bits no processador ARM, servindo de contraponto ao AES.
