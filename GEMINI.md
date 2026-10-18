@@ -37,9 +37,20 @@ If two levels conflict, stop and ask the user. Never resolve it silently.
 1. This file and `utils/memory/INDEX.md`.
 2. `utils/plan/STATUS.md` (what is done, what is next, blockers).
 3. The task row in `utils/plan/Cronograma_e_Tarefas.csv` and `utils/memory/handoff/<task-id>.md` if it exists.
-4. Digests in `utils/memory/modules/` for the modules the task depends on.
-5. Source files only for the module being edited, or when `memory-check.py` reports a digest as STALE.
-6. PDFs only through the `doc-lookup` skill (page and excerpt, never the whole PDF).
+4. The task planning document in `utils/plan/<task-id>/task.md` (or `plan/<task-id>/task.md`). If it does not exist, the orchestrator/agent must author it before executing any code changes.
+5. Digests in `utils/memory/modules/` for the modules the task depends on.
+6. Source files only for the module being edited, or when `memory-check.py` reports a digest as STALE.
+7. PDFs only through the `doc-lookup` skill (page and excerpt, never the whole PDF).
+
+### Dual-Mode Co-Development Workflow (Vivado GUI + CLI AI)
+The project relies on heavy Vivado Block Design (BD) integration and AXI communication (as demonstrated in `~/ufmg/soc/exercises/slides/corez7`). To ensure maximum development efficiency:
+- **CLI Channel (AI Assistant)**: Authors synthesizable VHDL-2008 RTL (`cora7z/app/hw/src/`), self-checking VUnit testbenches (`cora7z/app/hw/test/`), simulation/lint verification gates, Tcl helper scripts, and Vitis C firmware.
+- **GUI Channel (User)**: Opens Vivado GUI, manages the Block Design (`cora7z_top.bd`), adds module references (`Add Module...`), routes external I/Os and clocks, and validates graphical block connections.
+- **Task Plan Contract (`utils/plan/<task-id>/task.md`)**: Bridges both channels by clearly detailing:
+  1. CLI tasks (entity ports, generics, testbench commands).
+  2. Vivado GUI tasks (BD cell creation, pin mapping, Tcl Console one-liners).
+  3. Reusable interfaces (ensuring the common SPI ingress setup and modular PL cores seamlessly transition between standalone and hybrid co-design).
+  4. Acceptance criteria for both CLI (VUnit pass) and GUI (BD validation / bitstream).
 
 At the end of every iteration: update the handoff, refresh digests (`python3 .agents/hooks/memory-check.py --update <module>`), report to the orchestrator. At the end of a session: the orchestrator updates the plan with `plan-sync.py` and commits.
 

@@ -47,7 +47,10 @@
       "tools_allowed": ["run_command", "send_message", "view_file", "invoke_subagent", "write_to_file", "replace_file_content"],
       "run_scope": ["git (read-only and commit via git-safety-guard)", ".agents/hooks/*"],
       "write": [
-        "utils/plan/*",
+        "utils/plan/**",
+        "plan",
+        "plan/**",
+        "GEMINI.md",
         "utils/memory/INDEX.md",
         "utils/memory/decisions.md",
         "utils/memory/lessons.md",

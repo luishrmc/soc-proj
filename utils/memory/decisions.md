@@ -29,3 +29,7 @@ Reason: Task 1.3 formalizes the SoC architecture. Peripherals (`dma_controller`,
 ## ADR-009 | 2026-10-18 | 1.3 | Extended manifest.json write globs to include docs/** for orchestrator and doc-agent
 Reason: System architecture specifications and diagrams reside under `docs/`. Manifest is updated to allow orchestrator and doc agents to maintain top-level documentation.
 
+## ADR-010 | 2026-10-18 | process | Dual-mode Vivado GUI / CLI collaboration and per-task planning in plan/<task_id>/task.md
+Reason: Per reference corez7 setup, Vivado Block Design GUI is heavily utilized for SoC integration. To maximize synergy, the AI creates plan/<task_id>/task.md for each task, specifying CLI work (RTL authoring, VUnit verification, linting) alongside Vivado GUI work (BD module referencing, net wiring, Tcl console snippets) and detailing reusable interface contracts (common SPI ingress frontend and modular acceleration cores).
+
+
