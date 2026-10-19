@@ -33,3 +33,5 @@ Append-only. One line per status change.
 | 2026-10-19 | 3.5 | Em andamento -> Concluída | gate:3.5 |
 | 2026-10-19 | 4.4 | Pendente -> Em andamento | - |
 | 2026-10-19 | 4.4 | Em andamento -> Concluída | gate:4.4 |
+| 2026-10-19 | 4.1 | Pendente -> Em andamento | - |
+| 2026-10-19 | 4.1 | Em andamento -> Concluída | file:esp32/main/main.c |

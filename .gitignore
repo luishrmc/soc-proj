@@ -20,7 +20,16 @@ __pycache__/
 *~
 .DS_Store
 Thumbs.db
-.vscode/
+.vscode/*
+!.vscode/settings.json
+!.vscode/c_cpp_properties.json
+.clangd*
+
+# ---- ESP-IDF ESP32 build artifacts (recreated via idf.py build)
+esp32/build/
+esp32/sdkconfig
+esp32/sdkconfig.old
+
 
 # ---- VUnit / GHDL simulation outputs
 cora7z/app/hw/build/

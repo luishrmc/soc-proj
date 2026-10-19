@@ -38,7 +38,8 @@
     "2.3": ["vhdl-lint", "vhdl-sim", "vivado-build"],
     "3.3": ["address-map"],
     "3.4": ["xdc-check"],
-    "3.5": ["vivado-build", "address-map", "xdc-check"]
+    "3.5": ["vivado-build", "address-map", "xdc-check"],
+    "4.1": []
   },
   "agents": [
     {
@@ -64,7 +65,9 @@
         ".agents/**",
         "cora7z/app/hw/scripts/**",
         "SESSION.txt",
-        "SESSION_ID.txt"
+        "SESSION_ID.txt",
+        ".vscode/**",
+        "esp32/**"
       ],
       "skills": ["project-plan", "memory-protocol", "plan-agents", "plan-hooks", "git-branch-lifecycle", "git-commit-stager", "git-safety-guard"]
     },
@@ -114,6 +117,8 @@
         "cora7z/app/sw/src/**",
         "cora7z/app/sw/scripts/**",
         "cora7z/app/sw/vitis/.gitkeep",
+        "esp32/**",
+        ".vscode/**",
         "utils/memory/modules/*",
         "utils/memory/handoff/*"
       ],

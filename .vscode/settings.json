@@ -1,0 +1,34 @@
+{
+    "idf.currentSetup": "/home/luis/.espressif/v6.1/esp-idf",
+    "idf.espIdfPath": "/home/luis/.espressif/v6.1/esp-idf",
+    "idf.toolsPath": "/home/luis/.espressif/tools",
+    "idf.pythonBinPath": "/home/luis/.espressif/tools/python/v6.1/venv/bin/python",
+    "idf.customExtraPaths": "/home/luis/.espressif/tools/esp-clang/esp-21.1.3_20260408/esp-clang/bin:/home/luis/.espressif/tools/esp-clangd/esp-21.1.3_20260408/esp-clangd/bin:/home/luis/.espressif/tools/esp-rom-elfs/20241011/:/home/luis/.espressif/tools/esp32ulp-elf/2.38_20240113/esp32ulp-elf/bin:/home/luis/.espressif/tools/ninja/1.12.1/:/home/luis/.espressif/tools/openocd-esp32/v0.12.0-esp32-20260703/openocd-esp32/bin:/home/luis/.espressif/tools/riscv32-esp-elf-gdb/17.1_20260402/riscv32-esp-elf-gdb/bin:/home/luis/.espressif/tools/riscv32-esp-elf/esp-15.2.0_20251204/riscv32-esp-elf/bin:/home/luis/.espressif/tools/xtensa-esp-elf-gdb/17.1_20260402/xtensa-esp-elf-gdb/bin:/home/luis/.espressif/tools/xtensa-esp-elf/esp-15.2.0_20251204/xtensa-esp-elf/bin:/home/luis/.espressif/tools/python/v6.1/venv/bin:/home/luis/.espressif/tools/shims/v6.1",
+    "idf.customExtraVars": {
+        "OPENOCD_SCRIPTS": "/home/luis/.espressif/tools/openocd-esp32/v0.12.0-esp32-20260703/openocd-esp32/share/openocd/scripts",
+        "IDF_COMPONENT_LOCAL_STORAGE_URL": "file:///home/luis/.espressif/tools",
+        "ESP_ROM_ELF_DIR": "/home/luis/.espressif/tools/esp-rom-elfs/20241011/",
+        "IDF_PATH": "/home/luis/.espressif/v6.1/esp-idf",
+        "IDF_TOOLS_PATH": "/home/luis/.espressif/tools",
+        "IDF_PYTHON_ENV_PATH": "/home/luis/.espressif/tools/python/v6.1/venv"
+    },
+    "idf.flashType": "UART",
+    "idf.port": "/dev/ttyUSB0",
+    "idf.flashBaudRate": "460800",
+    "idf.adapterTargetName": "esp32",
+    "idf.openOcdConfigs": [
+        "board/esp32-wrover-kit-3.3v.cfg"
+    ],
+    "files.associations": {
+        "*.h": "c",
+        "*.c": "c",
+        "*.inc": "c"
+    },
+    "clangd.path": "/home/luis/.espressif/tools/esp-clangd/esp-21.1.3_20260408/esp-clangd/bin/clangd",
+    "clangd.arguments": [
+      "--background-index",
+      "--query-driver=**",
+      "--compile-commands-dir=/home/luis/ufmg/soc/proj/build"
+    ],
+    "cmake.sourceDirectory": "/home/luis/ufmg/soc/proj/esp32"
+}
