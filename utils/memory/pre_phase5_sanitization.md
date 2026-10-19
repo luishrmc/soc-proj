@@ -19,7 +19,7 @@ Following the critical meta-analysis of external audit reports, four high-priori
    - Chained modes (`0x5..0x8`) were implemented directly in `axis_accel_mux.vhdl` to daisy-chain `Compressor -> Cipher` in AXI4-Stream without round-tripping to DDR memory.
    - `pipeline_mgr.c` was enhanced to distinguish pure hardware cycles (`CYCLE_COUNT` @ 100 MHz) from hybrid co-design cycles (Cortex-A9 PMU @ 650 MHz), while introducing monotonic frame diversification for AES/ChaCha20 nonces.
 3. **Deliverable Gate Hygiene (`deliverable-audit.sh`) & Path Portability:**
-   - Hardcoded `/home/luis/` absolute paths in Vivado Tcl scripts, documentation, and `.vscode` settings were eliminated in favor of `$::env(HOME)` and repository-relative references.
+   - Hardcoded host user home absolute paths in Vivado Tcl scripts, documentation, and `.vscode` settings were eliminated in favor of `$::env(HOME)` and repository-relative references.
    - `Checklist_de_Entregaveis.csv` was updated to accurately reflect the 26 passing VUnit unit tests and the operational C firmware stack.
 4. **Automated Synthesis to Bitstream & Firmware Synchronism:**
    - Full synthesis, implementation, timing closure, bitstream generation, and hardware container export (`cora7z_top.xsa`) were executed via `build_bitstream.tcl`.
@@ -63,7 +63,7 @@ Following the critical meta-analysis of external audit reports, four high-priori
 
 ### Axis 3: Path Portability & Deliverable Gate Verification
 - **Tcl Scripts (`cora7z/app/hw/scripts/*.tcl`):**
-  - Replaced `/home/luis/.Xilinx/...` board repository paths with `$::env(HOME)/.Xilinx/...`.
+  - Replaced hardcoded board repository paths with `$::env(HOME)/.Xilinx/...`.
 - **Hygienic Exclusions:**
   - Removed `.vscode/` from git cache and excluded it in `.gitignore`.
   - Excluded self-referential string search in `.agents/hooks/deliverable-audit.sh`.
