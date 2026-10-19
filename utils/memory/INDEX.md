@@ -22,6 +22,7 @@ Protocol: `.agents/skills/memory-protocol/SKILL.md`. Limit: 40 lines.
 - `chacha20_engine`: ChaCha20 stream cipher cryptographic coprocessor core (`modules/chacha20_engine.md`)
 - `vitis_platform`: Vitis 2026.1 unified bare-metal platform & firmware baseline (`modules/vitis_platform.md`)
 - `audit_pre_phase5`: Pre-Phase 5 comprehensive audit report (`audit_pre_phase5.md`)
+- `pre_phase5_sanitization`: Pre-Phase 5.1 sanitization & golden verification (`pre_phase5_sanitization.md`)
 
 ## Active handoffs
 

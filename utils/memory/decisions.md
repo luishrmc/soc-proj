@@ -20,7 +20,7 @@ Reason: each tool has its own agent (vivado-integrator-agent, firmware-agent). T
 ## ADR-006 | 2026-10-17 | setup | All code, comments and agent-facing documents are in English. Plan CSV values stay in Portuguese
 Reason: user requirement. The CSVs are part of the course deliverable.
 
-## ADR-007 | 2026-10-17 | setup | Toolchain root is `/home/luis/Xilinx/2026.1`, loaded by `.agents/env.sh`, never through the global PATH
+## ADR-007 | 2026-10-17 | setup | Toolchain root is `$HOME/Xilinx/2026.1`, loaded by `.agents/env.sh`, never through the global PATH
 Reason: Vivado/Vitis/ARM GCC are installed but not on PATH.
 
 ## ADR-008 | 2026-10-18 | 1.3 | Standardized AXI4-Lite memory map and registers in INTERFACES.md
@@ -43,4 +43,8 @@ Reason: The automated Block Design integration and bitstream verification loops 
 
 ## ADR-014 | 2026-10-19 | architecture | Multi-Accelerator Stream Multiplexing and Timing Closure via Pipelined Engines
 Reason: Resolving findings from the pre-Phase 5 audit: (1) Added `axis_accel_mux.vhdl` (@ `0x43C40000`) to dynamically route AXI DMA MM2S and S2MM streams to any of the 4 accelerator engines with automatic `busy_i` detection; (2) Expanded DMA buffer descriptor length width to 23 bits (`0x17`) enabling up to 8 MB contiguous transfers; (3) Refactored `lz4_engine.vhdl` into a sequential streaming packer, dropping LUT utilization from 18,591 to 11,906 (67.65% of Zynq-7010); (4) Pipelined AES-128 key expansion into 10 sequential cycles; (5) Decomposed ChaCha20 quarter-rounds into 2 half-rounds over 2 cycles (`chacha_qr_half1`/`chacha_qr_half2`), closing timing at 100 MHz with positive setup slack ($WNS = +0.207$ ns).
+
+## ADR-015 | 2026-10-19 | architecture | LZ4 Literal Buffer Bounding, PL Stream Chaining, and Deliverable Portability
+Reason: Meta-analysis of external audits identified 4 high-priority technical debts: (1) Fixed intermediate literal flush in `lz4_engine.vhdl` and underflow in `lz4_simple.c`, bounded `lit_buf_r` to 64 bytes with deterministic hardware overflow protection (`reg_status_r(2) <= '1'`), eliminating 8,192 flip-flops / 1024:1 mux logic, achieving clean timing closure ($WNS = +0.330$ ns, LUTs: 12,709 / 17,600 = 72.2%); (2) Implemented hardware stream chaining routes `0x5..0x8` in `axis_accel_mux.vhdl` (`Compressor -> Cipher`) and distinct PMU / cycle paths in `pipeline_mgr.c`; (3) Replaced hardcoded `/home/luis/` paths with `$::env(HOME)` across all Vivado Tcl scripts and docs, achieving 100% compliance in `deliverable-audit.sh`.
+
 
