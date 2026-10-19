@@ -11,18 +11,18 @@ All external SPI signals route through Bank 34 and Bank 35 with 3.3V LVCMOS volt
 
 | Signal Name | FPGA Pin | Bank | Direction | Drive / Slew | Description |
 |---|---|---|---|---|---|
-| `spi_sclk_i` | `G20` | 35 | Input | - | SPI Clock input from ESP32 master (Mode 0, up to 25 MHz) |
-| `spi_mosi_i` | `T10` | 34 | Input | - | Master-Out Slave-In serial data from ESP32 |
-| `spi_miso_o` | `V15` | 34 | Output | 8mA, SLOW | Master-In Slave-Out serial data to ESP32 (status/loopback) |
-| `spi_cs_n_i` | `F16` | 35 | Input | - | Active-Low Slave Select (framing delineator) |
+| `shield_spi_io0_io` (MOSI) | `T10` | 34 | Input | - | Master-Out Slave-In serial data from ESP32 |
+| `shield_spi_io1_io` (MISO) | `V15` | 34 | Output | 8mA, SLOW | Master-In Slave-Out serial data to ESP32 (status/loopback) |
+| `shield_spi_sck_io` (SCK) | `G20` | 35 | Input | - | SPI Clock input from ESP32 master (Mode 0, up to 25 MHz) |
+| `shield_spi_ss_io` (CS_n) | `F16` | 35 | Input | - | Active-Low Slave Select (framing delineator) |
 
 ### 1.2 SPI Physical Layer Protocol
 - **SPI Mode**: Mode 0 (`CPOL = 0`, `CPHA = 0`).
   - Serial clock idles low.
-  - Data is driven on falling edge of `spi_sclk_i` and sampled on rising edge of `spi_sclk_i`.
-- **Clock Domain Crossing (CDC)**:
-  - `spi_sclk_i`, `spi_mosi_i`, and `spi_cs_n_i` are treated as asynchronous inputs.
-  - In PL, each input passes through an explicit 2-stage DFF synchronizer clocked by `clk_accel` (100 MHz) with edge-detection logic.
+  - Data is driven on falling edge of `sck` and sampled on rising edge of `sck`.
+- **Clock Domain Crossing (CDC) & Slave IP**:
+  - In PL, physical SPI communication with ESP32 is handled exclusively through the `axi_quad_spi_0` LogiCORE IP (ADR-012) in slave mode with 256-byte FIFO.
+  - CDC is managed internally within `axi_quad_spi_0` with `s_axi_aclk` on `FCLK_CLK0` (50 MHz) and `ext_spi_clk` on `FCLK_CLK1` (100 MHz) for high-speed sampling up to 25 MHz.
 - **Maximum Bus Clock**: 25.0 MHz.
 
 ### 1.3 SPI Packet Frame Contract
@@ -54,18 +54,18 @@ Every frame transferred from the ESP32 to the Cora Z7 conforms to the following 
 
 ## 2. AXI4-Lite Memory-Mapped Register Map
 
-All accelerator cores and control endpoints instantiate an AXI4-Lite slave interface. All registers are 32-bit wide, aligned on 4-byte boundaries, and clocked by `s_axi_aclk` (`FCLK_CLK0` @ 50 MHz).
+All accelerator cores and control endpoints instantiate an AXI4-Lite slave interface. All registers are 32-bit wide, aligned on 4-byte boundaries.
 
 ### 2.1 Peripheral Base Address Allocation
 
 | Peripheral | Base Address | High Address | Size | Description |
 |---|---|---|---|---|
-| `dma_controller` | `0x40400000` | `0x4040FFFF` | 64 KB | AXI Direct Memory Access (Simple DMA Mode) |
-| `axi_quad_spi_0` | `0x41E00000` | `0x41E0FFFF` | 64 KB | AXI Quad SPI LogiCORE IP (Slave Mode) |
-| `rle_engine` | `0x43C00000` | `0x43C00FFF` | 4 KB | RLE Compression Accelerator |
-| `lz4_engine` | `0x43C10000` | `0x43C10FFF` | 4 KB | LZ4 Sliding Window Compression Accelerator |
-| `aes_ctr_engine` | `0x43C20000` | `0x43C20FFF` | 4 KB | AES-128-CTR Symmetric Crypto Accelerator |
-| `chacha20_engine` | `0x43C30000` | `0x43C30FFF` | 4 KB | ChaCha20 Stream Cipher Engine (RFC 8439) |
+| `axi_dma_0` | `0x40400000` | `0x4040FFFF` | 64 KB | AXI Direct Memory Access (Simple DMA Mode, 50 MHz FCLK0) |
+| `axi_quad_spi_0` | `0x41E00000` | `0x41E0FFFF` | 64 KB | AXI Quad SPI LogiCORE IP (Slave Mode, 50 MHz FCLK0 / 100 MHz FCLK1) |
+| `rle_engine_0` | `0x43C00000` | `0x43C0FFFF` | 64 KB | RLE Compression Accelerator (100 MHz FCLK1, 4 KB CSR) |
+| `lz4_engine_0` | `0x43C10000` | `0x43C1FFFF` | 64 KB | LZ4 Sliding Window Compression Accelerator (100 MHz FCLK1, 4 KB CSR) |
+| `aes_ctr_engine_0` | `0x43C20000` | `0x43C2FFFF` | 64 KB | AES-128-CTR Symmetric Crypto Accelerator (100 MHz FCLK1, 4 KB CSR) |
+| `chacha20_engine_0` | `0x43C30000` | `0x43C3FFFF` | 64 KB | ChaCha20 Stream Cipher Engine (RFC 8439, 100 MHz FCLK1, 4 KB CSR) |
 
 ---
 
@@ -128,16 +128,25 @@ Every computation core (`rle_engine`, `lz4_engine`, `aes_ctr_engine`, `chacha20_
 
 ---
 
-### 2.5 SPI Ingest Controller Registers (`0x43C40000`)
+### 2.5 AXI Quad SPI Slave Registers (`0x41E00000`, PG153)
 
 | Offset | Name | Type | Reset Value | Description |
 |---|---|---|---|---|
-| `0x00` | `SPI_CTRL` | R/W | `0x00000000` | Bit 0: `FIFO_RD_EN`, Bit 1: `FIFO_RST`, Bit 2: `IRQ_EN` |
-| `0x04` | `SPI_STATUS` | RO | `0x00000001` | Bit 0: `RX_EMPTY`, Bit 1: `RX_FULL`, Bit 2: `FRAME_READY`, Bit 3: `CRC_ERR` |
-| `0x08` | `FRAME_LEN` | RO | `0x00000000` | Byte length of most recently received valid frame |
-| `0x0C` | `FRAME_TYPE` | RO | `0x00000000` | Frame type & flags byte of current packet |
-| `0x10` | `FIFO_DATA` | RO | `0x00000000` | 32-bit data read port popping words from RX FIFO |
-| `0x14` | `DROPPED_FRAMES` | RO | `0x00000000` | Cumulative count of frames rejected due to FIFO full |
+| `0x40` | `SRR` | WO | `0x00000000` | Software Reset Register (write `0x0000000A` to soft-reset core) |
+| `0x60` | `SPICR` | R/W | `0x00000180` | SPI Control Register (bit 1: `SPE`, bit 5: `TX_RST`, bit 6: `RX_RST`, bit 8: `Master_Inhibit`) |
+| `0x64` | `SPISR` | RO | `0x00000025` | SPI Status Register (bit 0: `RX_Empty`, bit 1: `RX_Full`, bit 2: `TX_Empty`, bit 3: `TX_Full`) |
+| `0x68` | `DTR` | WO | `0x00000000` | Data Transmit Register (writes byte into TX FIFO) |
+| `0x6C` | `DRR` | RO | `0x00000000` | Data Receive Register (reads byte from RX FIFO) |
+| `0x78` | `RX_FIFO_OCY` | RO | `0x00000000` | RX FIFO Occupancy Register (occupancy count minus 1) |
+
+---
+
+### 2.6 Accelerator Stream Multiplexer Registers (`0x43C40000`)
+
+| Offset | Name | Type | Reset Value | Description |
+|---|---|---|---|---|
+| `0x00` | `ROUTING_CTRL` | R/W | `0x00000000` | Stream Route: `0`=Auto by core BUSY, `1`=RLE, `2`=LZ4, `3`=AES-128-CTR, `4`=ChaCha20 |
+| `0x04` | `ACTIVE_CORE` | RO | `0x00000000` | Currently active/routed accelerator core ID (bits [2:0]) |
 
 ---
 
@@ -174,4 +183,4 @@ All stream interfaces operate in the `clk_accel` domain (100 MHz):
 - **Target Device**: `xc7z010clg400-1`
 - **Board Part**: `digilentinc.com:cora-z7-10:part0:1.1`
 - **Exported Container**: `cora7z/app/hw/vivado/cora7z_top.xsa`
-- **SHA-256**: *(Pending Vivado synthesis and export in Phase 3)*
+- **SHA-256**: `513af306ce6810542219632e7745f65d3f05d900198017d2319c5aa7b9022346`

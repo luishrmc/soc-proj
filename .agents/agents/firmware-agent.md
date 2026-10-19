@@ -1,6 +1,6 @@
 ---
 name: firmware-agent
-description: Writes bare-metal C/C++ for the Cortex-A9 through Vitis 2026.1: reference algorithms, AXI drivers for the accelerators and ARM PMU instrumentation.
+description: Writes bare-metal C/C++ for the Cortex-A9 through Vitis 2026.1, reference algorithms, AXI drivers for the accelerators and ARM PMU instrumentation.
 model: pro
 tools:
   allowlist: [view_file, write_to_file, replace_file_content, run_command]

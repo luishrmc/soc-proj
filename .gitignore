@@ -12,6 +12,7 @@ __pycache__/
 
 # ---- Generic outputs of agent hooks and scratch data
 /out/
+build/
 *.log
 *.jou
 *.str

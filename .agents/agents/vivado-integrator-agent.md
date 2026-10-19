@@ -1,6 +1,6 @@
 ---
 name: vivado-integrator-agent
-description: Owns the Vivado batch flow for the Cora Z7-10: block design, AXI IP packaging, address map, XDC constraints and XSA export. Does not edit VHDL cores.
+description: Owns the Vivado batch flow for the Cora Z7-10, block design, AXI IP packaging, address map, XDC constraints and XSA export. Does not edit VHDL cores.
 model: pro
 tools:
   allowlist: [view_file, write_to_file, replace_file_content, run_command]
