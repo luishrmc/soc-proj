@@ -126,7 +126,9 @@ Evidence and honesty:
 - A task is `Concluída` only when `plan-sync.py` accepts its evidence.
 
 Synthesis, Implementation and Bitstream Invariants:
-- Resource Budget Enforcement: The Zynq-7010 has 17,600 LUTs, 35,200 FFs, 60 36Kb BRAMs, and 80 DSPs. Designs must synthesize cleanly without over-utilization, latches, or timing violations. Sliding window array lookups and hash tables must be sized or converted to synchronous BRAM to prevent LUT combinatorial explosion.
+- Resource Budget Enforcement: The Zynq-7010 has 17,600 LUTs, 35,200 FFs, 60 36Kb BRAMs, and 80 DSPs. Designs must synthesize cleanly without over-utilization, latches, or timing violations.
+- Explicit Block Design Memory Architecture (ADR-012): Do NOT infer large multi-port memory arrays, FIFOs, or sliding windows inside VHDL RTL code (to prevent combinatorial multiplexer explosion in distributed LUTs). Expose standard AXI4-Stream or BRAM interface ports on the RTL entities and connect them directly to Xilinx standard IPs (`axis_data_fifo`, `blk_mem_gen`, `axi_bram_ctrl`) in the Vivado Block Design. All major data buffers and memories must be visually visible and interconnected on the Block Design canvas.
+- Unified Block Design SPI Ingress (ADR-012): Physical SPI communication with the external ESP32 is handled exclusively through the `axi_quad_spi_0` LogiCORE IP in the Block Design (connected to `M_AXI_GP0` @ `0x41E00000` with 256-byte FIFO and pins `G20`, `T10`, `V15`, `F16`). Avoid redundant discrete SPI RTL blocks that create pin contention on the Cora Z7 header.
 - Bitstream Packaging: Every hardware deliverable must produce a valid `cora7z_top.bit` bundled into `cora7z_top.xsa` via `write_hw_platform -fixed -include_bit -force`.
 - Bus Fault Prevention: All PS firmware accessing PL peripherals over M_AXI_GP0 must first verify `is_pl_programmed()` via DEVCFG (`0xF800700C`, bit 2 `PCFG_DONE`) before MMIO operations to prevent irreversible Cortex-A9 CPU bus stalls.
 

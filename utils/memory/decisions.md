@@ -35,5 +35,9 @@ Reason: Per reference corez7 setup, Vivado Block Design GUI is heavily utilized 
 ## ADR-011 | 2026-10-18 | process | Mandatory automated synthesis-through-bitstream verification loop
 Reason: Explicit user directive. To guarantee that every hardware development iteration produces a functioning, synthesizable, and routable bitstream within the Zynq-7010 device resource budget (17,600 LUTs, 35,200 FFs, 60 BRAMs) without CPU bus stalls on M_AXI_GP0, every task modifying PL logic must execute automated Tcl scripts via `run_vivado.sh` to update Block Design cell references, run synthesis (`synth_1`), implementation (`impl_1`), generate `write_bitstream`, export the `.xsa` with `-include_bit`, and synchronize the Vitis software workspace.
 
+## ADR-012 | 2026-10-18 | architecture | Unify SPI ingestion on Block Design axi_quad_spi and enforce visual memory IP integration in BD over RTL inference
+Reason: Explicit user directive. Creating a custom discrete spi_receiver in RTL duplicates the existing axi_quad_spi_0 (0x41E00000) LogiCORE IP in the Block Design, causing pin conflicts on the Cora Z7 shield header J1 (G20, T10, V15, F16). Therefore, axi_quad_spi_0 in the Block Design is the sole authoritative SPI ingress interface. Furthermore, large memory buffers, sliding windows, and FIFOs must NOT be inferred as large internal arrays in VHDL (which causes combinatorial LUT multiplexer explosion); instead, memory and FIFO elements must be instantiated as explicit standard Xilinx IP blocks (blk_mem_gen, axis_data_fifo) directly in the Vivado Block Design and visually wired to RTL cores via standard BRAM or AXI4-Stream interfaces.
+
+
 
 
