@@ -2,8 +2,8 @@
 module: lz4_engine
 status: verified
 sources:
-  - cora7z/app/hw/src/lz4_engine.vhdl sha256=bf76a8bf40f939a6e9c959e7a222f89cbe8042ed508ec15f6d57a826c4779c93
-  - cora7z/app/hw/test/tb_lz4_engine.vhdl sha256=4daa9639b04063136dfc81718e4108996a7b4f1a71819631502ae0109c338709
+  - cora7z/app/hw/src/lz4_engine.vhdl sha256=52955bd0844c9571cb917ccd4709ab7e87195f809ef55a8379aecd7b7c04565f
+  - cora7z/app/hw/test/tb_lz4_engine.vhdl sha256=c10d565661105c3de889c073ba9cdbc303b3284a9588ee4a90dd1ff38b16c9ae
   - docs/LZ4_ALGORITHM.md sha256=63726bf5a6ab3d5fc2167842c3ab3f106bac43d1afb2bf2c16aa41151730e2b4
 gates_passed: [vhdl-lint, vhdl-sim, vivado-bd]
 ---
@@ -31,7 +31,7 @@ gates_passed: [vhdl-lint, vhdl-sim, vivado-bd]
 - Followed by `Literal Length` raw bytes.
 - Followed by 16-bit little-endian Match Offset (`offset[7:0]`, `offset[15:8]`).
 - Trailing literals sequence: emitted on end of block without match offset.
-- Circular history buffer: 2048 bytes; Hash table: 1024 entries.
+- Circular history buffer: `c_window_size = 64` bytes; Hash table: `c_hash_size = 32` entries (compact LUT budget per ADR-012).
 
 ## 4. Verification & Gates
 - Static Lint: Clean (no GHDL warnings with `-Wall -Wno-hide`).

@@ -2,8 +2,8 @@
 module: aes_ctr_engine
 status: verified
 sources:
-  - cora7z/app/hw/src/aes_ctr_engine.vhdl sha256=3fee96e79ac04fc061eb1c31ac495082198bc3a6bafd321b4541ef11a86984ec
-  - cora7z/app/hw/test/tb_aes_ctr_engine.vhdl sha256=504fa090f2b96272dfd5378915b53fece0e7f1061bd239b7124db0f42cb35df0
+  - cora7z/app/hw/src/aes_ctr_engine.vhdl sha256=4970f70d5f252c0b6de81808d01bbb9582f0f638a6b0ce5e8ef4585bd0389110
+  - cora7z/app/hw/test/tb_aes_ctr_engine.vhdl sha256=c8fb783fdc67370eca86755a5b4b09dab331e11780ef81283b868bd5599fe4c7
   - docs/AES_CTR_ALGORITHM.md sha256=8ac969c6780ae7b60875d3f2a6be91294948b9d77680c6fa4b51d8097c4fc9b8
 gates_passed: [vhdl-lint, vhdl-sim]
 ---
@@ -18,14 +18,14 @@ gates_passed: [vhdl-lint, vhdl-sim]
 
 ## 2. Bus Interfaces & Addresses
 - **AXI4-Lite Slave (`s_axi_lite`)**:
-  - Base Address: `0x43C20000` (mapped via `axi_interconnect_0/M03_AXI`).
+  - Base Address: `0x43C20000` (mapped via `axi_interconnect_0/M04_AXI`).
   - Standard CSRs: `0x00 CONTROL`, `0x04 STATUS`, `0x08 SRC_LEN`, `0x0C DST_LEN`, `0x10 CYCLE_COUNT`.
   - Specific CSRs: `0x14-0x20 KEY_0..3`, `0x24-0x2C IV_0..2`, `0x30 COUNTER_INIT`.
 - **AXI4-Stream Interfaces**:
   - Ingress: `s_axis_tdata` (32-bit), `s_axis_tkeep`, `s_axis_tvalid`, `s_axis_tready`, `s_axis_tlast`.
   - Egress: `m_axis_tdata` (32-bit), `m_axis_tkeep`, `m_axis_tvalid`, `m_axis_tready`, `m_axis_tlast`.
 - **Interrupt Output (`irq_o`)**:
-  - Connected to `xlconcat_0` -> `processing_system7_0/IRQ_F2P`.
+  - Connected to `xlconcat_0/In5` -> `processing_system7_0/IRQ_F2P`.
 
 ## 3. Memory & Resource Decoupling (ADR-012)
 - Zero large inferred RAM arrays inside RTL.

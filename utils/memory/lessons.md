@@ -13,3 +13,6 @@ Tool quirks and recurring errors. Keep under 80 lines. Format: `symptom -> cause
 - Vivado Place DRC over-utilization with multi-port combinational arrays -> sliding window arrays infer distributed LUT multiplexers instead of BRAM -> limit window sizes or convert to synchronous Block RAM.
 - `xil_printf` on standalone Cortex-A9 does not support `%lu` -> prints corrupted large integers -> cast to `(unsigned int)` and format with `%u` or `%x`.
 - Vivado Block Design module reference `.xci` caches old generics -> source changes do not automatically propagate to BD synthesis -> set property `CONFIG.<name>` explicitly in BD or reset BD synthesis runs.
+- `update_module_reference` fails or does nothing when targeting `get_bd_cells` in batch Tcl -> module references are instantiated IP definitions -> run `update_module_reference [get_ips *<pattern>*]`.
+- AES-128 combinational key expansion causes severe setup violation (WNS = -18.9 ns) due to 39 unrolled logic levels -> calculate round keys sequentially over 10 cycles -> drops delay to 2.2 ns.
+- ChaCha20 quarter-rounds in 1 cycle violate 100 MHz timing (-2.8 ns) due to 4 chained additions (31 levels, 25 CARRY4s) -> split quarter-rounds into 2 half-rounds over 2 cycles -> closes timing cleanly (WNS = +0.21 ns).

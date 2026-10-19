@@ -2,26 +2,26 @@
 module: interfaces
 status: verified
 sources:
-  - cora7z/app/hw/src/INTERFACES.md sha256=07382e2f74edbad710bbf3f7dc7ae695a556a8ce837b6fc3e644da23b1c7b622
+  - cora7z/app/hw/src/INTERFACES.md sha256=d701ada51f59b44591e3c94c509d53a3898069ec73a38b25d3de680988c29e2b
   - docs/SYSTEM_ARCHITECTURE.md sha256=e675fd60f4b5a99a216719e7c22e968d6e0a23761e7f79ecb62a481cfb7bd990
 gates_passed: [address-map]
 ---
 
 # Interfaces & Architecture Digest
 
-## 1. Physical External Bus (ESP32 SPI Ingest)
+## 1. Physical External Bus (ESP32 SPI Ingest via AXI Quad SPI)
 - Pins (Arduino Header J1): `SCK` (G20), `MOSI` (T10), `MISO` (V15), `CS_n` (F16). LVCMOS33.
-- Mode: Mode 0 (CPOL=0, CPHA=0), up to 25 MHz.
-- CDC: 2-stage synchronizer + edge detector into async FIFO.
+- Mode: Mode 0 (CPOL=0, CPHA=0), up to 25 MHz via `axi_quad_spi_0` (256-byte FIFO, ADR-012).
+- CDC: Handled internally by `axi_quad_spi_0` (`s_axi_aclk` 50 MHz, `ext_spi_clk` 100 MHz).
 - Frame Contract: `[0xAA, 0x55, TYPE, FLAGS, LEN_MSB..LSB, PAYLOAD, CRC16_MSB..LSB]`.
 
-## 2. AXI4-Lite Address Map (50 MHz FCLK0)
-- `dma_controller`: `0x40400000` - `0x4040FFFF` (64 KB)
-- `rle_engine`: `0x43C00000` - `0x43C00FFF` (4 KB)
-- `lz4_engine`: `0x43C10000` - `0x43C10FFF` (4 KB)
-- `aes_ctr_engine`: `0x43C20000` - `0x43C20FFF` (4 KB)
-- `chacha20_engine`: `0x43C30000` - `0x43C30FFF` (4 KB)
-- `spi_ingest_engine`: `0x43C40000` - `0x43C40FFF` (4 KB)
+## 2. AXI4-Lite Address Map (M_AXI_GP0)
+- `axi_dma_0`: `0x40400000` - `0x4040FFFF` (64 KB, 50 MHz FCLK0)
+- `axi_quad_spi_0`: `0x41E00000` - `0x41E0FFFF` (64 KB, 50 MHz FCLK0)
+- `rle_engine_0`: `0x43C00000` - `0x43C0FFFF` (64 KB BD / 4 KB CSR, 100 MHz FCLK1)
+- `lz4_engine_0`: `0x43C10000` - `0x43C1FFFF` (64 KB BD / 4 KB CSR, 100 MHz FCLK1)
+- `aes_ctr_engine_0`: `0x43C20000` - `0x43C2FFFF` (64 KB BD / 4 KB CSR, 100 MHz FCLK1)
+- `chacha20_engine_0`: `0x43C30000` - `0x43C3FFFF` (64 KB BD / 4 KB CSR, 100 MHz FCLK1)
 
 ## 3. Standard Accelerator CSR Layout
 - `0x00`: `CONTROL` (bit 0: `START`, bit 1: `RESET_CORE`, bit 2: `IRQ_EN`)

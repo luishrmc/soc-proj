@@ -2,8 +2,8 @@
 module: chacha20_engine
 status: verified
 sources:
-  - cora7z/app/hw/src/chacha20_engine.vhdl sha256=7813ed624a2d81b4c76660651d9fdefcb8329a1d489a1dc1e2ddafd1aee04b1b
-  - cora7z/app/hw/test/tb_chacha20_engine.vhdl sha256=41a6670e76855aaeb7d9dffaa39032ae444730acf0ab69cc32fd654de85aa72a
+  - cora7z/app/hw/src/chacha20_engine.vhdl sha256=e581f16b9a252ca90d8bb41d432543923420a34578a745626972150ed8581838
+  - cora7z/app/hw/test/tb_chacha20_engine.vhdl sha256=251300ade853fe8522b3e70f9d6d38d6ab66b7d087fa6220b05ce11f8d3b19ac
   - docs/CHACHA20_ALGORITHM.md sha256=743d46a665adaf53b8ad121036164e2c5a4914497b71e8b88a4b85429dd23e8d
 gates_passed: [vhdl-lint, vhdl-sim]
 ---
@@ -25,7 +25,7 @@ gates_passed: [vhdl-lint, vhdl-sim]
   - Ingress: `s_axis_tdata` (32-bit), `s_axis_tkeep`, `s_axis_tvalid`, `s_axis_tready`, `s_axis_tlast`.
   - Egress: `m_axis_tdata` (32-bit), `m_axis_tkeep`, `m_axis_tvalid`, `m_axis_tready`, `m_axis_tlast`.
 - **Interrupt Output (`irq_o`)**:
-  - Connected to `xlconcat_0` -> `processing_system7_0/IRQ_F2P`.
+  - Connected to `xlconcat_0/In6` -> `processing_system7_0/IRQ_F2P`.
 
 ## 3. Memory & Resource Decoupling (ADR-012)
 - Zero large inferred RAM arrays inside RTL.
