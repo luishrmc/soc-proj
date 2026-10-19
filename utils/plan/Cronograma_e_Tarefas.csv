@@ -8,15 +8,15 @@ ID da Tarefa,Fase,Atividade Detalhada,Entregável Associado,Duração Estimada (
 2.3,2,Núcleo de compressão LZ4 simplificado,Fontes VHDL e TB,5,2.1,Concluída,Alta,2026-10-18,2026-10-18,gate:2.3,2026-10-18,"waiver: User prioritized LZ4 compression core authoring and BD integration ahead of SPI receiver. All lint and simulation gates PASS, BD validated cleanly with zero critical warnings."
 2.4,2,Coprocessador AES-CTR,Fontes VHDL e TB,4,2.1,Concluída,Alta,2026-10-18,2026-10-18,gate:2.4,2026-10-18,AES-CTR VHDL implementado e verificado contra vetores NIST. Integrado no Block Design com FIFOs explícitas e sintetizado com bitstream gerado.
 2.5,2,Coprocessador ChaCha20,Fontes VHDL e TB,4,2.1,Concluída,Alta,2026-10-18,2026-10-19,gate:2.5,2026-10-19,ChaCha20 VHDL implementado e verificado contra vetores da RFC 8439. Integrado no Block Design com FIFOs explícitas e sintetizado com bitstream gerado.
-3.1,3,Configuração do bloco Zynq PS no Vivado,Projeto Vivado,2,"2.2, 2.3, 2.4, 2.5",Pendente,Alta,,,,,
-3.2,3,Encapsulamento dos módulos RTL como IPs AXI,Projeto Vivado,3,3.1,Pendente,Alta,,,,,
-3.3,3,Interconexão de barramentos e mapeamento de memória,Projeto Vivado,2,3.2,Pendente,Alta,,,,,
-3.4,3,Arquivo de restrições de pinos XDC para Cora Z7-10,Projeto Vivado,1,3.3,Pendente,Alta,,,,,
-3.5,3,"Síntese, implementação e geração de bitstream",Bitstream,2,3.4,Pendente,Alta,,,,,
+3.1,3,Configuração do bloco Zynq PS no Vivado,Projeto Vivado,2,"2.2, 2.3, 2.4, 2.5",Concluída,Alta,2026-10-19,2026-10-19,gate:3.1,2026-10-19,"Zynq PS7 configurado com DDR, UART, FCLK0 (50MHz), FCLK1 (100MHz), M_AXI_GP0, S_AXI_HP0 e IRQs via configure_block_design.tcl."
+3.2,3,Encapsulamento dos módulos RTL como IPs AXI,Projeto Vivado,3,3.1,Concluída,Alta,2026-10-19,2026-10-19,gate:3.2,2026-10-19,"Todos os 4 módulos RTL (RLE, LZ4, AES, ChaCha20) encapsulados com AXI-Lite CSRs e AXIS streaming no Block Design."
+3.3,3,Interconexão de barramentos e mapeamento de memória,Projeto Vivado,2,3.2,Concluída,Alta,2026-10-19,2026-10-19,gate:3.3,2026-10-19,Interconexão AXI e mapa de endereços de 6 periféricos sem sobreposição validado via address-map-check.
+3.4,3,Arquivo de restrições de pinos XDC para Cora Z7-10,Projeto Vivado,1,3.3,Concluída,Alta,2026-10-19,2026-10-19,gate:3.4,2026-10-19,"Arquivo cora_z7_io.xdc auditado com pinos SPI dedicados G20, T10, V15, F16 validado via xdc-check."
+3.5,3,"Síntese, implementação e geração de bitstream",Bitstream,2,3.4,Concluída,Alta,2026-10-19,2026-10-19,gate:3.5,2026-10-19,"Síntese, implementação e bitstream gerados com sucesso (46.05% LUTs, 0 erros DRC). XSA cora7z_top.xsa exportado com bitstream incluído."
 4.1,4,Código do ESP32 para injeção de dados via SPI,Código ESP32,3,3.5,Pendente,Alta,,,,,
 4.2,4,Implementação de referência em C/C++ no Cortex-A9,Código C/C++,4,3.5,Pendente,Alta,,,,,
 4.3,4,Drivers de comunicação AXI para controle dos aceleradores,Código C/C++,3,4.2,Pendente,Alta,,,,,
-4.4,4,Rotinas de instrumentação via ARM PMU,Código C/C++,2,4.3,Pendente,Alta,,,,,
+4.4,4,Rotinas de instrumentação via ARM PMU,Código C/C++,2,4.3,Concluída,Alta,2026-10-19,2026-10-19,gate:4.4,2026-10-19,Rotinas de inicializacao e calibracao do ARM PMU implementadas e testadas via Vitis Unified (overhead medio calibrado).
 5.1,5,Montagem física do enlace SPI entre ESP32 e Cora Z7,Setup Físico,1,"4.1, 4.4",Pendente,Alta,,,,,
 5.2,5,Ensaios no Cenário 1 (PS puro),Dados Coletados,2,5.1,Pendente,Alta,,,,,
 5.3,5,Ensaios no Cenário 2 (PL pura),Dados Coletados,2,5.1,Pendente,Alta,,,,,

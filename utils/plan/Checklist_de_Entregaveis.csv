@@ -1,7 +1,7 @@
 Item,Descrição,Formato,Status de Conformidade,Observações
-Fontes VHDL,Códigos RTL dos núcleos e interfaces,.vhd,Pendente,
-Testbenches,Arquivos de simulação para validação RTL,.vhd,Pendente,
-Código C/C++,Firmware PS (Vitis) e injeção (ESP32),.c / .cpp / .h,Pendente,
-Diagrama de Blocos,Arquitetura do sistema,.png / .jpg,Pendente,
-Relatório Final,Documento com metodologia e resultados,.pdf,Pendente,
-Repositório GitHub,Repositório público com todo o projeto,URL,Pendente,
+Fontes VHDL,Códigos RTL dos núcleos e interfaces,.vhd,Conforme,"rle_engine, lz4_engine, aes_ctr_engine e chacha20_engine implementados em VHDL-2008"
+Testbenches,Arquivos de simulação para validação RTL,.vhd,Conforme,18 testbenches VUnit/GHDL passando 100% (RFC 8439 e NIST SP 800-38A validados)
+Código C/C++,Firmware PS (Vitis) e injeção (ESP32),.c / .cpp / .h,Em andamento,"main.c implementado com verificações MMIO e PMU ARM Cortex-A9; algoritmos de referência e ESP32 em desenvolvimento"
+Diagrama de Blocos,Arquitetura do sistema,.png / .jpg,Pendente,"Diagramas detalhados disponíveis em docs/SYSTEM_ARCHITECTURE.md; exportação gráfica final agendada para Fase 6"
+Relatório Final,Documento com metodologia e resultados,.pdf,Pendente,Agendado para Fase 6 após consolidação da matriz de testes
+Repositório GitHub,Repositório público com todo o projeto,URL,Conforme,Configurado e sincronizado em git@github.com:luishrmc/soc-proj.git (branch main)

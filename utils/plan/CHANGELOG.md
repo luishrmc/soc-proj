@@ -21,3 +21,15 @@ Append-only. One line per status change.
 | 2026-10-18 | 2.4 | Em andamento -> Concluída | gate:2.4 |
 | 2026-10-18 | 2.5 | Pendente -> Em andamento | - |
 | 2026-10-19 | 2.5 | Em andamento -> Concluída | gate:2.5 |
+| 2026-10-19 | 3.1 | Pendente -> Em andamento | - |
+| 2026-10-19 | 3.1 | Em andamento -> Concluída | gate:3.1 |
+| 2026-10-19 | 3.2 | Pendente -> Em andamento | - |
+| 2026-10-19 | 3.2 | Em andamento -> Concluída | gate:3.2 |
+| 2026-10-19 | 3.3 | Pendente -> Em andamento | - |
+| 2026-10-19 | 3.3 | Em andamento -> Concluída | gate:3.3 |
+| 2026-10-19 | 3.4 | Pendente -> Em andamento | - |
+| 2026-10-19 | 3.4 | Em andamento -> Concluída | gate:3.4 |
+| 2026-10-19 | 3.5 | Pendente -> Em andamento | - |
+| 2026-10-19 | 3.5 | Em andamento -> Concluída | gate:3.5 |
+| 2026-10-19 | 4.4 | Pendente -> Em andamento | - |
+| 2026-10-19 | 4.4 | Em andamento -> Concluída | gate:4.4 |
