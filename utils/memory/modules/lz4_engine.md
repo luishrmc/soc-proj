@@ -2,8 +2,8 @@
 module: lz4_engine
 status: verified
 sources:
-  - cora7z/app/hw/src/lz4_engine.vhdl sha256=52955bd0844c9571cb917ccd4709ab7e87195f809ef55a8379aecd7b7c04565f
-  - cora7z/app/hw/test/tb_lz4_engine.vhdl sha256=c10d565661105c3de889c073ba9cdbc303b3284a9588ee4a90dd1ff38b16c9ae
+  - cora7z/app/hw/src/lz4_engine.vhdl sha256=d155a0d8e70cbf52b91ee74b0be9f205eab65dc19a5ffbb0afc82c13a921449d
+  - cora7z/app/hw/test/tb_lz4_engine.vhdl sha256=821ef1284d31ae78a1c86b1b5640f89c7193beb1c750a03e92055d096ba44c7d
   - docs/LZ4_ALGORITHM.md sha256=63726bf5a6ab3d5fc2167842c3ab3f106bac43d1afb2bf2c16aa41151730e2b4
 gates_passed: [vhdl-lint, vhdl-sim, vivado-bd]
 ---

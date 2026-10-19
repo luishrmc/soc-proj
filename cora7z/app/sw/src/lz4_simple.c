@@ -29,8 +29,12 @@ size_t lz4_compress(const uint8_t *src, size_t src_len, uint8_t *dst, size_t dst
         return 0;
     }
 
-    /* Small buffer: emit pure literals token */
-    if (src_len < 4) {
+    /* Small buffer: emit pure literals token.
+     * Standard LZ4 requires at least 12 bytes to attempt match finding
+     * (5 bytes trailing literals + 4 bytes match + 3 bytes).
+     * For src_len < 12, emit a pure literals block.
+     */
+    if (src_len < 12) {
         if (dst_max_len < src_len + 1) return 0;
         dst[0] = (uint8_t)(src_len << 4);
         memcpy(&dst[1], src, src_len);
@@ -56,9 +60,9 @@ size_t lz4_compress(const uint8_t *src, size_t src_len, uint8_t *dst, size_t dst
 
         /* Check candidate match */
         if (ref < ip && (size_t)(ip - ref) <= LZ4_MAX_DISTANCE && lz4_read32(ref) == lz4_read32(ip)) {
-            /* Match found! Determine match length */
+            /* Match found! Determine match length without encroaching on mflimit */
             size_t match_len = 4;
-            while ((ip + match_len < iend) && (ref[match_len] == ip[match_len])) {
+            while ((ip + match_len < mflimit) && (ref[match_len] == ip[match_len])) {
                 match_len++;
             }
 

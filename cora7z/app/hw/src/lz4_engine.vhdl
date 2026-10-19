@@ -115,10 +115,12 @@ architecture rtl of lz4_engine is
     ST_FETCH_BEAT,
     ST_EVAL_BEAT,
     ST_EMIT_TOKEN,
+    ST_EMIT_LIT_EXT,
     ST_EMIT_LITERALS,
     ST_EMIT_OFF_LO,
     ST_EMIT_OFF_HI,
     ST_FLUSH_TOKEN,
+    ST_FLUSH_LIT_EXT,
     ST_FLUSH_LITERALS,
     ST_DRAIN_PACKER,
     ST_DONE_PULSE
@@ -141,11 +143,13 @@ architecture rtl of lz4_engine is
   signal in_beat_keep_r  : std_logic_vector(3 downto 0)  := (others => '0');
   signal in_beat_last_r  : std_logic := '0';
 
-  -- Literal buffer (stores up to 16 literal bytes)
-  type t_lit_buf is array (0 to 15) of std_logic_vector(7 downto 0);
+  -- Literal buffer (stores up to 64 literal bytes, matching sliding window history)
+  constant c_max_lit_buf : integer := 64;
+  type t_lit_buf is array (0 to c_max_lit_buf - 1) of std_logic_vector(7 downto 0);
   signal lit_buf_r       : t_lit_buf := (others => (others => '0'));
-  signal lit_count_r     : integer range 0 to 15 := 0;
-  signal lit_emit_idx_r  : integer range 0 to 15 := 0;
+  signal lit_count_r     : integer range 0 to c_max_lit_buf := 0;
+  signal lit_emit_idx_r  : integer range 0 to c_max_lit_buf := 0;
+  signal lit_ext_r       : integer range 0 to 65535 := 0;
 
   -- Match info
   signal match_found_r   : boolean := false;
@@ -399,34 +403,34 @@ begin
               -- NO MATCH: Append bytes to literal buffer
               match_found_r <= false;
 
-              -- Store 4 bytes into literal buffer
-              lit_buf_r(lit_count_r)     <= in_beat_data_r(7 downto 0);
-              lit_buf_r(lit_count_r + 1) <= in_beat_data_r(15 downto 8);
-              lit_buf_r(lit_count_r + 2) <= in_beat_data_r(23 downto 16);
-              lit_buf_r(lit_count_r + 3) <= in_beat_data_r(31 downto 24);
-
-              -- Record in history
-              if in_beat_keep_r = "1111" then
-                history_words_r((stream_pos_r / 4) mod 16) <= in_beat_data_r;
-                history_pos_r((stream_pos_r / 4) mod 16)   <= stream_pos_r;
-                history_valid_r((stream_pos_r / 4) mod 16) <= true;
-              end if;
-              stream_pos_r <= (stream_pos_r + 4) mod 65536;
-
-              if in_beat_last_r = '1' then
-                -- End of block: flush literals
-                lit_count_r    <= lit_count_r + 4;
-                lit_emit_idx_r <= 0;
-                state_r        <= ST_FLUSH_TOKEN;
-              elsif lit_count_r >= 8 then
-                -- Literal buffer getting full: emit literal sequence
-                lit_count_r    <= lit_count_r + 4;
-                lit_emit_idx_r <= 0;
-                match_offset_r <= 0;
-                state_r        <= ST_EMIT_TOKEN;
+              if lit_count_r + 4 > c_max_lit_buf then
+                -- Literal buffer overflow protection per INTERFACES.md (STATUS bit 2 = ERR)
+                reg_status_r(2) <= '1';
+                state_r         <= ST_DONE_PULSE;
               else
-                lit_count_r <= lit_count_r + 4;
-                state_r     <= ST_FETCH_BEAT;
+                -- Store 4 bytes into literal buffer
+                lit_buf_r(lit_count_r)     <= in_beat_data_r(7 downto 0);
+                lit_buf_r(lit_count_r + 1) <= in_beat_data_r(15 downto 8);
+                lit_buf_r(lit_count_r + 2) <= in_beat_data_r(23 downto 16);
+                lit_buf_r(lit_count_r + 3) <= in_beat_data_r(31 downto 24);
+
+                -- Record in history
+                if in_beat_keep_r = "1111" then
+                  history_words_r((stream_pos_r / 4) mod 16) <= in_beat_data_r;
+                  history_pos_r((stream_pos_r / 4) mod 16)   <= stream_pos_r;
+                  history_valid_r((stream_pos_r / 4) mod 16) <= true;
+                end if;
+                stream_pos_r <= (stream_pos_r + 4) mod 65536;
+
+                if in_beat_last_r = '1' then
+                  -- End of block: flush literals
+                  lit_count_r    <= lit_count_r + 4;
+                  lit_emit_idx_r <= 0;
+                  state_r        <= ST_FLUSH_TOKEN;
+                else
+                  lit_count_r <= lit_count_r + 4;
+                  state_r     <= ST_FETCH_BEAT;
+                end if;
               end if;
             end if;
 
@@ -437,7 +441,11 @@ begin
             cycle_counter_r <= cycle_counter_r + 1;
 
             if pack_valid_r = '0' or m_axis_tready = '1' then
-              v_lit_nibble := to_unsigned(lit_count_r, 4);
+              if lit_count_r >= 15 then
+                v_lit_nibble := x"F";
+              else
+                v_lit_nibble := to_unsigned(lit_count_r, 4);
+              end if;
               if match_found_r then
                 v_mat_nibble := to_unsigned(0, 4); -- match length 4 is encoded as 0 (len - 4)
               else
@@ -457,7 +465,10 @@ begin
                 pack_byte_idx_r <= pack_byte_idx_r + 1;
               end if;
 
-              if lit_count_r > 0 then
+              if lit_count_r >= 15 then
+                lit_ext_r <= lit_count_r - 15;
+                state_r   <= ST_EMIT_LIT_EXT;
+              elsif lit_count_r > 0 then
                 lit_emit_idx_r <= 0;
                 state_r        <= ST_EMIT_LITERALS;
               elsif match_found_r then
@@ -466,6 +477,33 @@ begin
                 state_r <= ST_DRAIN_PACKER;
               else
                 state_r <= ST_FETCH_BEAT;
+              end if;
+            end if;
+
+          -- ------------------------------------------------------------------
+          -- State: EMIT_LIT_EXT (Emit extended literal length bytes)
+          -- ------------------------------------------------------------------
+          when ST_EMIT_LIT_EXT =>
+            cycle_counter_r <= cycle_counter_r + 1;
+
+            if pack_valid_r = '0' or m_axis_tready = '1' then
+              if lit_ext_r >= 255 then
+                pack_word_r(pack_byte_idx_r * 8 + 7 downto pack_byte_idx_r * 8) <= x"FF";
+                lit_ext_r <= lit_ext_r - 255;
+              else
+                pack_word_r(pack_byte_idx_r * 8 + 7 downto pack_byte_idx_r * 8) <=
+                  std_logic_vector(to_unsigned(lit_ext_r, 8));
+                lit_emit_idx_r <= 0;
+                state_r        <= ST_EMIT_LITERALS;
+              end if;
+              byte_counter_out_r <= byte_counter_out_r + 1;
+
+              if pack_byte_idx_r = 3 then
+                pack_valid_r    <= '1';
+                pack_keep_r     <= "1111";
+                pack_byte_idx_r <= 0;
+              else
+                pack_byte_idx_r <= pack_byte_idx_r + 1;
               end if;
             end if;
 
@@ -557,8 +595,12 @@ begin
             cycle_counter_r <= cycle_counter_r + 1;
 
             if pack_valid_r = '0' or m_axis_tready = '1' then
-              v_lit_nibble := to_unsigned(lit_count_r, 4);
-              v_token      := std_logic_vector(v_lit_nibble) & x"0";
+              if lit_count_r >= 15 then
+                v_lit_nibble := x"F";
+              else
+                v_lit_nibble := to_unsigned(lit_count_r, 4);
+              end if;
+              v_token := std_logic_vector(v_lit_nibble) & x"0";
 
               pack_word_r(pack_byte_idx_r * 8 + 7 downto pack_byte_idx_r * 8) <= v_token;
               byte_counter_out_r <= byte_counter_out_r + 1;
@@ -571,11 +613,41 @@ begin
                 pack_byte_idx_r <= pack_byte_idx_r + 1;
               end if;
 
-              if lit_count_r > 0 then
+              if lit_count_r >= 15 then
+                lit_ext_r <= lit_count_r - 15;
+                state_r   <= ST_FLUSH_LIT_EXT;
+              elsif lit_count_r > 0 then
                 lit_emit_idx_r <= 0;
                 state_r        <= ST_FLUSH_LITERALS;
               else
                 state_r <= ST_DRAIN_PACKER;
+              end if;
+            end if;
+
+          -- ------------------------------------------------------------------
+          -- State: FLUSH_LIT_EXT (Emit extended literal length bytes for final sequence)
+          -- ------------------------------------------------------------------
+          when ST_FLUSH_LIT_EXT =>
+            cycle_counter_r <= cycle_counter_r + 1;
+
+            if pack_valid_r = '0' or m_axis_tready = '1' then
+              if lit_ext_r >= 255 then
+                pack_word_r(pack_byte_idx_r * 8 + 7 downto pack_byte_idx_r * 8) <= x"FF";
+                lit_ext_r <= lit_ext_r - 255;
+              else
+                pack_word_r(pack_byte_idx_r * 8 + 7 downto pack_byte_idx_r * 8) <=
+                  std_logic_vector(to_unsigned(lit_ext_r, 8));
+                lit_emit_idx_r <= 0;
+                state_r        <= ST_FLUSH_LITERALS;
+              end if;
+              byte_counter_out_r <= byte_counter_out_r + 1;
+
+              if pack_byte_idx_r = 3 then
+                pack_valid_r    <= '1';
+                pack_keep_r     <= "1111";
+                pack_byte_idx_r <= 0;
+              else
+                pack_byte_idx_r <= pack_byte_idx_r + 1;
               end if;
             end if;
 

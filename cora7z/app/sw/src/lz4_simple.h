@@ -24,6 +24,7 @@ extern "C" {
 #endif
 
 #define LZ4_MAX_DISTANCE   65535U
+#define LZ4_MAX_OUTPUT_SIZE(n) ((size_t)(n) + ((size_t)(n) / 255U) + 16U)
 
 /**
  * @brief Compress input buffer using standard LZ4 block format.
