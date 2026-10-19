@@ -17,6 +17,7 @@
 #include "xil_io.h"
 #include "xparameters.h"
 #include "benchmark_ps.h"
+#include "pipeline_mgr.h"
 
 /* ========================================================================= */
 /* Peripheral Base Address Definitions (Synchronized with INTERFACES.md)     */
@@ -231,6 +232,24 @@ int main(void) {
     /* Run Scenario 1: Pure Software (PS) Reference Algorithms Benchmark */
     xil_printf("--- 2. Running Scenario 1 (PS Pure) Software Benchmarks ---\r\n");
     benchmark_ps_run_all(666666667U);
+
+    /* Run AXI Communication Drivers Self-Test and Arming */
+    xil_printf("--- 3. Testing and Initializing AXI Communication Drivers ---\r\n");
+    int pipe_test_rc = pipeline_mgr_self_test();
+    if (pipe_test_rc == 0) {
+        xil_printf("[DRV_TEST] AXI Drivers and Frame Parser Self-Test: PASS\r\n");
+    } else {
+        xil_printf("[DRV_TEST] AXI Drivers Self-Test: FAIL (code %d)\r\n", pipe_test_rc);
+    }
+
+    if (status) {
+        int pipe_init_rc = pipeline_mgr_init();
+        if (pipe_init_rc == 0) {
+            xil_printf("[DRV_INIT] AXI DMA, Quad SPI, and Accelerators Initialized & Armed: PASS\r\n");
+        } else {
+            xil_printf("[DRV_INIT] Pipeline Manager Init: FAIL (code %d)\r\n", pipe_init_rc);
+        }
+    }
 
     /* Idle loop */
     while (1) {
