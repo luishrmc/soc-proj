@@ -33,6 +33,7 @@ entity rle_engine is
 
     -- Interrupt Output (Active-high completion pulse to ARM GIC)
     irq_o          : out std_logic;
+    busy_o         : out std_logic;
 
     -- ========================================================================
     -- AXI4-Lite Slave Interface (Control & Status Registers)
@@ -163,6 +164,7 @@ begin
   ctrl_start_s      <= reg_control_r(0);
   ctrl_reset_core_s <= reg_control_r(1);
   ctrl_irq_en_s     <= reg_control_r(2);
+  busy_o            <= reg_status_r(0);
 
   s_axi_lite_awready <= axi_awready_r;
   s_axi_lite_wready  <= axi_wready_r;

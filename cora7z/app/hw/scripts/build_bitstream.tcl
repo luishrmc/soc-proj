@@ -40,11 +40,9 @@ puts "=== BITSTREAM BUILD === Opening Block Design: $bd_file"
 open_bd_design $bd_file
 
 # Refresh module references if out of date
-set mref_cells [get_bd_cells -hierarchical -filter {VLNV =~ "*module_ref*"}]
-if {[llength $mref_cells] > 0} {
-    puts "=== BITSTREAM BUILD === Updating module references: $mref_cells"
-    catch { update_module_reference $mref_cells }
-}
+puts "=== BITSTREAM BUILD === Updating module references..."
+catch { update_module_reference [get_ips *engine*] }
+catch { update_module_reference [get_ips *mux*] }
 
 puts "=== BITSTREAM BUILD === Validating Block Design..."
 validate_bd_design

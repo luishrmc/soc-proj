@@ -83,6 +83,7 @@ begin
       aclk               => aclk,
       aresetn            => aresetn,
       irq_o              => irq_s,
+      busy_o             => open,
       s_axi_lite_awaddr  => s_axi_lite_awaddr,
       s_axi_lite_awvalid => s_axi_lite_awvalid,
       s_axi_lite_awready => s_axi_lite_awready,
@@ -315,7 +316,7 @@ begin
         m_axis_tready <= '0';
 
         wait until rising_edge(aclk) and s_axis_tready = '0';
-        wait for 300 ns; -- wait through rounds computation
+        wait for 600 ns; -- wait through rounds computation (40 cycles at 100 MHz)
 
         -- Deassert backpressure and stream 16 beats with intermittent stalls
         for i in 0 to 15 loop

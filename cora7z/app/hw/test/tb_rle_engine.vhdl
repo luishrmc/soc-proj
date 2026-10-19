@@ -75,6 +75,7 @@ begin
       aclk               => aclk,
       aresetn            => aresetn,
       irq_o              => irq_s,
+      busy_o             => open,
       s_axi_lite_awaddr  => s_axi_lite_awaddr,
       s_axi_lite_awvalid => s_axi_lite_awvalid,
       s_axi_lite_awready => s_axi_lite_awready,

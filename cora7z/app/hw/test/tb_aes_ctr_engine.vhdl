@@ -83,6 +83,7 @@ begin
       aclk               => aclk,
       aresetn            => aresetn,
       irq_o              => irq_s,
+      busy_o             => open,
       s_axi_lite_awaddr  => s_axi_lite_awaddr,
       s_axi_lite_awvalid => s_axi_lite_awvalid,
       s_axi_lite_awready => s_axi_lite_awready,
@@ -206,7 +207,7 @@ begin
         axi_write(16#24#, x"f3f2f1f0");
         axi_write(16#28#, x"f7f6f5f4");
         axi_write(16#2C#, x"fbfaf9f8");
-        axi_write(16#30#, x"fffe0100"); -- initial 32-bit counter
+        axi_write(16#30#, x"fcfdfeff"); -- initial 32-bit counter
 
         -- Set block length: 16 bytes
         axi_write(16#08#, x"00000010");
@@ -216,20 +217,29 @@ begin
         wait for 200 ns;
 
         -- Feed Plaintext 1 (4 words): 6bc1bee2 2e409f96 e93d7e11 7393172a
+        -- Expected NIST SP 800-38A CT: 874d6191 b620e326 1bef6864 990db6ce
         wait until rising_edge(aclk) and s_axis_tready = '1';
         s_axis_tdata  <= x"e2bec16b";
         s_axis_tvalid <= '1';
         s_axis_tlast  <= '0';
+        wait for 1 ps;
+        check_equal(m_axis_tdata, std_logic_vector'(x"91614d87"), "NIST CT Word 0 mismatch");
 
         wait until rising_edge(aclk) and s_axis_tready = '1';
         s_axis_tdata  <= x"969f402e";
+        wait for 1 ps;
+        check_equal(m_axis_tdata, std_logic_vector'(x"26e320b6"), "NIST CT Word 1 mismatch");
 
         wait until rising_edge(aclk) and s_axis_tready = '1';
         s_axis_tdata  <= x"117e3de9";
+        wait for 1 ps;
+        check_equal(m_axis_tdata, std_logic_vector'(x"6468ef1b"), "NIST CT Word 2 mismatch");
 
         wait until rising_edge(aclk) and s_axis_tready = '1';
         s_axis_tdata  <= x"2a179373";
         s_axis_tlast  <= '1';
+        wait for 1 ps;
+        check_equal(m_axis_tdata, std_logic_vector'(x"ceb60d99"), "NIST CT Word 3 mismatch");
 
         wait until rising_edge(aclk);
         s_axis_tvalid <= '0';
@@ -263,20 +273,24 @@ begin
         axi_write(16#00#, x"00000001");
         wait for 200 ns;
 
-        -- Hold m_axis_tready = '0'
-        m_axis_tready <= '0';
-
-        wait until rising_edge(aclk) and s_axis_tready = '1';
+        -- Present input data and hold m_axis_tready = '0' to test downstream backpressure
         s_axis_tdata  <= x"FFFFFFFF";
         s_axis_tvalid <= '1';
         s_axis_tlast  <= '0';
-
+        m_axis_tready <= '0';
         wait for 100 ns;
-        -- Release tready
+
+        -- Verify that s_axis_tready propagates backpressure
+        check_equal(s_axis_tready, '0', "s_axis_tready must remain low during downstream backpressure");
+
+        -- Release backpressure
         m_axis_tready <= '1';
-        wait until rising_edge(aclk) and m_axis_tvalid = '1';
+        wait until rising_edge(aclk) and s_axis_tready = '1';
+        wait for 1 ps;
+        check_equal(m_axis_tvalid, '1', "m_axis_tvalid must be asserted once backpressure released");
         check_equal(m_axis_tkeep, std_logic_vector'(x"F"), "tkeep must be full");
 
+        wait until rising_edge(aclk);
         s_axis_tvalid <= '0';
 
       --------------------------------------------------------------------------

@@ -2,17 +2,18 @@
 -- Company:       UFMG / Embedded Systems & SoC Laboratory
 -- Engineer:      Antigravity Agentic Assistant & User
 --
--- Create Date:   2026-10-18
+-- Create Date:   2026-10-18 (Refactored 2026-10-19)
 -- Design Name:   lz4_engine
 -- Module Name:   lz4_engine - rtl
 -- Project Name:  Zynq-7010 PS/PL Compression & Encryption Benchmark
 -- Target Devices: Digilent Cora Z7-10 (XC7Z010-1CLG400C)
 -- Tool Versions: Vivado 2026.1 / GHDL VHDL-2008
--- Description:   Simplified LZ4 Lossless Hardware Compression Engine.
---                Implements dictionary-based sliding window compression with
---                a 4-byte hash table match finder, byte-aligned sequence
---                token emission, 32-bit AXI4-Stream data channels, and an
---                AXI4-Lite slave interface for control, status, and metrics.
+-- Description:   Optimized Hardware LZ4 Lossless Compression Engine.
+--                Low-resource, high-throughput streaming architecture:
+--                - 32-bit word dictionary matching for zero combinatorial explosion
+--                - Sequential token/literal/offset byte serialization
+--                - Direct AXI4-Stream beat packing with exact tlast/tkeep boundary
+--                - AXI4-Lite CSR control, status, performance counters
 --------------------------------------------------------------------------------
 
 library ieee;
@@ -22,7 +23,7 @@ use ieee.numeric_std.all;
 entity lz4_engine is
   generic (
     c_s_axi_data_width : integer := 32;
-    c_s_axi_addr_width : integer := 8;
+    c_s_axi_addr_width : integer := 12;
     c_axis_data_width  : integer := 32;
     c_window_size      : integer := 64;
     c_hash_size        : integer := 32
@@ -32,8 +33,9 @@ entity lz4_engine is
     aclk               : in  std_logic;
     aresetn            : in  std_logic;
 
-    -- Interrupt Output (Active-high completion pulse to ARM GIC)
+    -- Interrupt and Busy Indicators
     irq_o              : out std_logic;
+    busy_o             : out std_logic;
 
     -- ========================================================================
     -- AXI4-Lite Slave Interface (Control & Status Registers)
@@ -61,7 +63,7 @@ entity lz4_engine is
     s_axi_lite_rready  : in  std_logic;
 
     -- ========================================================================
-    -- AXI4-Stream Slave Interface (Raw Ingress Stream from DMA)
+    -- AXI4-Stream Ingress Channel (Raw Data from DMA MM2S)
     -- ========================================================================
     s_axis_tdata       : in  std_logic_vector(c_axis_data_width - 1 downto 0);
     s_axis_tkeep       : in  std_logic_vector((c_axis_data_width / 8) - 1 downto 0);
@@ -70,7 +72,7 @@ entity lz4_engine is
     s_axis_tlast       : in  std_logic;
 
     -- ========================================================================
-    -- AXI4-Stream Master Interface (Compressed Egress Stream to DMA)
+    -- AXI4-Stream Egress Channel (Compressed Data to DMA S2MM)
     -- ========================================================================
     m_axis_tdata       : out std_logic_vector(c_axis_data_width - 1 downto 0);
     m_axis_tkeep       : out std_logic_vector((c_axis_data_width / 8) - 1 downto 0);
@@ -78,29 +80,18 @@ entity lz4_engine is
     m_axis_tready      : in  std_logic;
     m_axis_tlast       : out std_logic
   );
-
-  -- ==========================================================================
-  -- Vivado IP Integrator Clock and Reset Association
-  -- ==========================================================================
-  attribute X_INTERFACE_PARAMETER : string;
-  attribute X_INTERFACE_PARAMETER of aclk    : signal is "ASSOCIATED_BUSIF s_axi_lite:s_axis:m_axis, ASSOCIATED_RESET aresetn";
-  attribute X_INTERFACE_PARAMETER of aresetn : signal is "POLARITY ACTIVE_LOW";
 end entity lz4_engine;
 
 architecture rtl of lz4_engine is
 
-  -- --------------------------------------------------------------------------
-  -- Constants: Register Offsets
-  -- --------------------------------------------------------------------------
+  -- Register address offsets (per INTERFACES.md Section 2.2)
   constant c_addr_control     : std_logic_vector(7 downto 0) := x"00";
   constant c_addr_status      : std_logic_vector(7 downto 0) := x"04";
   constant c_addr_src_len     : std_logic_vector(7 downto 0) := x"08";
   constant c_addr_dst_len     : std_logic_vector(7 downto 0) := x"0C";
   constant c_addr_cycle_count : std_logic_vector(7 downto 0) := x"10";
 
-  -- --------------------------------------------------------------------------
   -- AXI4-Lite Internal Registers
-  -- --------------------------------------------------------------------------
   signal reg_control_r     : std_logic_vector(31 downto 0) := (others => '0');
   signal reg_status_r      : std_logic_vector(31 downto 0) := (others => '0');
   signal reg_src_len_r     : std_logic_vector(31 downto 0) := (others => '0');
@@ -113,61 +104,59 @@ architecture rtl of lz4_engine is
   signal axi_rdata_r       : std_logic_vector(31 downto 0) := (others => '0');
 
   signal ctrl_start_s      : std_logic;
+  signal ctrl_reset_s      : std_logic;
   signal ctrl_irq_en_s     : std_logic;
 
   -- --------------------------------------------------------------------------
-  -- Internal Datapath & Buffers
+  -- Datapath States
   -- --------------------------------------------------------------------------
   type t_fsm_state is (
     ST_IDLE,
-    ST_INGEST_BEAT,
-    ST_EVAL_STREAM,
-    ST_EMIT_SEQUENCE,
-    ST_FLUSH_REMAINING,
-    ST_FINISH
+    ST_FETCH_BEAT,
+    ST_EVAL_BEAT,
+    ST_EMIT_TOKEN,
+    ST_EMIT_LITERALS,
+    ST_EMIT_OFF_LO,
+    ST_EMIT_OFF_HI,
+    ST_FLUSH_TOKEN,
+    ST_FLUSH_LITERALS,
+    ST_DRAIN_PACKER,
+    ST_DONE_PULSE
   );
   signal state_r : t_fsm_state := ST_IDLE;
 
-  -- Circular History Buffer
-  type t_history_ram is array (0 to c_window_size - 1) of std_logic_vector(7 downto 0);
-  signal history_ram_r : t_history_ram := (others => (others => '0'));
+  -- Word-based sliding window history (16 words = 64 bytes)
+  type t_word_history is array (0 to 15) of std_logic_vector(31 downto 0);
+  signal history_words_r : t_word_history := (others => (others => '0'));
+  type t_word_pos_array is array (0 to 15) of integer range 0 to 65535;
+  signal history_pos_r   : t_word_pos_array := (others => 0);
+  type t_word_valid_array is array (0 to 15) of boolean;
+  signal history_valid_r : t_word_valid_array := (others => false);
 
-  -- Hash Table for 4-byte prefix matching
-  type t_hash_ram is array (0 to c_hash_size - 1) of integer range 0 to c_window_size - 1;
-  signal hash_ram_r   : t_hash_ram := (others => 0);
-  type t_hash_valid_array is array (0 to c_hash_size - 1) of boolean;
-  signal hash_valid_r : t_hash_valid_array := (others => false);
+  -- Stream position in bytes
+  signal stream_pos_r    : integer range 0 to 65535 := 0;
 
-  -- Sliding Window Pointers & Position
-  signal write_pos_r    : integer range 0 to 65535 := 0;
-  signal stream_pos_r   : integer range 0 to 65535 := 0;
+  -- Current input beat register
+  signal in_beat_data_r  : std_logic_vector(31 downto 0) := (others => '0');
+  signal in_beat_keep_r  : std_logic_vector(3 downto 0)  := (others => '0');
+  signal in_beat_last_r  : std_logic := '0';
 
-  -- Input Ingress Queue (Stores up to 8 bytes for 4-byte lookahead)
-  type t_byte_queue is array (0 to 7) of std_logic_vector(7 downto 0);
-  signal in_queue_r     : t_byte_queue := (others => (others => '0'));
-  signal in_queue_len_r : integer range 0 to 8 := 0;
-  signal in_last_seen_r : boolean := false;
+  -- Literal buffer (stores up to 16 literal bytes)
+  type t_lit_buf is array (0 to 15) of std_logic_vector(7 downto 0);
+  signal lit_buf_r       : t_lit_buf := (others => (others => '0'));
+  signal lit_count_r     : integer range 0 to 15 := 0;
+  signal lit_emit_idx_r  : integer range 0 to 15 := 0;
 
-  -- Pending Literals Buffer (Stores up to 32 literal bytes)
-  type t_lit_buffer is array (0 to 31) of std_logic_vector(7 downto 0);
-  signal lit_buf_r      : t_lit_buffer := (others => (others => '0'));
-  signal lit_count_r    : integer range 0 to 31 := 0;
-
-  -- Output Byte FIFO (Emits bytes into 32-bit beat packer)
-  type t_out_queue is array (0 to 31) of std_logic_vector(7 downto 0);
-  signal out_queue_r    : t_out_queue := (others => (others => '0'));
-  signal out_queue_len_r: integer range 0 to 31 := 0;
-
-  -- Match info registers
-  signal match_offset_r : integer range 0 to 65535 := 0;
-  signal match_len_r    : integer range 0 to 19 := 0;
+  -- Match info
+  signal match_found_r   : boolean := false;
+  signal match_offset_r  : integer range 0 to 65535 := 0;
 
   -- Egress Word Packer
-  signal pack_word_r    : std_logic_vector(31 downto 0) := (others => '0');
-  signal pack_keep_r    : std_logic_vector(3 downto 0)  := (others => '0');
-  signal pack_count_r   : integer range 0 to 4 := 0;
-  signal pack_valid_r   : std_logic := '0';
-  signal pack_last_r    : std_logic := '0';
+  signal pack_word_r     : std_logic_vector(31 downto 0) := (others => '0');
+  signal pack_byte_idx_r : integer range 0 to 3 := 0;
+  signal pack_valid_r    : std_logic := '0';
+  signal pack_last_r     : std_logic := '0';
+  signal pack_keep_r     : std_logic_vector(3 downto 0) := (others => '0');
 
   -- Performance Counters
   signal byte_counter_in_r  : unsigned(31 downto 0) := (others => '0');
@@ -175,7 +164,6 @@ architecture rtl of lz4_engine is
   signal cycle_counter_r    : unsigned(31 downto 0) := (others => '0');
 
   signal irq_pulse_r        : std_logic := '0';
-  signal s_axis_ready_s     : std_logic;
 
 begin
 
@@ -183,7 +171,9 @@ begin
   -- Section 1: AXI4-Lite Control & Status Registers
   -- ==========================================================================
   ctrl_start_s  <= reg_control_r(0);
+  ctrl_reset_s  <= reg_control_r(1);
   ctrl_irq_en_s <= reg_control_r(2);
+  busy_o        <= reg_status_r(0);
 
   s_axi_lite_awready <= axi_awready_r;
   s_axi_lite_wready  <= axi_wready_r;
@@ -195,7 +185,7 @@ begin
   s_axi_lite_rresp   <= "00"; -- OKAY
   s_axi_lite_rvalid  <= axi_rvalid_r;
 
-  -- Process: AXI4-Lite Write Channel
+  -- AXI4-Lite Write Channel
   process (aclk)
   begin
     if rising_edge(aclk) then
@@ -230,15 +220,18 @@ begin
           axi_bvalid_r <= '0';
         end if;
 
-        -- Self-clearing start bit
+        -- Self-clearing start and reset bits
         if ctrl_start_s = '1' and state_r /= ST_IDLE then
           reg_control_r(0) <= '0';
+        end if;
+        if reg_control_r(1) = '1' then
+          reg_control_r(1) <= '0';
         end if;
       end if;
     end if;
   end process;
 
-  -- Process: AXI4-Lite Read Channel
+  -- AXI4-Lite Read Channel
   process (aclk)
   begin
     if rising_edge(aclk) then
@@ -275,346 +268,378 @@ begin
     end if;
   end process;
 
-  -- ==========================================================================
-  -- Section 2: Ingress Flow Control
-  -- ==========================================================================
-  -- Accept new 32-bit beat if internal queue has room for 4 bytes
-  s_axis_ready_s <= '1' when (state_r = ST_INGEST_BEAT or state_r = ST_EVAL_STREAM)
-                         and in_queue_len_r <= 4
-                         and not in_last_seen_r else '0';
-  s_axis_tready  <= s_axis_ready_s;
+  -- Ready to accept input beat when in ST_FETCH_BEAT and packer is not stalled
+  s_axis_tready <= '1' when (state_r = ST_FETCH_BEAT and (pack_valid_r = '0' or m_axis_tready = '1')) else '0';
 
   -- ==========================================================================
-  -- Section 3: LZ4 Compression Core FSM & Datapath
+  -- Section 2: Sequential LZ4 Datapath & Packer FSM
   -- ==========================================================================
   process (aclk)
-    variable v_hash         : integer range 0 to c_hash_size - 1;
-    variable v_cand_pos     : integer range 0 to c_window_size - 1;
-    variable v_offset       : integer range 0 to 65535;
-    variable v_match_found  : boolean;
-    variable v_token        : std_logic_vector(7 downto 0);
-    variable v_lit_nibble   : unsigned(3 downto 0);
-    variable v_match_nibble : unsigned(3 downto 0);
-    variable v_hash_16      : unsigned(15 downto 0);
+    variable v_token      : std_logic_vector(7 downto 0);
+    variable v_lit_nibble : unsigned(3 downto 0);
+    variable v_mat_nibble : unsigned(3 downto 0);
+    variable v_found      : boolean;
+    variable v_off        : integer range 0 to 65535;
   begin
     if rising_edge(aclk) then
-      if aresetn = '0' then
+      if aresetn = '0' or ctrl_reset_s = '1' then
         state_r            <= ST_IDLE;
         reg_status_r       <= (others => '0');
         byte_counter_in_r  <= (others => '0');
         byte_counter_out_r <= (others => '0');
         cycle_counter_r    <= (others => '0');
         irq_pulse_r        <= '0';
-        in_queue_len_r     <= 0;
-        in_last_seen_r     <= false;
+        stream_pos_r       <= 0;
+        history_valid_r    <= (others => false);
         lit_count_r        <= 0;
-        out_queue_len_r    <= 0;
-        pack_count_r       <= 0;
+        lit_emit_idx_r     <= 0;
+        match_found_r      <= false;
+        match_offset_r     <= 0;
+        pack_word_r        <= (others => '0');
+        pack_byte_idx_r    <= 0;
         pack_valid_r       <= '0';
         pack_last_r        <= '0';
-        write_pos_r        <= 0;
-        stream_pos_r       <= 0;
-        hash_valid_r       <= (others => false);
+        pack_keep_r        <= (others => '0');
       else
         irq_pulse_r <= '0';
 
-        -- --------------------------------------------------------------------
-        -- Sub-engine A: Ingress Beat Ingestion into Queue
-        -- --------------------------------------------------------------------
-        if s_axis_tvalid = '1' and s_axis_ready_s = '1' then
-          -- Unpack 32-bit beat (little-endian byte lanes)
-          if s_axis_tkeep(0) = '1' then
-            in_queue_r(in_queue_len_r) <= s_axis_tdata(7 downto 0);
-          end if;
-          if s_axis_tkeep(1) = '1' then
-            in_queue_r(in_queue_len_r + 1) <= s_axis_tdata(15 downto 8);
-          end if;
-          if s_axis_tkeep(2) = '1' then
-            in_queue_r(in_queue_len_r + 2) <= s_axis_tdata(23 downto 16);
-          end if;
-          if s_axis_tkeep(3) = '1' then
-            in_queue_r(in_queue_len_r + 3) <= s_axis_tdata(31 downto 24);
-          end if;
-
-          if s_axis_tkeep = "1111" then
-            in_queue_len_r    <= in_queue_len_r + 4;
-            byte_counter_in_r <= byte_counter_in_r + 4;
-          elsif s_axis_tkeep = "0111" then
-            in_queue_len_r    <= in_queue_len_r + 3;
-            byte_counter_in_r <= byte_counter_in_r + 3;
-          elsif s_axis_tkeep = "0011" then
-            in_queue_len_r    <= in_queue_len_r + 2;
-            byte_counter_in_r <= byte_counter_in_r + 2;
-          else
-            in_queue_len_r    <= in_queue_len_r + 1;
-            byte_counter_in_r <= byte_counter_in_r + 1;
-          end if;
-
-          if s_axis_tlast = '1' then
-            in_last_seen_r <= true;
-          end if;
-        end if;
-
-        -- --------------------------------------------------------------------
-        -- Sub-engine B: Egress Word Packer (Emits 32-bit beats to m_axis)
-        -- --------------------------------------------------------------------
+        -- Clear pack_valid_r on downstream handshake
         if pack_valid_r = '1' and m_axis_tready = '1' then
           pack_valid_r <= '0';
           pack_last_r  <= '0';
         end if;
 
-        if (pack_valid_r = '0' or m_axis_tready = '1') and out_queue_len_r > 0 then
-          -- Pack up to 4 bytes into 32-bit beat
-          if out_queue_len_r >= 4 then
-            pack_word_r <= out_queue_r(3) & out_queue_r(2) & out_queue_r(1) & out_queue_r(0);
-            pack_keep_r <= "1111";
-            pack_valid_r <= '1';
-            byte_counter_out_r <= byte_counter_out_r + 4;
-
-            -- Shift out queue by 4
-            for i in 0 to 27 loop
-              out_queue_r(i) <= out_queue_r(i + 4);
-            end loop;
-            out_queue_len_r <= out_queue_len_r - 4;
-
-          elsif in_last_seen_r and state_r = ST_FINISH then
-            -- Emit final partial word with tlast
-            case out_queue_len_r is
-              when 1 =>
-                pack_word_r <= x"000000" & out_queue_r(0);
-                pack_keep_r <= "0001";
-                byte_counter_out_r <= byte_counter_out_r + 1;
-              when 2 =>
-                pack_word_r <= x"0000" & out_queue_r(1) & out_queue_r(0);
-                pack_keep_r <= "0011";
-                byte_counter_out_r <= byte_counter_out_r + 2;
-              when 3 =>
-                pack_word_r <= x"00" & out_queue_r(2) & out_queue_r(1) & out_queue_r(0);
-                pack_keep_r <= "0111";
-                byte_counter_out_r <= byte_counter_out_r + 3;
-              when others =>
-                null;
-            end case;
-            pack_valid_r    <= '1';
-            pack_last_r     <= '1';
-            out_queue_len_r <= 0;
-          end if;
-        end if;
-
-        -- --------------------------------------------------------------------
-        -- Sub-engine C: Main Compression FSM
-        -- --------------------------------------------------------------------
         case state_r is
-
           -- ------------------------------------------------------------------
-          -- State: IDLE (Wait for start bit or valid incoming stream)
+          -- State: IDLE
           -- ------------------------------------------------------------------
           when ST_IDLE =>
-            reg_status_r(0)    <= '0'; -- BUSY = 0
-            in_queue_len_r     <= 0;
-            in_last_seen_r     <= false;
-            lit_count_r        <= 0;
-            out_queue_len_r    <= 0;
-            write_pos_r        <= 0;
-            stream_pos_r       <= 0;
-            pack_valid_r       <= '0';
-            pack_last_r        <= '0';
-
-            if ctrl_start_s = '1' or s_axis_tvalid = '1' then
-              state_r            <= ST_INGEST_BEAT;
+            if ctrl_start_s = '1' then
               reg_status_r(0)    <= '1'; -- BUSY = 1
               reg_status_r(1)    <= '0'; -- DONE = 0
               reg_status_r(2)    <= '0'; -- ERR = 0
               byte_counter_in_r  <= (others => '0');
               byte_counter_out_r <= (others => '0');
               cycle_counter_r    <= (others => '0');
-              hash_valid_r       <= (others => false);
+              stream_pos_r       <= 0;
+              history_valid_r    <= (others => false);
+              lit_count_r        <= 0;
+              pack_byte_idx_r    <= 0;
+              pack_valid_r       <= '0';
+              pack_last_r        <= '0';
+              state_r            <= ST_FETCH_BEAT;
             end if;
 
           -- ------------------------------------------------------------------
-          -- State: INGEST_BEAT (Buffer bytes into lookahead queue)
+          -- State: FETCH_BEAT (Wait for 32-bit beat from DMA MM2S)
           -- ------------------------------------------------------------------
-          when ST_INGEST_BEAT =>
+          when ST_FETCH_BEAT =>
             cycle_counter_r <= cycle_counter_r + 1;
 
-            if in_queue_len_r >= 4 or (in_last_seen_r and in_queue_len_r > 0) then
-              state_r <= ST_EVAL_STREAM;
+            if s_axis_tvalid = '1' and (pack_valid_r = '0' or m_axis_tready = '1') then
+              in_beat_data_r <= s_axis_tdata;
+              in_beat_keep_r <= s_axis_tkeep;
+              in_beat_last_r <= s_axis_tlast;
+
+              -- Count bytes received
+              if s_axis_tkeep = "1111" then
+                byte_counter_in_r <= byte_counter_in_r + 4;
+              elsif s_axis_tkeep = "0111" then
+                byte_counter_in_r <= byte_counter_in_r + 3;
+              elsif s_axis_tkeep = "0011" then
+                byte_counter_in_r <= byte_counter_in_r + 2;
+              else
+                byte_counter_in_r <= byte_counter_in_r + 1;
+              end if;
+
+              state_r <= ST_EVAL_BEAT;
             end if;
 
           -- ------------------------------------------------------------------
-          -- State: EVAL_STREAM (Match evaluation via hash table lookup)
+          -- State: EVAL_BEAT (Search history for 4-byte match)
           -- ------------------------------------------------------------------
-          when ST_EVAL_STREAM =>
+          when ST_EVAL_BEAT =>
             cycle_counter_r <= cycle_counter_r + 1;
 
-            -- Check if we have at least 4 lookahead bytes to evaluate match
-            if in_queue_len_r >= 4 then
-              -- Compute 10-bit hash on 4 bytes: [B0, B1, B2, B3]
-              v_hash_16 := resize(unsigned(in_queue_r(0)), 16) xor
-                           shift_left(resize(unsigned(in_queue_r(1)), 16), 2) xor
-                           shift_left(resize(unsigned(in_queue_r(2)), 16), 4) xor
-                           shift_left(resize(unsigned(in_queue_r(3)), 16), 6);
-              v_hash := to_integer(v_hash_16(4 downto 0));
+            v_found := false;
+            v_off   := 0;
 
-              v_cand_pos := hash_ram_r(v_hash);
-              v_match_found := false;
+            -- Check if beat is a full 4-byte word and matches recent word in history
+            if in_beat_keep_r = "1111" then
+              for k in 0 to 15 loop
+                if history_valid_r(k) and history_words_r(k) = in_beat_data_r then
+                  if stream_pos_r >= history_pos_r(k) then
+                    v_off := stream_pos_r - history_pos_r(k);
+                  else
+                    v_off := (65536 + stream_pos_r) - history_pos_r(k);
+                  end if;
 
-              if hash_valid_r(v_hash) then
-                -- Calculate distance
-                if stream_pos_r >= v_cand_pos then
-                  v_offset := stream_pos_r - v_cand_pos;
-                else
-                  v_offset := (65536 + stream_pos_r) - v_cand_pos;
-                end if;
-
-                -- Check if candidate position is within sliding window and bytes match
-                if v_offset > 0 and v_offset < c_window_size then
-                  if history_ram_r(v_cand_pos mod c_window_size)       = in_queue_r(0) and
-                     history_ram_r((v_cand_pos + 1) mod c_window_size) = in_queue_r(1) and
-                     history_ram_r((v_cand_pos + 2) mod c_window_size) = in_queue_r(2) and
-                     history_ram_r((v_cand_pos + 3) mod c_window_size) = in_queue_r(3) then
-                    v_match_found := true;
+                  if v_off > 0 and v_off < 65536 then
+                    v_found := true;
+                    exit;
                   end if;
                 end if;
-              end if;
-
-              if v_match_found and out_queue_len_r <= 20 then
-                -- MATCH HIT: Register match and transition to emit sequence
-                match_offset_r <= v_offset;
-                match_len_r    <= 4; -- Initial 4-byte match
-                state_r        <= ST_EMIT_SEQUENCE;
-
-              else
-                -- LITERAL: Append byte 0 to literal buffer, store position in hash table
-                lit_buf_r(lit_count_r) <= in_queue_r(0);
-                lit_count_r            <= lit_count_r + 1;
-
-                -- Write byte 0 to history buffer
-                history_ram_r(stream_pos_r mod c_window_size) <= in_queue_r(0);
-                hash_ram_r(v_hash)   <= stream_pos_r;
-                hash_valid_r(v_hash) <= true;
-
-                stream_pos_r <= (stream_pos_r + 1) mod 65536;
-
-                -- Shift input queue by 1 byte
-                for i in 0 to 6 loop
-                  in_queue_r(i) <= in_queue_r(i + 1);
-                end loop;
-                in_queue_len_r <= in_queue_len_r - 1;
-
-                -- If literal buffer is nearly full (15 bytes), flush as literal-only sequence
-                if lit_count_r = 14 then
-                  match_offset_r <= 0;
-                  match_len_r    <= 0;
-                  state_r        <= ST_EMIT_SEQUENCE;
-                end if;
-              end if;
-
-            elsif in_last_seen_r then
-              -- End of input stream: transition to flush remaining literals
-              state_r <= ST_FLUSH_REMAINING;
-            else
-              -- Wait for more bytes
-              state_r <= ST_INGEST_BEAT;
-            end if;
-
-          -- ------------------------------------------------------------------
-          -- State: EMIT_SEQUENCE (Emit LZ4 Sequence Token, Literals, Offset)
-          -- ------------------------------------------------------------------
-          when ST_EMIT_SEQUENCE =>
-            cycle_counter_r <= cycle_counter_r + 1;
-
-            if out_queue_len_r <= 20 then
-              -- Format Token: [LitLen (4 bits) | MatchLen-4 (4 bits)]
-              if lit_count_r >= 15 then
-                v_lit_nibble := x"F";
-              else
-                v_lit_nibble := to_unsigned(lit_count_r, 4);
-              end if;
-
-              if match_len_r >= 4 then
-                v_match_nibble := to_unsigned(match_len_r - 4, 4);
-              else
-                v_match_nibble := x"0";
-              end if;
-
-              v_token := std_logic_vector(v_lit_nibble) & std_logic_vector(v_match_nibble);
-
-              -- Append Token to out queue
-              out_queue_r(out_queue_len_r) <= v_token;
-
-              -- Append Literal Bytes
-              for i in 0 to 14 loop
-                if i < lit_count_r then
-                  out_queue_r(out_queue_len_r + 1 + i) <= lit_buf_r(i);
-                end if;
               end loop;
+            end if;
 
-              -- Append Offset (16-bit little-endian) if match occurred
-              if match_len_r >= 4 then
-                out_queue_r(out_queue_len_r + 1 + lit_count_r)     <= std_logic_vector(to_unsigned(match_offset_r mod 256, 8));
-                out_queue_r(out_queue_len_r + 1 + lit_count_r + 1) <= std_logic_vector(to_unsigned(match_offset_r / 256, 8));
-                out_queue_len_r <= out_queue_len_r + 1 + lit_count_r + 2;
+            if v_found then
+              -- MATCH: Prepare to emit sequence token [lit_len | match_len=4]
+              match_found_r  <= true;
+              match_offset_r <= v_off;
+              lit_emit_idx_r <= 0;
+              state_r        <= ST_EMIT_TOKEN;
 
-                -- Advance stream past matched bytes (4 bytes)
-                for m in 0 to 3 loop
-                  history_ram_r((stream_pos_r + m) mod c_window_size) <= in_queue_r(m);
-                end loop;
-                stream_pos_r <= (stream_pos_r + 4) mod 65536;
+              -- Update history with current beat
+              history_words_r((stream_pos_r / 4) mod 16) <= in_beat_data_r;
+              history_pos_r((stream_pos_r / 4) mod 16)   <= stream_pos_r;
+              history_valid_r((stream_pos_r / 4) mod 16) <= true;
+              stream_pos_r <= (stream_pos_r + 4) mod 65536;
 
-                -- Shift input queue by 4
-                for k in 0 to 3 loop
-                  in_queue_r(k) <= in_queue_r(k + 4);
-                end loop;
-                in_queue_len_r <= in_queue_len_r - 4;
-              else
-                out_queue_len_r <= out_queue_len_r + 1 + lit_count_r;
+            else
+              -- NO MATCH: Append bytes to literal buffer
+              match_found_r <= false;
+
+              -- Store 4 bytes into literal buffer
+              lit_buf_r(lit_count_r)     <= in_beat_data_r(7 downto 0);
+              lit_buf_r(lit_count_r + 1) <= in_beat_data_r(15 downto 8);
+              lit_buf_r(lit_count_r + 2) <= in_beat_data_r(23 downto 16);
+              lit_buf_r(lit_count_r + 3) <= in_beat_data_r(31 downto 24);
+
+              -- Record in history
+              if in_beat_keep_r = "1111" then
+                history_words_r((stream_pos_r / 4) mod 16) <= in_beat_data_r;
+                history_pos_r((stream_pos_r / 4) mod 16)   <= stream_pos_r;
+                history_valid_r((stream_pos_r / 4) mod 16) <= true;
               end if;
+              stream_pos_r <= (stream_pos_r + 4) mod 65536;
 
-              lit_count_r <= 0;
-              state_r     <= ST_EVAL_STREAM;
+              if in_beat_last_r = '1' then
+                -- End of block: flush literals
+                lit_count_r    <= lit_count_r + 4;
+                lit_emit_idx_r <= 0;
+                state_r        <= ST_FLUSH_TOKEN;
+              elsif lit_count_r >= 8 then
+                -- Literal buffer getting full: emit literal sequence
+                lit_count_r    <= lit_count_r + 4;
+                lit_emit_idx_r <= 0;
+                match_offset_r <= 0;
+                state_r        <= ST_EMIT_TOKEN;
+              else
+                lit_count_r <= lit_count_r + 4;
+                state_r     <= ST_FETCH_BEAT;
+              end if;
             end if;
 
           -- ------------------------------------------------------------------
-          -- State: FLUSH_REMAINING (Flush trailing literals at end of stream)
+          -- State: EMIT_TOKEN (Emit token byte: lit_nibble | match_nibble)
           -- ------------------------------------------------------------------
-          when ST_FLUSH_REMAINING =>
+          when ST_EMIT_TOKEN =>
             cycle_counter_r <= cycle_counter_r + 1;
 
-            if out_queue_len_r <= 20 then
-              -- Transfer any remaining bytes in in_queue to literal buffer
-              if in_queue_len_r > 0 and lit_count_r < 15 then
-                lit_buf_r(lit_count_r) <= in_queue_r(0);
-                lit_count_r <= lit_count_r + 1;
-                for i in 0 to 6 loop
-                  in_queue_r(i) <= in_queue_r(i + 1);
-                end loop;
-                in_queue_len_r <= in_queue_len_r - 1;
+            if pack_valid_r = '0' or m_axis_tready = '1' then
+              v_lit_nibble := to_unsigned(lit_count_r, 4);
+              if match_found_r then
+                v_mat_nibble := to_unsigned(0, 4); -- match length 4 is encoded as 0 (len - 4)
               else
-                -- Emit final literal sequence token (match length = 0, no offset)
-                if lit_count_r > 0 then
-                  v_lit_nibble := to_unsigned(lit_count_r, 4);
-                  v_token := std_logic_vector(v_lit_nibble) & x"0";
-                  out_queue_r(out_queue_len_r) <= v_token;
-                  for j in 0 to 14 loop
-                    if j < lit_count_r then
-                      out_queue_r(out_queue_len_r + 1 + j) <= lit_buf_r(j);
-                    end if;
-                  end loop;
-                  out_queue_len_r <= out_queue_len_r + 1 + lit_count_r;
-                  lit_count_r     <= 0;
+                v_mat_nibble := to_unsigned(0, 4);
+              end if;
+              v_token := std_logic_vector(v_lit_nibble) & std_logic_vector(v_mat_nibble);
+
+              -- Pack token byte
+              pack_word_r(pack_byte_idx_r * 8 + 7 downto pack_byte_idx_r * 8) <= v_token;
+              byte_counter_out_r <= byte_counter_out_r + 1;
+
+              if pack_byte_idx_r = 3 then
+                pack_valid_r    <= '1';
+                pack_keep_r     <= "1111";
+                pack_byte_idx_r <= 0;
+              else
+                pack_byte_idx_r <= pack_byte_idx_r + 1;
+              end if;
+
+              if lit_count_r > 0 then
+                lit_emit_idx_r <= 0;
+                state_r        <= ST_EMIT_LITERALS;
+              elsif match_found_r then
+                state_r <= ST_EMIT_OFF_LO;
+              elsif in_beat_last_r = '1' then
+                state_r <= ST_DRAIN_PACKER;
+              else
+                state_r <= ST_FETCH_BEAT;
+              end if;
+            end if;
+
+          -- ------------------------------------------------------------------
+          -- State: EMIT_LITERALS (Sequentially serialize literal bytes)
+          -- ------------------------------------------------------------------
+          when ST_EMIT_LITERALS =>
+            cycle_counter_r <= cycle_counter_r + 1;
+
+            if pack_valid_r = '0' or m_axis_tready = '1' then
+              pack_word_r(pack_byte_idx_r * 8 + 7 downto pack_byte_idx_r * 8) <= lit_buf_r(lit_emit_idx_r);
+              byte_counter_out_r <= byte_counter_out_r + 1;
+
+              if pack_byte_idx_r = 3 then
+                pack_valid_r    <= '1';
+                pack_keep_r     <= "1111";
+                pack_byte_idx_r <= 0;
+              else
+                pack_byte_idx_r <= pack_byte_idx_r + 1;
+              end if;
+
+              if lit_emit_idx_r + 1 < lit_count_r then
+                lit_emit_idx_r <= lit_emit_idx_r + 1;
+              else
+                -- Literals done
+                lit_count_r <= 0;
+                if match_found_r then
+                  state_r <= ST_EMIT_OFF_LO;
+                elsif in_beat_last_r = '1' then
+                  state_r <= ST_DRAIN_PACKER;
+                else
+                  state_r <= ST_FETCH_BEAT;
                 end if;
-                state_r <= ST_FINISH;
               end if;
             end if;
 
           -- ------------------------------------------------------------------
-          -- State: FINISH (Wait for egress packer to drain, assert DONE & IRQ)
+          -- State: EMIT_OFF_LO (Emit 16-bit match offset low byte)
           -- ------------------------------------------------------------------
-          when ST_FINISH =>
+          when ST_EMIT_OFF_LO =>
             cycle_counter_r <= cycle_counter_r + 1;
 
-            if out_queue_len_r = 0 and pack_valid_r = '0' then
+            if pack_valid_r = '0' or m_axis_tready = '1' then
+              pack_word_r(pack_byte_idx_r * 8 + 7 downto pack_byte_idx_r * 8) <=
+                std_logic_vector(to_unsigned(match_offset_r mod 256, 8));
+              byte_counter_out_r <= byte_counter_out_r + 1;
+
+              if pack_byte_idx_r = 3 then
+                pack_valid_r    <= '1';
+                pack_keep_r     <= "1111";
+                pack_byte_idx_r <= 0;
+              else
+                pack_byte_idx_r <= pack_byte_idx_r + 1;
+              end if;
+
+              state_r <= ST_EMIT_OFF_HI;
+            end if;
+
+          -- ------------------------------------------------------------------
+          -- State: EMIT_OFF_HI (Emit 16-bit match offset high byte)
+          -- ------------------------------------------------------------------
+          when ST_EMIT_OFF_HI =>
+            cycle_counter_r <= cycle_counter_r + 1;
+
+            if pack_valid_r = '0' or m_axis_tready = '1' then
+              pack_word_r(pack_byte_idx_r * 8 + 7 downto pack_byte_idx_r * 8) <=
+                std_logic_vector(to_unsigned((match_offset_r / 256) mod 256, 8));
+              byte_counter_out_r <= byte_counter_out_r + 1;
+
+              if pack_byte_idx_r = 3 then
+                pack_valid_r    <= '1';
+                pack_keep_r     <= "1111";
+                pack_byte_idx_r <= 0;
+              else
+                pack_byte_idx_r <= pack_byte_idx_r + 1;
+              end if;
+
+              if in_beat_last_r = '1' then
+                state_r <= ST_DRAIN_PACKER;
+              else
+                state_r <= ST_FETCH_BEAT;
+              end if;
+            end if;
+
+          -- ------------------------------------------------------------------
+          -- State: FLUSH_TOKEN (Emit final literal sequence token)
+          -- ------------------------------------------------------------------
+          when ST_FLUSH_TOKEN =>
+            cycle_counter_r <= cycle_counter_r + 1;
+
+            if pack_valid_r = '0' or m_axis_tready = '1' then
+              v_lit_nibble := to_unsigned(lit_count_r, 4);
+              v_token      := std_logic_vector(v_lit_nibble) & x"0";
+
+              pack_word_r(pack_byte_idx_r * 8 + 7 downto pack_byte_idx_r * 8) <= v_token;
+              byte_counter_out_r <= byte_counter_out_r + 1;
+
+              if pack_byte_idx_r = 3 then
+                pack_valid_r    <= '1';
+                pack_keep_r     <= "1111";
+                pack_byte_idx_r <= 0;
+              else
+                pack_byte_idx_r <= pack_byte_idx_r + 1;
+              end if;
+
+              if lit_count_r > 0 then
+                lit_emit_idx_r <= 0;
+                state_r        <= ST_FLUSH_LITERALS;
+              else
+                state_r <= ST_DRAIN_PACKER;
+              end if;
+            end if;
+
+          -- ------------------------------------------------------------------
+          -- State: FLUSH_LITERALS (Sequentially serialize remaining literals)
+          -- ------------------------------------------------------------------
+          when ST_FLUSH_LITERALS =>
+            cycle_counter_r <= cycle_counter_r + 1;
+
+            if pack_valid_r = '0' or m_axis_tready = '1' then
+              pack_word_r(pack_byte_idx_r * 8 + 7 downto pack_byte_idx_r * 8) <= lit_buf_r(lit_emit_idx_r);
+              byte_counter_out_r <= byte_counter_out_r + 1;
+
+              if pack_byte_idx_r = 3 then
+                pack_valid_r    <= '1';
+                pack_keep_r     <= "1111";
+                pack_byte_idx_r <= 0;
+              else
+                pack_byte_idx_r <= pack_byte_idx_r + 1;
+              end if;
+
+              if lit_emit_idx_r + 1 < lit_count_r then
+                lit_emit_idx_r <= lit_emit_idx_r + 1;
+              else
+                lit_count_r <= 0;
+                state_r     <= ST_DRAIN_PACKER;
+              end if;
+            end if;
+
+          -- ------------------------------------------------------------------
+          -- State: DRAIN_PACKER (Emit trailing partial or full word with tlast)
+          -- ------------------------------------------------------------------
+          when ST_DRAIN_PACKER =>
+            cycle_counter_r <= cycle_counter_r + 1;
+
+            -- Wait for any currently pending word handshake to complete
+            if pack_valid_r = '0' or m_axis_tready = '1' then
+              if pack_byte_idx_r > 0 then
+                -- Partial beat remaining: emit with matching tkeep and tlast
+                pack_valid_r <= '1';
+                pack_last_r  <= '1';
+                case pack_byte_idx_r is
+                  when 1 => pack_keep_r <= "0001";
+                  when 2 => pack_keep_r <= "0011";
+                  when 3 => pack_keep_r <= "0111";
+                  when others => pack_keep_r <= "1111";
+                end case;
+                pack_byte_idx_r <= 0;
+                state_r         <= ST_DONE_PULSE;
+              else
+                -- Word packer already drained! If last beat was already sent, just finish
+                state_r <= ST_DONE_PULSE;
+              end if;
+            end if;
+
+          -- ------------------------------------------------------------------
+          -- State: DONE_PULSE (Wait for final handshake, assert DONE & IRQ)
+          -- ------------------------------------------------------------------
+          when ST_DONE_PULSE =>
+            cycle_counter_r <= cycle_counter_r + 1;
+
+            if pack_valid_r = '0' or m_axis_tready = '1' then
+              pack_valid_r    <= '0';
+              pack_last_r     <= '0';
               reg_status_r(0) <= '0'; -- BUSY = 0
               reg_status_r(1) <= '1'; -- DONE = 1
               if ctrl_irq_en_s = '1' then
@@ -629,7 +654,7 @@ begin
   end process;
 
   -- ==========================================================================
-  -- Section 4: Output Port Assignments
+  -- Section 3: Output Port Assignments
   -- ==========================================================================
   m_axis_tdata  <= pack_word_r;
   m_axis_tkeep  <= pack_keep_r;

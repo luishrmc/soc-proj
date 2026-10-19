@@ -25,9 +25,10 @@ architecture tb of tb_lz4_engine is
   signal aclk    : std_logic := '0';
   signal aresetn : std_logic := '0';
   signal irq_s   : std_logic;
+  signal busy_s  : std_logic;
 
   -- AXI4-Lite Signals
-  signal s_axi_lite_awaddr  : std_logic_vector(7 downto 0) := (others => '0');
+  signal s_axi_lite_awaddr  : std_logic_vector(11 downto 0) := (others => '0');
   signal s_axi_lite_awvalid : std_logic := '0';
   signal s_axi_lite_awready : std_logic;
   signal s_axi_lite_wdata   : std_logic_vector(31 downto 0) := (others => '0');
@@ -37,7 +38,7 @@ architecture tb of tb_lz4_engine is
   signal s_axi_lite_bresp   : std_logic_vector(1 downto 0);
   signal s_axi_lite_bvalid  : std_logic;
   signal s_axi_lite_bready  : std_logic := '0';
-  signal s_axi_lite_araddr  : std_logic_vector(7 downto 0) := (others => '0');
+  signal s_axi_lite_araddr  : std_logic_vector(11 downto 0) := (others => '0');
   signal s_axi_lite_arvalid : std_logic := '0';
   signal s_axi_lite_arready : std_logic;
   signal s_axi_lite_rdata   : std_logic_vector(31 downto 0);
@@ -67,7 +68,7 @@ begin
   -- Device Under Test
   dut : entity work.lz4_engine
     generic map (
-      c_s_axi_addr_width => 8,
+      c_s_axi_addr_width => 12,
       c_s_axi_data_width => 32,
       c_axis_data_width  => 32,
       c_window_size      => 2048,
@@ -77,6 +78,7 @@ begin
       aclk               => aclk,
       aresetn            => aresetn,
       irq_o              => irq_s,
+      busy_o             => busy_s,
       s_axi_lite_awaddr  => s_axi_lite_awaddr,
       s_axi_lite_awvalid => s_axi_lite_awvalid,
       s_axi_lite_awready => s_axi_lite_awready,
@@ -112,7 +114,7 @@ begin
     procedure axi_write(addr : in integer; data : in std_logic_vector(31 downto 0)) is
     begin
       wait until rising_edge(aclk);
-      s_axi_lite_awaddr  <= std_logic_vector(to_unsigned(addr, 8));
+      s_axi_lite_awaddr  <= std_logic_vector(to_unsigned(addr, 12));
       s_axi_lite_awvalid <= '1';
       s_axi_lite_wdata   <= data;
       s_axi_lite_wvalid  <= '1';
@@ -136,7 +138,7 @@ begin
     procedure axi_read(addr : in integer; data : out std_logic_vector(31 downto 0)) is
     begin
       wait until rising_edge(aclk);
-      s_axi_lite_araddr  <= std_logic_vector(to_unsigned(addr, 8));
+      s_axi_lite_araddr  <= std_logic_vector(to_unsigned(addr, 12));
       s_axi_lite_arvalid <= '1';
       s_axi_lite_rready  <= '1';
       loop
@@ -317,6 +319,24 @@ begin
         -- Verify input counter
         axi_read(8, v_read_val);
         check_equal(v_read_val, std_logic_vector'(x"00000008"), "SRC_LEN should record 8 input bytes despite backpressure");
+
+      -- ----------------------------------------------------------------------
+      -- Test 6: Soft Reset via CONTROL (bit 1)
+      -- ----------------------------------------------------------------------
+      elsif run("test_soft_reset") then
+        -- Start an operation
+        axi_write(0, x"00000001");
+        send_beat(x"01020304", '0');
+        wait for 2 * c_clk_period;
+
+        -- Trigger soft reset
+        axi_write(0, x"00000002");
+        wait for 3 * c_clk_period;
+
+        -- Verify status BUSY is cleared and STATUS is 0
+        axi_read(4, v_read_val);
+        check_equal(v_read_val(0), '0', "BUSY bit should be cleared after soft reset");
+        check_equal(busy_s, '0', "busy_o should be deasserted after soft reset");
       end if;
 
     end loop;

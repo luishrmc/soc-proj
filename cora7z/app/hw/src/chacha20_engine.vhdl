@@ -41,6 +41,7 @@ entity chacha20_engine is
 
     -- Interrupt Request (Active-High)
     irq_o          : out std_logic;
+    busy_o         : out std_logic;
 
     -- AXI4-Lite Slave Interface (Control & Status Registers)
     s_axi_lite_awaddr  : in  std_logic_vector(c_s_axi_addr_width - 1 downto 0);
@@ -118,8 +119,8 @@ architecture rtl of chacha20_engine is
     return x(24 downto 0) & x(31 downto 25);
   end function rotl7;
 
-  -- Quarter-Round transformation
-  function chacha_qr(
+  -- ChaCha20 Quarter-Round Half 1: Steps 1 & 2 (RFC 8439 Section 2.1)
+  function chacha_qr_half1(
     a_in : unsigned(31 downto 0);
     b_in : unsigned(31 downto 0);
     c_in : unsigned(31 downto 0);
@@ -137,19 +138,40 @@ architecture rtl of chacha20_engine is
     -- Step 2
     v_c := c_in + v_d;
     v_b := rotl12(b_in xor v_c);
-    -- Step 3
-    v_a := v_a + v_b;
-    v_d := rotl8(v_d xor v_a);
-    -- Step 4
-    v_c := v_c + v_d;
-    v_b := rotl7(v_b xor v_c);
 
     res.a := v_a;
     res.b := v_b;
     res.c := v_c;
     res.d := v_d;
     return res;
-  end function chacha_qr;
+  end function chacha_qr_half1;
+
+  -- ChaCha20 Quarter-Round Half 2: Steps 3 & 4 (RFC 8439 Section 2.1)
+  function chacha_qr_half2(
+    a_in : unsigned(31 downto 0);
+    b_in : unsigned(31 downto 0);
+    c_in : unsigned(31 downto 0);
+    d_in : unsigned(31 downto 0)
+  ) return qr_out_t is
+    variable v_a : unsigned(31 downto 0);
+    variable v_b : unsigned(31 downto 0);
+    variable v_c : unsigned(31 downto 0);
+    variable v_d : unsigned(31 downto 0);
+    variable res : qr_out_t;
+  begin
+    -- Step 3
+    v_a := a_in + b_in;
+    v_d := rotl8(d_in xor v_a);
+    -- Step 4
+    v_c := c_in + v_d;
+    v_b := rotl7(b_in xor v_c);
+
+    res.a := v_a;
+    res.b := v_b;
+    res.c := v_c;
+    res.d := v_d;
+    return res;
+  end function chacha_qr_half2;
 
   -- FSM States
   type fsm_state_t is (
@@ -184,6 +206,7 @@ architecture rtl of chacha20_engine is
   signal state_work_r        : state_t;
   signal keystream_r         : state_t;
   signal round_cnt_r         : integer range 0 to 20;
+  signal round_half_r        : std_logic;
   signal word_idx_r          : integer range 0 to 15;
   signal bytes_processed_r   : unsigned(31 downto 0);
 
@@ -202,7 +225,8 @@ architecture rtl of chacha20_engine is
 
 begin
 
-  irq_o <= irq_pulse_r;
+  irq_o  <= irq_pulse_r;
+  busy_o <= status_busy_r;
 
   -- AXI4-Stream Interface (Combinational zero-latency XOR streaming)
   s_axis_tready <= m_axis_tready when (fsm_state_r = S_STREAM) else '0';
@@ -404,6 +428,7 @@ begin
         cycle_count_r      <= (others => '0');
         current_counter_r  <= to_unsigned(1, 32);
         round_cnt_r        <= 0;
+        round_half_r       <= '0';
         word_idx_r         <= 0;
         bytes_processed_r  <= (others => '0');
         irq_pulse_r        <= '0';
@@ -455,6 +480,7 @@ begin
             state_init_r <= v_init_block;
             state_work_r <= v_init_block;
             round_cnt_r  <= 0;
+            round_half_r <= '0';
             fsm_state_r  <= S_ROUNDS;
 
           when S_ROUNDS =>
@@ -462,10 +488,17 @@ begin
 
             if (round_cnt_r mod 2 = 0) then
               -- Column Round: 4 Column Quarter-Rounds in parallel
-              v_qr0 := chacha_qr(state_work_r(0), state_work_r(4), state_work_r(8),  state_work_r(12));
-              v_qr1 := chacha_qr(state_work_r(1), state_work_r(5), state_work_r(9),  state_work_r(13));
-              v_qr2 := chacha_qr(state_work_r(2), state_work_r(6), state_work_r(10), state_work_r(14));
-              v_qr3 := chacha_qr(state_work_r(3), state_work_r(7), state_work_r(11), state_work_r(15));
+              if round_half_r = '0' then
+                v_qr0 := chacha_qr_half1(state_work_r(0), state_work_r(4), state_work_r(8),  state_work_r(12));
+                v_qr1 := chacha_qr_half1(state_work_r(1), state_work_r(5), state_work_r(9),  state_work_r(13));
+                v_qr2 := chacha_qr_half1(state_work_r(2), state_work_r(6), state_work_r(10), state_work_r(14));
+                v_qr3 := chacha_qr_half1(state_work_r(3), state_work_r(7), state_work_r(11), state_work_r(15));
+              else
+                v_qr0 := chacha_qr_half2(state_work_r(0), state_work_r(4), state_work_r(8),  state_work_r(12));
+                v_qr1 := chacha_qr_half2(state_work_r(1), state_work_r(5), state_work_r(9),  state_work_r(13));
+                v_qr2 := chacha_qr_half2(state_work_r(2), state_work_r(6), state_work_r(10), state_work_r(14));
+                v_qr3 := chacha_qr_half2(state_work_r(3), state_work_r(7), state_work_r(11), state_work_r(15));
+              end if;
 
               v_next_state(0)  := v_qr0.a;
               v_next_state(4)  := v_qr0.b;
@@ -488,10 +521,17 @@ begin
               v_next_state(15) := v_qr3.d;
             else
               -- Diagonal Round: 4 Diagonal Quarter-Rounds in parallel
-              v_qr0 := chacha_qr(state_work_r(0), state_work_r(5), state_work_r(10), state_work_r(15));
-              v_qr1 := chacha_qr(state_work_r(1), state_work_r(6), state_work_r(11), state_work_r(12));
-              v_qr2 := chacha_qr(state_work_r(2), state_work_r(7), state_work_r(8),  state_work_r(13));
-              v_qr3 := chacha_qr(state_work_r(3), state_work_r(4), state_work_r(9),  state_work_r(14));
+              if round_half_r = '0' then
+                v_qr0 := chacha_qr_half1(state_work_r(0), state_work_r(5), state_work_r(10), state_work_r(15));
+                v_qr1 := chacha_qr_half1(state_work_r(1), state_work_r(6), state_work_r(11), state_work_r(12));
+                v_qr2 := chacha_qr_half1(state_work_r(2), state_work_r(7), state_work_r(8),  state_work_r(13));
+                v_qr3 := chacha_qr_half1(state_work_r(3), state_work_r(4), state_work_r(9),  state_work_r(14));
+              else
+                v_qr0 := chacha_qr_half2(state_work_r(0), state_work_r(5), state_work_r(10), state_work_r(15));
+                v_qr1 := chacha_qr_half2(state_work_r(1), state_work_r(6), state_work_r(11), state_work_r(12));
+                v_qr2 := chacha_qr_half2(state_work_r(2), state_work_r(7), state_work_r(8),  state_work_r(13));
+                v_qr3 := chacha_qr_half2(state_work_r(3), state_work_r(4), state_work_r(9),  state_work_r(14));
+              end if;
 
               v_next_state(0)  := v_qr0.a;
               v_next_state(5)  := v_qr0.b;
@@ -516,10 +556,15 @@ begin
 
             state_work_r <= v_next_state;
 
-            if round_cnt_r = 19 then
-              fsm_state_r <= S_ADD_STATE;
+            if round_half_r = '0' then
+              round_half_r <= '1';
             else
-              round_cnt_r <= round_cnt_r + 1;
+              round_half_r <= '0';
+              if round_cnt_r = 19 then
+                fsm_state_r <= S_ADD_STATE;
+              else
+                round_cnt_r <= round_cnt_r + 1;
+              end if;
             end if;
 
           when S_ADD_STATE =>

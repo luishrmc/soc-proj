@@ -37,8 +37,9 @@ entity aes_ctr_engine is
     aclk           : in  std_logic;
     aresetn        : in  std_logic;
 
-    -- Interrupt Request (Active-High Level/Pulse)
+    -- Interrupt Request and Busy Indicators
     irq_o          : out std_logic;
+    busy_o         : out std_logic;
 
     -- AXI4-Lite Slave Interface (Control & Status Registers)
     s_axi_lite_awaddr  : in  std_logic_vector(c_s_axi_addr_width - 1 downto 0);
@@ -152,7 +153,6 @@ architecture rtl of aes_ctr_engine is
 
   -- Precomputed Expanded Keys
   signal round_keys_r      : round_keys_t := (others => (others => (others => '0')));
-  signal keys_expanded_r   : std_logic := '0';
 
   -- AES Core Datapath Signals
   type fsm_state_t is (
@@ -167,6 +167,7 @@ architecture rtl of aes_ctr_engine is
   signal state_r : fsm_state_t := ST_IDLE;
 
   signal round_idx_r       : integer range 0 to 10 := 0;
+  signal key_exp_round_r   : integer range 1 to 10 := 1;
   signal state_matrix_r    : state_t := (others => (others => '0'));
   signal keystream_r       : state_t := (others => (others => '0'));
 
@@ -183,11 +184,18 @@ architecture rtl of aes_ctr_engine is
 
 begin
 
-  irq_o <= irq_r;
+  irq_o  <= irq_r;
+  busy_o <= reg_status_r(0);
 
-  ------------------------------------------------------------------------------
-  -- 1. AXI4-Lite CSR Read/Write Logic
-  ------------------------------------------------------------------------------
+  -- AXI4-Stream Interface (Combinational zero-latency XOR streaming per PG021)
+  s_axis_tready <= m_axis_tready when (state_r = ST_STREAM_XOR) else '0';
+  m_axis_tvalid <= s_axis_tvalid when (state_r = ST_STREAM_XOR) else '0';
+  m_axis_tdata  <= s_axis_tdata xor (keystream_r(4*word_idx_r + 3) &
+                                     keystream_r(4*word_idx_r + 2) &
+                                     keystream_r(4*word_idx_r + 1) &
+                                     keystream_r(4*word_idx_r + 0));
+  m_axis_tkeep  <= s_axis_tkeep;
+  m_axis_tlast  <= s_axis_tlast;
   s_axi_lite_awready <= axi_awready_r;
   s_axi_lite_wready  <= axi_wready_r;
   s_axi_lite_bresp   <= "00"; -- OKAY
@@ -370,10 +378,26 @@ begin
   -- 3. Core FSM: Key Expansion, Counter Encryption, and Stream XOR
   ------------------------------------------------------------------------------
   p_aes_fsm : process(aclk)
-    type array_44_t is array (0 to 43) of std_logic_vector(31 downto 0);
-    variable v_w       : array_44_t := (others => (others => '0'));
-    variable v_temp    : std_logic_vector(31 downto 0);
-    variable v_ks_word : std_logic_vector(31 downto 0);
+    variable v_rot0 : std_logic_vector(7 downto 0);
+    variable v_rot1 : std_logic_vector(7 downto 0);
+    variable v_rot2 : std_logic_vector(7 downto 0);
+    variable v_rot3 : std_logic_vector(7 downto 0);
+    variable v_w0_0 : std_logic_vector(7 downto 0);
+    variable v_w0_1 : std_logic_vector(7 downto 0);
+    variable v_w0_2 : std_logic_vector(7 downto 0);
+    variable v_w0_3 : std_logic_vector(7 downto 0);
+    variable v_w1_0 : std_logic_vector(7 downto 0);
+    variable v_w1_1 : std_logic_vector(7 downto 0);
+    variable v_w1_2 : std_logic_vector(7 downto 0);
+    variable v_w1_3 : std_logic_vector(7 downto 0);
+    variable v_w2_0 : std_logic_vector(7 downto 0);
+    variable v_w2_1 : std_logic_vector(7 downto 0);
+    variable v_w2_2 : std_logic_vector(7 downto 0);
+    variable v_w2_3 : std_logic_vector(7 downto 0);
+    variable v_w3_0 : std_logic_vector(7 downto 0);
+    variable v_w3_1 : std_logic_vector(7 downto 0);
+    variable v_w3_2 : std_logic_vector(7 downto 0);
+    variable v_w3_3 : std_logic_vector(7 downto 0);
   begin
     if rising_edge(aclk) then
       if aresetn = '0' or reset_core_s = '1' then
@@ -382,14 +406,9 @@ begin
         reg_dst_len_r     <= (others => '0');
         reg_cycle_count_r <= (others => '0');
         irq_r             <= '0';
-        s_axis_tready     <= '0';
-        m_axis_tvalid     <= '0';
-        m_axis_tdata      <= (others => '0');
-        m_axis_tkeep      <= (others => '0');
-        m_axis_tlast      <= '0';
         bytes_processed_r <= (others => '0');
-        keys_expanded_r   <= '0';
         round_idx_r       <= 0;
+        key_exp_round_r   <= 1;
       else
         irq_r <= '0';
 
@@ -398,8 +417,6 @@ begin
           -- IDLE: Wait for start command
           ----------------------------------------------------------------------
           when ST_IDLE =>
-            s_axis_tready <= '0';
-            m_axis_tvalid <= '0';
             if start_pulse_s = '1' then
               reg_status_r(0)   <= '1'; -- BUSY
               reg_status_r(1)   <= '0'; -- clear DONE
@@ -407,48 +424,94 @@ begin
               reg_cycle_count_r <= (others => '0');
               bytes_processed_r <= (others => '0');
               cur_counter_r     <= reg_counter_r;
-              state_r           <= ST_EXPAND_KEYS;
+
+              -- Round 0 Key: direct load from 32-bit registers (little-endian byte lanes)
+              round_keys_r(0)(0)  <= reg_key_0_r(7 downto 0);
+              round_keys_r(0)(1)  <= reg_key_0_r(15 downto 8);
+              round_keys_r(0)(2)  <= reg_key_0_r(23 downto 16);
+              round_keys_r(0)(3)  <= reg_key_0_r(31 downto 24);
+
+              round_keys_r(0)(4)  <= reg_key_1_r(7 downto 0);
+              round_keys_r(0)(5)  <= reg_key_1_r(15 downto 8);
+              round_keys_r(0)(6)  <= reg_key_1_r(23 downto 16);
+              round_keys_r(0)(7)  <= reg_key_1_r(31 downto 24);
+
+              round_keys_r(0)(8)  <= reg_key_2_r(7 downto 0);
+              round_keys_r(0)(9)  <= reg_key_2_r(15 downto 8);
+              round_keys_r(0)(10) <= reg_key_2_r(23 downto 16);
+              round_keys_r(0)(11) <= reg_key_2_r(31 downto 24);
+
+              round_keys_r(0)(12) <= reg_key_3_r(7 downto 0);
+              round_keys_r(0)(13) <= reg_key_3_r(15 downto 8);
+              round_keys_r(0)(14) <= reg_key_3_r(23 downto 16);
+              round_keys_r(0)(15) <= reg_key_3_r(31 downto 24);
+
+              key_exp_round_r <= 1;
+              state_r         <= ST_EXPAND_KEYS;
             end if;
 
           ----------------------------------------------------------------------
-          -- EXPAND_KEYS: Precompute 11 Round Keys from 128-bit Key
+          -- EXPAND_KEYS: Sequentially compute round keys (1 round per cycle)
           ----------------------------------------------------------------------
           when ST_EXPAND_KEYS =>
             reg_cycle_count_r <= reg_cycle_count_r + 1;
 
-            -- Words 0 to 3: Cipher Key (Little-Endian words)
-            v_w(0) := reg_key_0_r;
-            v_w(1) := reg_key_1_r;
-            v_w(2) := reg_key_2_r;
-            v_w(3) := reg_key_3_r;
+            -- RotWord & SubWord on previous round's word 3 (bytes 12..15):
+            -- RotWord shifts left: byte 1 -> pos 0, byte 2 -> pos 1, byte 3 -> pos 2, byte 0 -> pos 3
+            v_rot0 := c_sbox(to_integer(unsigned(round_keys_r(key_exp_round_r - 1)(13)))) xor c_rcon(key_exp_round_r);
+            v_rot1 := c_sbox(to_integer(unsigned(round_keys_r(key_exp_round_r - 1)(14))));
+            v_rot2 := c_sbox(to_integer(unsigned(round_keys_r(key_exp_round_r - 1)(15))));
+            v_rot3 := c_sbox(to_integer(unsigned(round_keys_r(key_exp_round_r - 1)(12))));
 
-            -- Key schedule expansion for words 4 to 43
-            for i in 4 to 43 loop
-              v_temp := v_w(i - 1);
-              if (i mod 4) = 0 then
-                -- RotWord & SubWord
-                v_temp := c_sbox(to_integer(unsigned(v_temp(23 downto 16)))) &
-                          c_sbox(to_integer(unsigned(v_temp(15 downto 8))))  &
-                          c_sbox(to_integer(unsigned(v_temp(7 downto 0))))   &
-                          c_sbox(to_integer(unsigned(v_temp(31 downto 24))));
-                -- XOR Rcon
-                v_temp(31 downto 24) := v_temp(31 downto 24) xor c_rcon(i / 4);
-              end if;
-              v_w(i) := v_w(i - 4) xor v_temp;
-            end loop;
+            -- Word 0 of current round
+            v_w0_0 := round_keys_r(key_exp_round_r - 1)(0) xor v_rot0;
+            v_w0_1 := round_keys_r(key_exp_round_r - 1)(1) xor v_rot1;
+            v_w0_2 := round_keys_r(key_exp_round_r - 1)(2) xor v_rot2;
+            v_w0_3 := round_keys_r(key_exp_round_r - 1)(3) xor v_rot3;
 
-            -- Store into round_keys_r array
-            for r in 0 to 10 loop
-              for c in 0 to 3 loop
-                round_keys_r(r)(4*c + 0) <= v_w(4*r + c)(7 downto 0);
-                round_keys_r(r)(4*c + 1) <= v_w(4*r + c)(15 downto 8);
-                round_keys_r(r)(4*c + 2) <= v_w(4*r + c)(23 downto 16);
-                round_keys_r(r)(4*c + 3) <= v_w(4*r + c)(31 downto 24);
-              end loop;
-            end loop;
+            -- Word 1 of current round
+            v_w1_0 := round_keys_r(key_exp_round_r - 1)(4) xor v_w0_0;
+            v_w1_1 := round_keys_r(key_exp_round_r - 1)(5) xor v_w0_1;
+            v_w1_2 := round_keys_r(key_exp_round_r - 1)(6) xor v_w0_2;
+            v_w1_3 := round_keys_r(key_exp_round_r - 1)(7) xor v_w0_3;
 
-            keys_expanded_r <= '1';
-            state_r         <= ST_LOAD_CTR;
+            -- Word 2 of current round
+            v_w2_0 := round_keys_r(key_exp_round_r - 1)(8)  xor v_w1_0;
+            v_w2_1 := round_keys_r(key_exp_round_r - 1)(9)  xor v_w1_1;
+            v_w2_2 := round_keys_r(key_exp_round_r - 1)(10) xor v_w1_2;
+            v_w2_3 := round_keys_r(key_exp_round_r - 1)(11) xor v_w1_3;
+
+            -- Word 3 of current round
+            v_w3_0 := round_keys_r(key_exp_round_r - 1)(12) xor v_w2_0;
+            v_w3_1 := round_keys_r(key_exp_round_r - 1)(13) xor v_w2_1;
+            v_w3_2 := round_keys_r(key_exp_round_r - 1)(14) xor v_w2_2;
+            v_w3_3 := round_keys_r(key_exp_round_r - 1)(15) xor v_w2_3;
+
+            round_keys_r(key_exp_round_r)(0)  <= v_w0_0;
+            round_keys_r(key_exp_round_r)(1)  <= v_w0_1;
+            round_keys_r(key_exp_round_r)(2)  <= v_w0_2;
+            round_keys_r(key_exp_round_r)(3)  <= v_w0_3;
+
+            round_keys_r(key_exp_round_r)(4)  <= v_w1_0;
+            round_keys_r(key_exp_round_r)(5)  <= v_w1_1;
+            round_keys_r(key_exp_round_r)(6)  <= v_w1_2;
+            round_keys_r(key_exp_round_r)(7)  <= v_w1_3;
+
+            round_keys_r(key_exp_round_r)(8)  <= v_w2_0;
+            round_keys_r(key_exp_round_r)(9)  <= v_w2_1;
+            round_keys_r(key_exp_round_r)(10) <= v_w2_2;
+            round_keys_r(key_exp_round_r)(11) <= v_w2_3;
+
+            round_keys_r(key_exp_round_r)(12) <= v_w3_0;
+            round_keys_r(key_exp_round_r)(13) <= v_w3_1;
+            round_keys_r(key_exp_round_r)(14) <= v_w3_2;
+            round_keys_r(key_exp_round_r)(15) <= v_w3_3;
+
+            if key_exp_round_r = 10 then
+              state_r <= ST_LOAD_CTR;
+            else
+              key_exp_round_r <= key_exp_round_r + 1;
+            end if;
 
           ----------------------------------------------------------------------
           -- LOAD_CTR: Load IV and Counter Block into State Matrix
@@ -456,30 +519,30 @@ begin
           when ST_LOAD_CTR =>
             reg_cycle_count_r <= reg_cycle_count_r + 1;
 
-            -- 128-bit Counter Block: [IV_0, IV_1, IV_2, cur_counter_r]
-            -- Column 0: IV_0
+            -- 128-bit Counter Block per NIST SP 800-38A Section F.5.1:
+            -- Column 0: IV_0 (bytes 0..3)
             state_matrix_r(0)  <= reg_iv_0_r(7 downto 0)   xor round_keys_r(0)(0);
             state_matrix_r(1)  <= reg_iv_0_r(15 downto 8)  xor round_keys_r(0)(1);
             state_matrix_r(2)  <= reg_iv_0_r(23 downto 16) xor round_keys_r(0)(2);
             state_matrix_r(3)  <= reg_iv_0_r(31 downto 24) xor round_keys_r(0)(3);
 
-            -- Column 1: IV_1
+            -- Column 1: IV_1 (bytes 4..7)
             state_matrix_r(4)  <= reg_iv_1_r(7 downto 0)   xor round_keys_r(0)(4);
             state_matrix_r(5)  <= reg_iv_1_r(15 downto 8)  xor round_keys_r(0)(5);
             state_matrix_r(6)  <= reg_iv_1_r(23 downto 16) xor round_keys_r(0)(6);
             state_matrix_r(7)  <= reg_iv_1_r(31 downto 24) xor round_keys_r(0)(7);
 
-            -- Column 2: IV_2
+            -- Column 2: IV_2 (bytes 8..11)
             state_matrix_r(8)  <= reg_iv_2_r(7 downto 0)   xor round_keys_r(0)(8);
             state_matrix_r(9)  <= reg_iv_2_r(15 downto 8)  xor round_keys_r(0)(9);
             state_matrix_r(10) <= reg_iv_2_r(23 downto 16) xor round_keys_r(0)(10);
             state_matrix_r(11) <= reg_iv_2_r(31 downto 24) xor round_keys_r(0)(11);
 
-            -- Column 3: Counter
-            state_matrix_r(12) <= std_logic_vector(cur_counter_r(7 downto 0))   xor round_keys_r(0)(12);
-            state_matrix_r(13) <= std_logic_vector(cur_counter_r(15 downto 8))  xor round_keys_r(0)(13);
-            state_matrix_r(14) <= std_logic_vector(cur_counter_r(23 downto 16)) xor round_keys_r(0)(14);
-            state_matrix_r(15) <= std_logic_vector(cur_counter_r(31 downto 24)) xor round_keys_r(0)(15);
+            -- Column 3: Counter (Big-Endian increment in bytes 12..15)
+            state_matrix_r(12) <= std_logic_vector(cur_counter_r(31 downto 24)) xor round_keys_r(0)(12);
+            state_matrix_r(13) <= std_logic_vector(cur_counter_r(23 downto 16)) xor round_keys_r(0)(13);
+            state_matrix_r(14) <= std_logic_vector(cur_counter_r(15 downto 8))  xor round_keys_r(0)(14);
+            state_matrix_r(15) <= std_logic_vector(cur_counter_r(7 downto 0))   xor round_keys_r(0)(15);
 
             round_idx_r <= 1;
             state_r     <= ST_ROUND_OP;
@@ -505,21 +568,7 @@ begin
           when ST_STREAM_XOR =>
             reg_cycle_count_r <= reg_cycle_count_r + 1;
 
-            -- Extract current 32-bit keystream word (column word_idx_r)
-            v_ks_word := keystream_r(4*word_idx_r + 3) &
-                         keystream_r(4*word_idx_r + 2) &
-                         keystream_r(4*word_idx_r + 1) &
-                         keystream_r(4*word_idx_r + 0);
-
-            -- Ready to accept incoming stream beat when output is ready
-            s_axis_tready <= m_axis_tready;
-
             if s_axis_tvalid = '1' and m_axis_tready = '1' then
-              m_axis_tvalid <= '1';
-              m_axis_tdata  <= s_axis_tdata xor v_ks_word;
-              m_axis_tkeep  <= s_axis_tkeep;
-              m_axis_tlast  <= s_axis_tlast;
-
               bytes_processed_r <= bytes_processed_r + 4;
 
               if s_axis_tlast = '1' or (bytes_processed_r + 4 >= unsigned(reg_src_len_r) and unsigned(reg_src_len_r) > 0) then
@@ -529,8 +578,6 @@ begin
               else
                 word_idx_r <= word_idx_r + 1;
               end if;
-            else
-              m_axis_tvalid <= '0';
             end if;
 
           ----------------------------------------------------------------------
@@ -539,16 +586,12 @@ begin
           when ST_NEXT_BLOCK =>
             reg_cycle_count_r <= reg_cycle_count_r + 1;
             cur_counter_r     <= cur_counter_r + 1;
-            m_axis_tvalid     <= '0';
-            s_axis_tready     <= '0';
             state_r           <= ST_LOAD_CTR;
 
           ----------------------------------------------------------------------
           -- DONE: Assert completion and raise interrupt if enabled
           ----------------------------------------------------------------------
           when ST_DONE =>
-            s_axis_tready   <= '0';
-            m_axis_tvalid   <= '0';
             reg_status_r(0) <= '0'; -- clear BUSY
             reg_status_r(1) <= '1'; -- set DONE
             reg_dst_len_r   <= std_logic_vector(bytes_processed_r);
