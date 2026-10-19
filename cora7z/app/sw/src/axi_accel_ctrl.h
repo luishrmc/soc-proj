@@ -30,11 +30,15 @@ extern "C" {
 #define ACCEL_BASE_STREAM_MUX 0x43C40000U
 
 /* Stream Multiplexer Route Selection */
-#define ACCEL_MUX_ROUTE_AUTO     0U
-#define ACCEL_MUX_ROUTE_RLE      1U
-#define ACCEL_MUX_ROUTE_LZ4      2U
-#define ACCEL_MUX_ROUTE_AES_CTR  3U
-#define ACCEL_MUX_ROUTE_CHACHA   4U
+#define ACCEL_MUX_ROUTE_AUTO         0U
+#define ACCEL_MUX_ROUTE_RLE          1U
+#define ACCEL_MUX_ROUTE_LZ4          2U
+#define ACCEL_MUX_ROUTE_AES_CTR      3U
+#define ACCEL_MUX_ROUTE_CHACHA       4U
+#define ACCEL_MUX_ROUTE_RLE_AES_CTR  5U
+#define ACCEL_MUX_ROUTE_RLE_CHACHA   6U
+#define ACCEL_MUX_ROUTE_LZ4_AES_CTR  7U
+#define ACCEL_MUX_ROUTE_LZ4_CHACHA   8U
 
 /* ========================================================================= */
 /* Standard Accelerator Common Register Offsets                              */

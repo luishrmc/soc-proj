@@ -158,8 +158,9 @@ architecture rtl of axis_accel_mux is
   -- Control Register: 0=Auto by busy, 1=RLE, 2=LZ4, 3=AES, 4=ChaCha20
   signal reg_routing_ctrl_r : std_logic_vector(31 downto 0) := (others => '0');
 
-  -- Active Core Selection: 0=None/Parked, 1=RLE, 2=LZ4, 3=AES, 4=ChaCha20
-  signal active_core_s : integer range 0 to 4 := 0;
+  -- Active Core Selection: 0=None/Parked, 1=RLE, 2=LZ4, 3=AES, 4=ChaCha20,
+  --                        5=RLE+AES, 6=RLE+ChaCha, 7=LZ4+AES, 8=LZ4+ChaCha
+  signal active_core_s : integer range 0 to 8 := 0;
 
 begin
 
@@ -244,15 +245,23 @@ begin
   -- ==========================================================================
   process (reg_routing_ctrl_r, busy_rle_i, busy_lz4_i, busy_aes_i, busy_chacha_i)
   begin
-    case reg_routing_ctrl_r(2 downto 0) is
-      when "001" =>
+    case reg_routing_ctrl_r(3 downto 0) is
+      when "0001" =>
         active_core_s <= 1; -- Manual Override: RLE
-      when "010" =>
+      when "0010" =>
         active_core_s <= 2; -- Manual Override: LZ4
-      when "011" =>
+      when "0011" =>
         active_core_s <= 3; -- Manual Override: AES-128-CTR
-      when "100" =>
+      when "0100" =>
         active_core_s <= 4; -- Manual Override: ChaCha20
+      when "0101" =>
+        active_core_s <= 5; -- Chained: RLE -> AES-128-CTR
+      when "0110" =>
+        active_core_s <= 6; -- Chained: RLE -> ChaCha20
+      when "0111" =>
+        active_core_s <= 7; -- Chained: LZ4 -> AES-128-CTR
+      when "1000" =>
+        active_core_s <= 8; -- Chained: LZ4 -> ChaCha20
       when others =>
         -- Auto Mode: Route based on which core has BUSY asserted
         if busy_rle_i = '1' then
@@ -270,28 +279,62 @@ begin
   end process;
 
   -- ==========================================================================
-  -- Section 3: AXI4-Stream Demultiplexer (DMA MM2S -> Selected Core)
+  -- Section 3: AXI4-Stream Demultiplexer & Inter-Core Chaining
   -- ==========================================================================
-  -- Connect data and metadata common signals
-  m_axis_rle_tdata    <= s_axis_dma_tdata;
-  m_axis_rle_tkeep    <= s_axis_dma_tkeep;
-  m_axis_rle_tlast    <= s_axis_dma_tlast;
+  -- RLE Ingress
+  m_axis_rle_tdata <= s_axis_dma_tdata;
+  m_axis_rle_tkeep <= s_axis_dma_tkeep;
+  m_axis_rle_tlast <= s_axis_dma_tlast;
 
-  m_axis_lz4_tdata    <= s_axis_dma_tdata;
-  m_axis_lz4_tkeep    <= s_axis_dma_tkeep;
-  m_axis_lz4_tlast    <= s_axis_dma_tlast;
+  -- LZ4 Ingress
+  m_axis_lz4_tdata <= s_axis_dma_tdata;
+  m_axis_lz4_tkeep <= s_axis_dma_tkeep;
+  m_axis_lz4_tlast <= s_axis_dma_tlast;
 
-  m_axis_aes_tdata    <= s_axis_dma_tdata;
-  m_axis_aes_tkeep    <= s_axis_dma_tkeep;
-  m_axis_aes_tlast    <= s_axis_dma_tlast;
+  -- AES-128-CTR Ingress (From DMA in mode 3, or chained from RLE in mode 5, LZ4 in mode 7)
+  process (active_core_s, s_axis_dma_tdata, s_axis_dma_tkeep, s_axis_dma_tlast,
+           s_axis_rle_tdata, s_axis_rle_tkeep, s_axis_rle_tlast,
+           s_axis_lz4_tdata, s_axis_lz4_tkeep, s_axis_lz4_tlast)
+  begin
+    if active_core_s = 5 then
+      m_axis_aes_tdata <= s_axis_rle_tdata;
+      m_axis_aes_tkeep <= s_axis_rle_tkeep;
+      m_axis_aes_tlast <= s_axis_rle_tlast;
+    elsif active_core_s = 7 then
+      m_axis_aes_tdata <= s_axis_lz4_tdata;
+      m_axis_aes_tkeep <= s_axis_lz4_tkeep;
+      m_axis_aes_tlast <= s_axis_lz4_tlast;
+    else
+      m_axis_aes_tdata <= s_axis_dma_tdata;
+      m_axis_aes_tkeep <= s_axis_dma_tkeep;
+      m_axis_aes_tlast <= s_axis_dma_tlast;
+    end if;
+  end process;
 
-  m_axis_chacha_tdata <= s_axis_dma_tdata;
-  m_axis_chacha_tkeep <= s_axis_dma_tkeep;
-  m_axis_chacha_tlast <= s_axis_dma_tlast;
+  -- ChaCha20 Ingress (From DMA in mode 4, or chained from RLE in mode 6, LZ4 in mode 8)
+  process (active_core_s, s_axis_dma_tdata, s_axis_dma_tkeep, s_axis_dma_tlast,
+           s_axis_rle_tdata, s_axis_rle_tkeep, s_axis_rle_tlast,
+           s_axis_lz4_tdata, s_axis_lz4_tkeep, s_axis_lz4_tlast)
+  begin
+    if active_core_s = 6 then
+      m_axis_chacha_tdata <= s_axis_rle_tdata;
+      m_axis_chacha_tkeep <= s_axis_rle_tkeep;
+      m_axis_chacha_tlast <= s_axis_rle_tlast;
+    elsif active_core_s = 8 then
+      m_axis_chacha_tdata <= s_axis_lz4_tdata;
+      m_axis_chacha_tkeep <= s_axis_lz4_tkeep;
+      m_axis_chacha_tlast <= s_axis_lz4_tlast;
+    else
+      m_axis_chacha_tdata <= s_axis_dma_tdata;
+      m_axis_chacha_tkeep <= s_axis_dma_tkeep;
+      m_axis_chacha_tlast <= s_axis_dma_tlast;
+    end if;
+  end process;
 
   -- Demux valid and ready handshakes
   process (active_core_s, s_axis_dma_tvalid, m_axis_rle_tready,
-           m_axis_lz4_tready, m_axis_aes_tready, m_axis_chacha_tready)
+           m_axis_lz4_tready, m_axis_aes_tready, m_axis_chacha_tready,
+           s_axis_rle_tvalid, s_axis_lz4_tvalid)
   begin
     m_axis_rle_tvalid    <= '0';
     m_axis_lz4_tvalid    <= '0';
@@ -316,6 +359,26 @@ begin
         m_axis_chacha_tvalid <= s_axis_dma_tvalid;
         s_axis_dma_tready    <= m_axis_chacha_tready;
 
+      when 5 => -- Chained: RLE -> AES
+        m_axis_rle_tvalid <= s_axis_dma_tvalid;
+        s_axis_dma_tready <= m_axis_rle_tready;
+        m_axis_aes_tvalid <= s_axis_rle_tvalid;
+
+      when 6 => -- Chained: RLE -> ChaCha
+        m_axis_rle_tvalid    <= s_axis_dma_tvalid;
+        s_axis_dma_tready    <= m_axis_rle_tready;
+        m_axis_chacha_tvalid <= s_axis_rle_tvalid;
+
+      when 7 => -- Chained: LZ4 -> AES
+        m_axis_lz4_tvalid <= s_axis_dma_tvalid;
+        s_axis_dma_tready <= m_axis_lz4_tready;
+        m_axis_aes_tvalid <= s_axis_lz4_tvalid;
+
+      when 8 => -- Chained: LZ4 -> ChaCha
+        m_axis_lz4_tvalid    <= s_axis_dma_tvalid;
+        s_axis_dma_tready    <= m_axis_lz4_tready;
+        m_axis_chacha_tvalid <= s_axis_lz4_tvalid;
+
       when others =>
         s_axis_dma_tready <= '0';
     end case;
@@ -328,7 +391,8 @@ begin
            s_axis_rle_tdata, s_axis_rle_tkeep, s_axis_rle_tvalid, s_axis_rle_tlast,
            s_axis_lz4_tdata, s_axis_lz4_tkeep, s_axis_lz4_tvalid, s_axis_lz4_tlast,
            s_axis_aes_tdata, s_axis_aes_tkeep, s_axis_aes_tvalid, s_axis_aes_tlast,
-           s_axis_chacha_tdata, s_axis_chacha_tkeep, s_axis_chacha_tvalid, s_axis_chacha_tlast)
+           s_axis_chacha_tdata, s_axis_chacha_tkeep, s_axis_chacha_tvalid, s_axis_chacha_tlast,
+           m_axis_aes_tready, m_axis_chacha_tready)
   begin
     s_axis_rle_tready    <= '0';
     s_axis_lz4_tready    <= '0';
@@ -358,6 +422,38 @@ begin
         s_axis_aes_tready <= m_axis_dma_tready;
 
       when 4 =>
+        m_axis_dma_tdata     <= s_axis_chacha_tdata;
+        m_axis_dma_tkeep     <= s_axis_chacha_tkeep;
+        m_axis_dma_tvalid    <= s_axis_chacha_tvalid;
+        m_axis_dma_tlast     <= s_axis_chacha_tlast;
+        s_axis_chacha_tready <= m_axis_dma_tready;
+
+      when 5 => -- Chained: RLE -> AES -> DMA
+        s_axis_rle_tready <= m_axis_aes_tready;
+        m_axis_dma_tdata  <= s_axis_aes_tdata;
+        m_axis_dma_tkeep  <= s_axis_aes_tkeep;
+        m_axis_dma_tvalid <= s_axis_aes_tvalid;
+        m_axis_dma_tlast  <= s_axis_aes_tlast;
+        s_axis_aes_tready <= m_axis_dma_tready;
+
+      when 6 => -- Chained: RLE -> ChaCha -> DMA
+        s_axis_rle_tready    <= m_axis_chacha_tready;
+        m_axis_dma_tdata     <= s_axis_chacha_tdata;
+        m_axis_dma_tkeep     <= s_axis_chacha_tkeep;
+        m_axis_dma_tvalid    <= s_axis_chacha_tvalid;
+        m_axis_dma_tlast     <= s_axis_chacha_tlast;
+        s_axis_chacha_tready <= m_axis_dma_tready;
+
+      when 7 => -- Chained: LZ4 -> AES -> DMA
+        s_axis_lz4_tready <= m_axis_aes_tready;
+        m_axis_dma_tdata  <= s_axis_aes_tdata;
+        m_axis_dma_tkeep  <= s_axis_aes_tkeep;
+        m_axis_dma_tvalid <= s_axis_aes_tvalid;
+        m_axis_dma_tlast  <= s_axis_aes_tlast;
+        s_axis_aes_tready <= m_axis_dma_tready;
+
+      when 8 => -- Chained: LZ4 -> ChaCha -> DMA
+        s_axis_lz4_tready    <= m_axis_chacha_tready;
         m_axis_dma_tdata     <= s_axis_chacha_tdata;
         m_axis_dma_tkeep     <= s_axis_chacha_tkeep;
         m_axis_dma_tvalid    <= s_axis_chacha_tvalid;

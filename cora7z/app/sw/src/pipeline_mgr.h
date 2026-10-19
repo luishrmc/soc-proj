@@ -30,10 +30,14 @@ typedef enum {
 
 /* Algorithm Identifiers */
 typedef enum {
-    ALGO_RLE       = 0,
-    ALGO_LZ4       = 1,
-    ALGO_AES_CTR   = 2,
-    ALGO_CHACHA20  = 3
+    ALGO_RLE             = 0,
+    ALGO_LZ4             = 1,
+    ALGO_AES_CTR         = 2,
+    ALGO_CHACHA20        = 3,
+    ALGO_RLE_AES_CTR     = 4,
+    ALGO_RLE_CHACHA20    = 5,
+    ALGO_LZ4_AES_CTR     = 6,
+    ALGO_LZ4_CHACHA20    = 7
 } pipeline_algo_t;
 
 typedef struct {

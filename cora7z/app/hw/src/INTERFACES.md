@@ -145,8 +145,8 @@ Every computation core (`rle_engine`, `lz4_engine`, `aes_ctr_engine`, `chacha20_
 
 | Offset | Name | Type | Reset Value | Description |
 |---|---|---|---|---|
-| `0x00` | `ROUTING_CTRL` | R/W | `0x00000000` | Stream Route: `0`=Auto by core BUSY, `1`=RLE, `2`=LZ4, `3`=AES-128-CTR, `4`=ChaCha20 |
-| `0x04` | `ACTIVE_CORE` | RO | `0x00000000` | Currently active/routed accelerator core ID (bits [2:0]) |
+| `0x00` | `ROUTING_CTRL` | R/W | `0x00000000` | Stream Route: `0`=Auto, `1`=RLE, `2`=LZ4, `3`=AES, `4`=ChaCha20, `5`=RLE->AES, `6`=RLE->ChaCha, `7`=LZ4->AES, `8`=LZ4->ChaCha |
+| `0x04` | `ACTIVE_CORE` | RO | `0x00000000` | Currently active/routed accelerator core ID (bits [3:0], range 0 to 8) |
 
 ---
 
@@ -183,4 +183,4 @@ All stream interfaces operate in the `clk_accel` domain (100 MHz):
 - **Target Device**: `xc7z010clg400-1`
 - **Board Part**: `digilentinc.com:cora-z7-10:part0:1.1`
 - **Exported Container**: `cora7z/app/hw/vivado/cora7z_top.xsa`
-- **SHA-256**: `513af306ce6810542219632e7745f65d3f05d900198017d2319c5aa7b9022346`
+- **SHA-256**: `a74aae9c1042f87d91d9676d42163bb1b06904741a224b3a324d31d6b268a1d5`

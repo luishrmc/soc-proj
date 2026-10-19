@@ -356,6 +356,69 @@ begin
         m_axis_lz4_tready <= '1';
         wait for 1 ns;
         check_equal(s_axis_dma_tready, '1', "DMA ready should be 1 when LZ4 ready");
+
+      -- ----------------------------------------------------------------------
+      -- Test 5: Chained Inter-Core Routing (Modes 5 and 8)
+      -- ----------------------------------------------------------------------
+      elsif run("test_chained_routing") then
+        -- 1. Mode 5: RLE -> AES-CTR -> DMA
+        axi_write(0, x"00000005");
+        axi_read(4, v_read_val);
+        check_equal(to_integer(unsigned(v_read_val)), 5, "Active core should be 5 (RLE->AES)");
+
+        -- DMA MM2S beat should reach RLE
+        s_axis_dma_tdata  <= x"11223344";
+        s_axis_dma_tvalid <= '1';
+        wait for 1 ns;
+        check_equal(m_axis_rle_tvalid, '1', "RLE should receive DMA MM2S stream in Mode 5");
+        check_equal(m_axis_rle_tdata, std_logic_vector'(x"11223344"), "RLE receives DMA data in Mode 5");
+        check_equal(m_axis_lz4_tvalid, '0', "LZ4 must be disabled in Mode 5");
+
+        -- RLE output stream should feed AES ingress
+        s_axis_rle_tdata  <= x"55667788";
+        s_axis_rle_tvalid <= '1';
+        wait for 1 ns;
+        check_equal(m_axis_aes_tvalid, '1', "AES must receive chained output from RLE in Mode 5");
+        check_equal(m_axis_aes_tdata, std_logic_vector'(x"55667788"), "AES data must match RLE output");
+
+        -- AES output stream should feed DMA S2MM
+        s_axis_aes_tdata  <= x"99AABBCC";
+        s_axis_aes_tvalid <= '1';
+        s_axis_aes_tlast  <= '1';
+        wait for 1 ns;
+        check_equal(m_axis_dma_tvalid, '1', "DMA S2MM must receive final output from AES in Mode 5");
+        check_equal(m_axis_dma_tdata, std_logic_vector'(x"99AABBCC"), "DMA data must match AES output");
+        check_equal(m_axis_dma_tlast, '1', "DMA tlast must match AES tlast");
+
+        -- 2. Mode 8: LZ4 -> ChaCha20 -> DMA
+        s_axis_dma_tvalid <= '0';
+        s_axis_rle_tvalid <= '0';
+        s_axis_aes_tvalid <= '0';
+        axi_write(0, x"00000008");
+        axi_read(4, v_read_val);
+        check_equal(to_integer(unsigned(v_read_val)), 8, "Active core should be 8 (LZ4->ChaCha)");
+
+        -- DMA MM2S reaches LZ4
+        s_axis_dma_tdata  <= x"A1B2C3D4";
+        s_axis_dma_tvalid <= '1';
+        wait for 1 ns;
+        check_equal(m_axis_lz4_tvalid, '1', "LZ4 receives DMA MM2S in Mode 8");
+        check_equal(m_axis_rle_tvalid, '0', "RLE must be disabled in Mode 8");
+
+        -- LZ4 stream feeds ChaCha20
+        s_axis_lz4_tdata  <= x"E5F6A7B8";
+        s_axis_lz4_tvalid <= '1';
+        wait for 1 ns;
+        check_equal(m_axis_chacha_tvalid, '1', "ChaCha20 receives chained output from LZ4 in Mode 8");
+        check_equal(m_axis_chacha_tdata, std_logic_vector'(x"E5F6A7B8"), "ChaCha20 data matches LZ4");
+
+        -- ChaCha20 stream feeds DMA S2MM
+        s_axis_chacha_tdata  <= x"01020304";
+        s_axis_chacha_tvalid <= '1';
+        s_axis_chacha_tlast  <= '1';
+        wait for 1 ns;
+        check_equal(m_axis_dma_tvalid, '1', "DMA S2MM receives final output from ChaCha20 in Mode 8");
+        check_equal(m_axis_dma_tdata, std_logic_vector'(x"01020304"), "DMA data matches ChaCha20");
       end if;
 
     end loop;
