@@ -19,6 +19,7 @@ Protocol: `.agents/skills/memory-protocol/SKILL.md`. Limit: 40 lines.
 - `rle_engine`: Run-Length Encoding hardware accelerator core (`modules/rle_engine.md`)
 - `lz4_engine`: LZ4 streaming compression accelerator core (`modules/lz4_engine.md`)
 - `aes_ctr_engine`: AES-128-CTR cryptographic coprocessor core (`modules/aes_ctr_engine.md`)
+- `chacha20_engine`: ChaCha20 stream cipher cryptographic coprocessor core (`modules/chacha20_engine.md`)
 - `vitis_platform`: Vitis 2026.1 unified bare-metal platform & firmware baseline (`modules/vitis_platform.md`)
 
 ## Active handoffs

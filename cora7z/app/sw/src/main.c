@@ -50,6 +50,12 @@
 #define AES_CTR_ENGINE_BASEADDR 0x43C20000U
 #endif
 
+#ifdef XPAR_CHACHA20_ENGINE_0_BASEADDR
+#define CHACHA20_ENGINE_BASEADDR XPAR_CHACHA20_ENGINE_0_BASEADDR
+#else
+#define CHACHA20_ENGINE_BASEADDR 0x43C30000U
+#endif
+
 /* Accelerator CSR Offsets */
 #define CSR_REG_CONTROL      0x00U
 #define CSR_REG_STATUS       0x04U
@@ -165,7 +171,17 @@ static bool check_peripherals(void) {
         all_ok = false;
     }
 
-    /* 4. AXI Direct Memory Access (AXI DMA) */
+    /* 4. ChaCha20 Stream Cipher Coprocessor */
+    val = Xil_In32(CHACHA20_ENGINE_BASEADDR + CSR_REG_STATUS);
+    xil_printf("[CHECK] ChaCha Engine @ 0x%08X -> STATUS = 0x%08X ... ", CHACHA20_ENGINE_BASEADDR, val);
+    if ((val & 0x01U) == 0U) { /* BUSY should be 0 at idle */
+        xil_printf("PASS (IDLE)\r\n");
+    } else {
+        xil_printf("FAIL (Unexpected BUSY state)\r\n");
+        all_ok = false;
+    }
+
+    /* 5. AXI Direct Memory Access (AXI DMA) */
     val = Xil_In32(AXI_DMA_BASEADDR + 0x00U); /* MM2S_DMACR */
     xil_printf("[CHECK] AXI DMA    @ 0x%08X -> MM2S_DMACR = 0x%08X ... ", AXI_DMA_BASEADDR, val);
     /* In reset state, DMACR bit 0 (RS) is 0 */
@@ -175,7 +191,7 @@ static bool check_peripherals(void) {
         xil_printf("PASS (RUNNING)\r\n");
     }
 
-    /* 5. AXI Quad SPI Slave */
+    /* 6. AXI Quad SPI Slave */
     val = Xil_In32(AXI_SPI_BASEADDR + 0x64U); /* Status Register */
     xil_printf("[CHECK] AXI SPI    @ 0x%08X -> STATUS     = 0x%08X ... ", AXI_SPI_BASEADDR, val);
     xil_printf("PASS (ACCESSIBLE)\r\n");

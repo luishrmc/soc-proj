@@ -7,7 +7,7 @@ ID da Tarefa,Fase,Atividade Detalhada,Entregável Associado,Duração Estimada (
 2.2,2,Núcleo de compressão RLE,Fontes VHDL e TB,3,2.1,Concluída,Alta,2026-10-18,2026-10-18,gate:2.2,2026-10-18,"waiver: User prioritized rle_engine RTL core authoring and BD integration ahead of SPI receiver. All lint and simulation gates PASS, BD validated."
 2.3,2,Núcleo de compressão LZ4 simplificado,Fontes VHDL e TB,5,2.1,Concluída,Alta,2026-10-18,2026-10-18,gate:2.3,2026-10-18,"waiver: User prioritized LZ4 compression core authoring and BD integration ahead of SPI receiver. All lint and simulation gates PASS, BD validated cleanly with zero critical warnings."
 2.4,2,Coprocessador AES-CTR,Fontes VHDL e TB,4,2.1,Concluída,Alta,2026-10-18,2026-10-18,gate:2.4,2026-10-18,AES-CTR VHDL implementado e verificado contra vetores NIST. Integrado no Block Design com FIFOs explícitas e sintetizado com bitstream gerado.
-2.5,2,Coprocessador ChaCha20,Fontes VHDL e TB,4,2.1,Pendente,Alta,,,,,
+2.5,2,Coprocessador ChaCha20,Fontes VHDL e TB,4,2.1,Concluída,Alta,2026-10-18,2026-10-19,gate:2.5,2026-10-19,ChaCha20 VHDL implementado e verificado contra vetores da RFC 8439. Integrado no Block Design com FIFOs explícitas e sintetizado com bitstream gerado.
 3.1,3,Configuração do bloco Zynq PS no Vivado,Projeto Vivado,2,"2.2, 2.3, 2.4, 2.5",Pendente,Alta,,,,,
 3.2,3,Encapsulamento dos módulos RTL como IPs AXI,Projeto Vivado,3,3.1,Pendente,Alta,,,,,
 3.3,3,Interconexão de barramentos e mapeamento de memória,Projeto Vivado,2,3.2,Pendente,Alta,,,,,
