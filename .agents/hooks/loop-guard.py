@@ -30,10 +30,13 @@ def save(s):
 
 
 def normalize(text):
-    # Strip timestamps, hex ids and line numbers so equal errors hash equally
+    # Strip dates, timestamps, hex ids, pids and line numbers so equal errors hash equally
+    text = re.sub(r"\d{4}-\d{2}-\d{2}", "", text)
     text = re.sub(r"\d{2}:\d{2}:\d{2}(\.\d+)?", "", text)
     text = re.sub(r"0x[0-9a-fA-F]+|[0-9a-f]{12,}", "", text)
     text = re.sub(r":\d+(:\d+)?", ":N", text)
+    text = re.sub(r"pid\s*\d+", "pid N", text, flags=re.I)
+    text = re.sub(r"/.*?/(?=cora7z|\.agents|utils|out)", "", text)
     return text.strip()
 
 

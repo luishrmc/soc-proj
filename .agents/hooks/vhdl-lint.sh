@@ -58,7 +58,7 @@ for e in $ENTITIES; do
 done
 if grep -qiE 'warning' "$LOG"; then
   echo "[ERROR][vhdl-lint] GHDL warnings present (treated as failures):" >&2
-  grep -iE 'warning' "$LOG" >&2
+  grep -iE 'warning' "$LOG" | head -n 20 >&2
   FAIL=1
 fi
 

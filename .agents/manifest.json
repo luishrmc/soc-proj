@@ -34,8 +34,10 @@
     "6": ["deliverable-audit"]
   },
   "gates_by_task": {
-    "3.4": ["xdc-check"],
+    "2.2": ["vhdl-lint", "vhdl-sim", "vivado-build"],
+    "2.3": ["vhdl-lint", "vhdl-sim", "vivado-build"],
     "3.3": ["address-map"],
+    "3.4": ["xdc-check"],
     "3.5": ["vivado-build", "address-map", "xdc-check"]
   },
   "agents": [
@@ -51,6 +53,7 @@
         "plan",
         "plan/**",
         "GEMINI.md",
+        ".gitignore",
         "utils/memory/INDEX.md",
         "utils/memory/decisions.md",
         "utils/memory/lessons.md",
@@ -103,9 +106,11 @@
       "role": "Bare-metal C/C++ on Cortex-A9 via Vitis: reference algorithms, AXI drivers, ARM PMU",
       "model": "pro",
       "tools_allowed": ["view_file", "write_to_file", "replace_file_content", "run_command"],
-      "run_scope": ["vitis", "cmake/ninja inside cora7z/app/sw", ".agents/hooks/vitis-gate.sh"],
+      "run_scope": ["vitis", "cmake/ninja inside cora7z/app/sw", ".agents/hooks/vitis-gate.sh", ".agents/hooks/c-lint.sh"],
       "write": [
-        "cora7z/app/sw/**",
+        "cora7z/app/sw/src/**",
+        "cora7z/app/sw/scripts/**",
+        "cora7z/app/sw/vitis/.gitkeep",
         "utils/memory/modules/*",
         "utils/memory/handoff/*"
       ],

@@ -32,4 +32,8 @@ Reason: System architecture specifications and diagrams reside under `docs/`. Ma
 ## ADR-010 | 2026-10-18 | process | Dual-mode Vivado GUI / CLI collaboration and per-task planning in plan/<task_id>/task.md
 Reason: Per reference corez7 setup, Vivado Block Design GUI is heavily utilized for SoC integration. To maximize synergy, the AI creates plan/<task_id>/task.md for each task, specifying CLI work (RTL authoring, VUnit verification, linting) alongside Vivado GUI work (BD module referencing, net wiring, Tcl console snippets) and detailing reusable interface contracts (common SPI ingress frontend and modular acceleration cores).
 
+## ADR-011 | 2026-10-18 | process | Mandatory automated synthesis-through-bitstream verification loop
+Reason: Explicit user directive. To guarantee that every hardware development iteration produces a functioning, synthesizable, and routable bitstream within the Zynq-7010 device resource budget (17,600 LUTs, 35,200 FFs, 60 BRAMs) without CPU bus stalls on M_AXI_GP0, every task modifying PL logic must execute automated Tcl scripts via `run_vivado.sh` to update Block Design cell references, run synthesis (`synth_1`), implementation (`impl_1`), generate `write_bitstream`, export the `.xsa` with `-include_bit`, and synchronize the Vitis software workspace.
+
+
 

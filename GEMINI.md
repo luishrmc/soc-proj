@@ -51,6 +51,8 @@ The project relies on heavy Vivado Block Design (BD) integration and AXI communi
   2. Vivado GUI tasks (BD cell creation, pin mapping, Tcl Console one-liners).
   3. Reusable interfaces (ensuring the common SPI ingress setup and modular PL cores seamlessly transition between standalone and hybrid co-design).
   4. Acceptance criteria for both CLI (VUnit pass) and GUI (BD validation / bitstream).
+- **Mandatory Automated Synthesis & Bitstream Verification Loop (ADR-011)**:
+  After developing or updating any hardware IP core or modifying Block Design connections, the agent MUST execute the automated Vivado batch scripts (`cora7z/app/hw/scripts/build_bitstream.tcl` via `run_vivado.sh`). This performs synthesis (`synth_1`), implementation (`impl_1`), timing checks, DRC validation, bitstream generation, and hardware platform export (`cora7z_top.xsa` with `-include_bit`). No hardware iteration is complete without passing this automated synthesis-to-bitstream loop and synchronizing the Vitis software workspace.
 
 At the end of every iteration: update the handoff, refresh digests (`python3 .agents/hooks/memory-check.py --update <module>`), report to the orchestrator. At the end of a session: the orchestrator updates the plan with `plan-sync.py` and commits.
 
@@ -122,6 +124,11 @@ Evidence and honesty:
 - Never write a performance number that was not measured. Never fill a result cell with an estimate.
 - Never claim a build, simulation or synthesis passed without the matching hook exiting 0. A `SKIPPED` gate means the task is not complete.
 - A task is `Concluída` only when `plan-sync.py` accepts its evidence.
+
+Synthesis, Implementation and Bitstream Invariants:
+- Resource Budget Enforcement: The Zynq-7010 has 17,600 LUTs, 35,200 FFs, 60 36Kb BRAMs, and 80 DSPs. Designs must synthesize cleanly without over-utilization, latches, or timing violations. Sliding window array lookups and hash tables must be sized or converted to synchronous BRAM to prevent LUT combinatorial explosion.
+- Bitstream Packaging: Every hardware deliverable must produce a valid `cora7z_top.bit` bundled into `cora7z_top.xsa` via `write_hw_platform -fixed -include_bit -force`.
+- Bus Fault Prevention: All PS firmware accessing PL peripherals over M_AXI_GP0 must first verify `is_pl_programmed()` via DEVCFG (`0xF800700C`, bit 2 `PCFG_DONE`) before MMIO operations to prevent irreversible Cortex-A9 CPU bus stalls.
 
 ## 8. Delivery constraints
 

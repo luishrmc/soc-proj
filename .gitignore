@@ -61,16 +61,9 @@ hs_err_pid*.log
 nlviewcommon.logfile
 
 # ---- Vitis: the workspace is regenerated from app/sw/scripts/*
-# Versioned: app/sw/vitis/<app>/src/** and the CMake user config.
-cora7z/app/sw/vitis/platform/
-cora7z/app/sw/vitis/_ide/
-cora7z/app/sw/vitis/.rigel_lopper/
-cora7z/app/sw/vitis/.vitisWorkspace.json
-cora7z/app/sw/vitis/**/build/
-cora7z/app/sw/vitis/**/export/
-cora7z/app/sw/vitis/**/logs/
-cora7z/app/sw/vitis/**/compile_commands.json
-cora7z/app/sw/vitis/**/.clangd
+# Versioned: app/sw/src/ and app/sw/scripts/
+cora7z/app/sw/vitis/*
+!cora7z/app/sw/vitis/.gitkeep
 *.elf
 *.elf.size
 *.map

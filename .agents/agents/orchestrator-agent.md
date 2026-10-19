@@ -23,12 +23,20 @@ Drive tasks of `utils/plan/Cronograma_e_Tarefas.csv` to `Concluída` with verifi
 ## 2. Procedure per task
 1. Read `GEMINI.md`, `utils/memory/INDEX.md`, `utils/plan/STATUS.md`. Pick a task from `plan-sync.py next`.
 2. Run `bash .agents/hooks/pre-task-audit.sh` and `python3 .agents/hooks/loop-guard.py start <task>`.
-3. Set the task to `Em andamento` with `plan-sync.py set`.
-4. Dispatch with the JSON contract below. Give the author the handoff path, the dependency digests and nothing else.
-5. After the author reports: `boundary-guard.py check --agent <author>`, then the gates for the task phase (`gates_by_phase` in the manifest).
-6. Gate failure: `loop-guard.py tick <task> <gate> <errfile>`. Exit 0 sends the error back to the author. Exit 70 or 71 stops the loop (see section 4).
-7. All gates PASS: dispatch to `technical-critic-agent`. `REJECT` returns the findings to the author and counts as an iteration.
-8. `APPROVE`: run `memory-check.py`, set the task with `--evidence gate:<task>` to `Concluída` (or `Pendente de validação` when a gate was `SKIPPED`), append decisions, then commit through `git-safety-guard`.
+3. Set the task to `Em andamento` with `plan-sync.py set <task> "Em andamento"`.
+4. Dispatch to author agent (see Dispatch Contract below).
+5. **Inner Loop (Author <-> Local Gates)**:
+   - Author implements changes, runs fast local gates (`vhdl-lint.sh`, `vhdl-sim-gate.sh`, or `c-lint.sh`), and fixes failures locally.
+   - Author verifies changed files against `boundary-guard.py check --agent <author>`.
+   - On gate failure: author loops internally up to 5 times. If stuck, orchestrator triggers `loop-guard.py tick <task> <gate> <errfile>`. Exit 70/71 halts and escalates.
+6. **Outer Loop (Technical Critic & Bitstream Verification)**:
+   - Once all deterministic local gates pass:
+     a. If hardware task requires synthesis/bitstream (ADR-011), run `bash .agents/hooks/vivado-gate.sh`.
+     b. Dispatch to `technical-critic-agent`. The critic evaluates spec, CDC, AXI, timing, and resource conformance.
+     c. Parse critic JSON verdict:
+        - If `verdict == "REJECT"`: feed `blockers` back to author, tick `loop-guard.py`, and return to author.
+        - If `verdict == "APPROVE"`: proceed to completion.
+7. **Task Completion**: Run `memory-check.py`, update module digests, set task to `Concluída` with `plan-sync.py set <task> "Concluída" --evidence gate:<task>`, and stage commit via `git-safety-guard`.
 
 ## 3. Dispatch contract
 ```json

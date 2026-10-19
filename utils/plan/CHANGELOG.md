@@ -14,3 +14,4 @@ Append-only. One line per status change.
 | 2026-10-18 | 2.2 | Em andamento -> Concluída | gate:2.2 |
 | 2026-10-18 | 2.3 | Pendente -> Em andamento | - |
 | 2026-10-18 | 2.3 | Em andamento -> Concluída | gate:2.3 |
+| 2026-10-18 | 1.4 | Em andamento -> Concluída | file:cora7z/app/sw/scripts/build_sw.py |

@@ -27,23 +27,30 @@ if ! command -v vivado >/dev/null 2>&1; then
   exit 0
 fi
 
-if [ ! -f "$SCRIPTS_DIR/build.tcl" ]; then
-  record PASS "build.tcl not authored yet"
-  echo "[OK][vivado-gate] $SCRIPTS_DIR/build.tcl not authored yet (skipped)."
+BUILD_SCRIPT=""
+if [ -f "$SCRIPTS_DIR/build_bitstream.tcl" ]; then
+  BUILD_SCRIPT="../scripts/build_bitstream.tcl"
+elif [ -f "$SCRIPTS_DIR/build.tcl" ]; then
+  BUILD_SCRIPT="../scripts/build.tcl"
+fi
+
+if [ -z "$BUILD_SCRIPT" ]; then
+  record PASS "build script not authored yet"
+  echo "[OK][vivado-gate] Neither build_bitstream.tcl nor build.tcl authored yet (skipped)."
   exit 0
 fi
 
-echo "[INFO][vivado-gate] Running Vivado batch build..."
+echo "[INFO][vivado-gate] Running Vivado batch build via $BUILD_SCRIPT..."
 (
   cd "$VIVADO_DIR"
-  vivado -mode batch -notrace -source "../scripts/build.tcl"
+  vivado -mode batch -notrace -source "$BUILD_SCRIPT"
 ) > "$LOG" 2>&1
 RC=$?
 
 if [ "$RC" -ne 0 ]; then
   record FAIL "vivado exit code $RC"
-  echo "[FAIL][vivado-gate] Vivado execution failed with code $RC. Tail of $LOG:" >&2
-  tail -n 30 "$LOG" >&2
+  echo "[FAIL][vivado-gate] Vivado execution failed with code $RC. Key errors from $LOG:" >&2
+  grep -E "(ERROR:|CRITICAL WARNING:)" "$LOG" | head -n 20 >&2 || tail -n 20 "$LOG" >&2
   exit 1
 fi
 
@@ -52,7 +59,7 @@ CW_COUNT=$(grep -c "CRITICAL WARNING" "$LOG" || true)
 if [ "$CW_COUNT" -gt 0 ]; then
   record FAIL "$CW_COUNT CRITICAL WARNINGs detected"
   echo "[FAIL][vivado-gate] $CW_COUNT CRITICAL WARNINGs found in log:" >&2
-  grep "CRITICAL WARNING" "$LOG" | head -n 10 >&2
+  grep "CRITICAL WARNING" "$LOG" | head -n 15 >&2
   exit 1
 fi
 

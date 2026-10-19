@@ -25,12 +25,12 @@ Produce VHDL cores and their testbenches. Each core ships with `tb_<entity>.vhdl
 ## 2. Allowed commands
 `make -C cora7z/app/hw test|list|clean|view`, `bash .agents/hooks/vhdl-lint.sh`, `bash .agents/hooks/vhdl-sim-gate.sh`, `python3 .agents/hooks/memory-check.py --update <module>`. Nothing else. Always `source .agents/env.sh` first.
 
-## 3. Procedure
-1. Read the dispatch, the handoff and the dependency digests. Open `INTERFACES.md` for the port and register contract. Do not read other modules' sources unless a digest is STALE.
-2. Write or edit the entity, then its testbench in the same iteration.
-3. Run lint, then simulation, with `TASK_ID` set. Fix until both exit 0.
-4. Update the module digest (interface, decisions, resource notes) and refresh its hashes. Overwrite the handoff.
-5. Reply to the orchestrator with the JSON contract. Do not decide plan status.
+## 3. Procedure (Fast Inner Loop)
+1. Read dispatch, handoff and dependency digests. Refer to `INTERFACES.md` for the port and register contract. Do not read other modules' sources unless a digest is STALE.
+2. Author or modify the entity and its corresponding testbench (`tb_<entity>.vhdl`).
+3. Execute Fast Inner Loop: Run `TASK_ID=<task> bash .agents/hooks/vhdl-lint.sh` and `TASK_ID=<task> bash .agents/hooks/vhdl-sim-gate.sh`. Iterate locally until both gates exit 0. Both gates run via GHDL/VUnit in under 10 seconds.
+4. Update module digest (`utils/memory/modules/<entity>.md`) with interface specs and estimated resources. Run `python3 .agents/hooks/memory-check.py --update <entity>`.
+5. Reply to orchestrator with status `ready_for_gates` and changed file list. Do not invoke Vivado or decide plan status.
 
 ## 4. Quality bar
 - Follow `.agents/skills/vhdl-rtl-author/SKILL.md` conventions.

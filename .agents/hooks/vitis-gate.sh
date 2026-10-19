@@ -36,8 +36,8 @@ RC=$?
 
 if [ "$RC" -ne 0 ]; then
   record FAIL "vitis exit code $RC"
-  echo "[FAIL][vitis-gate] Vitis build failed with code $RC. Tail of $LOG:" >&2
-  tail -n 30 "$LOG" >&2
+  echo "[FAIL][vitis-gate] Vitis build failed with code $RC. Key errors from $LOG:" >&2
+  grep -iE "(error:|fatal|failed)" "$LOG" | head -n 20 >&2 || tail -n 20 "$LOG" >&2
   exit 1
 fi
 

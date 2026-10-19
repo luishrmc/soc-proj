@@ -24,8 +24,8 @@ entity lz4_engine is
     c_s_axi_data_width : integer := 32;
     c_s_axi_addr_width : integer := 8;
     c_axis_data_width  : integer := 32;
-    c_window_size      : integer := 2048;
-    c_hash_size        : integer := 1024
+    c_window_size      : integer := 64;
+    c_hash_size        : integer := 32
   );
   port (
     -- Global Synchronous Clock and Active-Low Reset
@@ -454,7 +454,7 @@ begin
                            shift_left(resize(unsigned(in_queue_r(1)), 16), 2) xor
                            shift_left(resize(unsigned(in_queue_r(2)), 16), 4) xor
                            shift_left(resize(unsigned(in_queue_r(3)), 16), 6);
-              v_hash := to_integer(v_hash_16(9 downto 0));
+              v_hash := to_integer(v_hash_16(4 downto 0));
 
               v_cand_pos := hash_ram_r(v_hash);
               v_match_found := false;

@@ -25,19 +25,44 @@ Review work that already passed every deterministic gate. Look for what tools ca
 7. **Reproducibility**: no generated files committed, scripts regenerate the result.
 
 ## 3. Output contract
+The agent MUST output strictly and exclusively the JSON payload below, with NO markdown code block wrapper, no conversational preamble, and no trailing chatter:
 ```json
 {
-  "task": "2.1",
-  "decision": "REJECT",
-  "deficiencies": [
-    {"severity": "CRITICAL|MODERATE|MINOR", "category": "cdc", "location": "path:line", "description": "...", "remediation": "..."}
-  ],
-  "can_proceed": false
+  "verdict": "APPROVE",
+  "gate_id": "2.1",
+  "blockers": [],
+  "optimizations": []
 }
 ```
-`APPROVE` only when no `CRITICAL` deficiency remains. `MINOR` items are logged, not blocking.
+When deficiencies are detected:
+```json
+{
+  "verdict": "REJECT",
+  "gate_id": "2.1",
+  "blockers": [
+    {
+      "severity": "CRITICAL",
+      "category": "cdc",
+      "location": "cora7z/app/hw/src/spi_slave.vhdl:42",
+      "description": "SCLK input sampled without double-register synchronizer",
+      "remediation": "Instantiate 2-stage synchronizer flip-flops on SCLK and CS_n inputs"
+    }
+  ],
+  "optimizations": [
+    {
+      "severity": "MINOR",
+      "category": "documentation",
+      "location": "cora7z/app/hw/src/spi_slave.vhdl:15",
+      "description": "Generic comment does not specify default SPI mode",
+      "remediation": "Document CPOL=0 CPHA=0 in header comment"
+    }
+  ]
+}
+```
+`verdict` is `APPROVE` if and only if `blockers` is strictly empty (`[]`). Any item in `blockers` requires `verdict: "REJECT"`.
 
 ## 4. Negative constraints
+- Output ONLY the raw JSON payload. Do not include markdown ticks (```), greetings, or explanations.
 - Never edit files or run commands.
-- Never approve based on the author's own claims: check the evidence files (`out/gates/<task>.json`, reports).
-- Never invent line numbers. Cite what you read.
+- Never approve based on the author's own claims: inspect evidence files (`out/gates/<task>.json`, synthesis reports).
+- Never invent line numbers. Cite exact paths and line numbers verified via `view_file`.
