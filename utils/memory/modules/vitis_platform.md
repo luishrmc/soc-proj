@@ -3,7 +3,7 @@ module: vitis_platform
 status: verified
 sources:
   - cora7z/app/sw/scripts/build_sw.py sha256=17bb10d4f883148b8116f34955c0ca3ee8ca7b3bca2a80421663c17d4cd01911
-  - cora7z/app/sw/src/main.c sha256=0617788068103837e7068aa0a53fc646d49f2a732acdfaeea7e90134ae53aa70
+  - cora7z/app/sw/src/main.c sha256=3d767f19d47f41327448947b69725c37f1df83865ad898491a9bee34c604dbb4
   - cora7z/app/hw/scripts/export_hw_platform.tcl sha256=184668f0aae65f0cfcdc55dd2a5fb8c04ce33b470a57b2199ffdf928f38a02a4
 gates_passed: [vitis-build, elf-link]
 ---

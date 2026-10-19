@@ -44,6 +44,12 @@
 #define LZ4_ENGINE_BASEADDR  0x43C10000U
 #endif
 
+#ifdef XPAR_AES_CTR_ENGINE_0_BASEADDR
+#define AES_CTR_ENGINE_BASEADDR XPAR_AES_CTR_ENGINE_0_BASEADDR
+#else
+#define AES_CTR_ENGINE_BASEADDR 0x43C20000U
+#endif
+
 /* Accelerator CSR Offsets */
 #define CSR_REG_CONTROL      0x00U
 #define CSR_REG_STATUS       0x04U
@@ -75,7 +81,7 @@ static inline void pmu_enable(void) {
  */
 static inline uint32_t pmu_read_cycles(void) {
     uint32_t cycles;
-    __asm__ volatile("mrc p15, 0, %0, c9, c13, 0" : "=r"(cycles));
+    __asm__ volatile("isb; mrc p15, 0, %0, c9, c13, 0; isb" : "=r"(cycles) :: "memory");
     return cycles;
 }
 
@@ -86,15 +92,19 @@ static inline uint32_t pmu_read_cycles(void) {
 static uint32_t pmu_calibrate(void) {
     uint32_t t_start, t_end;
     uint32_t sum = 0;
+    uint32_t count = 0;
     const uint32_t iterations = 20;
 
     for (uint32_t i = 0; i < iterations; i++) {
         t_start = pmu_read_cycles();
         t_end   = pmu_read_cycles();
-        sum += (t_end - t_start);
+        if (t_end >= t_start) {
+            sum += (t_end - t_start);
+            count++;
+        }
     }
 
-    return sum / iterations;
+    return (count > 0U) ? (sum / count) : 0U;
 }
 
 /* Device Configuration Interface (DevC) definitions for FPGA state audit */
@@ -145,7 +155,17 @@ static bool check_peripherals(void) {
         all_ok = false;
     }
 
-    /* 3. AXI Direct Memory Access (AXI DMA) */
+    /* 3. AES-CTR Coprocessor */
+    val = Xil_In32(AES_CTR_ENGINE_BASEADDR + CSR_REG_STATUS);
+    xil_printf("[CHECK] AES Engine @ 0x%08X -> STATUS = 0x%08X ... ", AES_CTR_ENGINE_BASEADDR, val);
+    if ((val & 0x01U) == 0U) { /* BUSY should be 0 at idle */
+        xil_printf("PASS (IDLE)\r\n");
+    } else {
+        xil_printf("FAIL (Unexpected BUSY state)\r\n");
+        all_ok = false;
+    }
+
+    /* 4. AXI Direct Memory Access (AXI DMA) */
     val = Xil_In32(AXI_DMA_BASEADDR + 0x00U); /* MM2S_DMACR */
     xil_printf("[CHECK] AXI DMA    @ 0x%08X -> MM2S_DMACR = 0x%08X ... ", AXI_DMA_BASEADDR, val);
     /* In reset state, DMACR bit 0 (RS) is 0 */
@@ -155,7 +175,7 @@ static bool check_peripherals(void) {
         xil_printf("PASS (RUNNING)\r\n");
     }
 
-    /* 4. AXI Quad SPI Slave */
+    /* 5. AXI Quad SPI Slave */
     val = Xil_In32(AXI_SPI_BASEADDR + 0x64U); /* Status Register */
     xil_printf("[CHECK] AXI SPI    @ 0x%08X -> STATUS     = 0x%08X ... ", AXI_SPI_BASEADDR, val);
     xil_printf("PASS (ACCESSIBLE)\r\n");
@@ -178,7 +198,7 @@ int main(void) {
     pmu_enable();
     uint32_t pmu_overhead = pmu_calibrate();
     xil_printf("[PMU] Performance Monitor Unit initialized.\r\n");
-    xil_printf("[PMU] Average PMCCNTR read overhead: %u CPU cycles\r\n\r\n", (unsigned int)pmu_overhead);
+    xil_printf("[PMU] Average PMCCNTR read overhead: %d CPU cycles\r\n\r\n", (int)pmu_overhead);
 
     /* Run MMIO peripheral checks */
     bool status = check_peripherals();
