@@ -16,6 +16,7 @@
 #include "xil_printf.h"
 #include "xil_io.h"
 #include "xparameters.h"
+#include "benchmark_ps.h"
 
 /* ========================================================================= */
 /* Peripheral Base Address Definitions (Synchronized with INTERFACES.md)     */
@@ -226,6 +227,10 @@ int main(void) {
         xil_printf("[RESULT] ONE OR MORE PERIPHERALS FAILED SANITY CHECKS (FAIL)\r\n");
     }
     xil_printf("================================================================\r\n\r\n");
+
+    /* Run Scenario 1: Pure Software (PS) Reference Algorithms Benchmark */
+    xil_printf("--- 2. Running Scenario 1 (PS Pure) Software Benchmarks ---\r\n");
+    benchmark_ps_run_all(666666667U);
 
     /* Idle loop */
     while (1) {
