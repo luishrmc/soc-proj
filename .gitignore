@@ -20,6 +20,7 @@ __pycache__/
 *~
 .DS_Store
 Thumbs.db
+.vscode/
 
 # ---- VUnit / GHDL simulation outputs
 cora7z/app/hw/build/

@@ -1,0 +1,27 @@
+# Antigravity CLI Session Information
+
+CONVERSATION_ID: 21b52fce-4d85-4faf-a204-961136d53e2b
+PROJECT_NAME: cora-z7-10-compression-crypto
+SAVED_AT: 2026-10-19T00:41:46-03:00
+WORKSPACE_DIR: /home/luis/ufmg/soc/proj
+GIT_BRANCH: main
+LAST_COMMIT: 9ff3e1d
+
+## How to Resume this Session:
+
+1. Resume by specific Conversation ID:
+   agy --conversation 21b52fce-4d85-4faf-a204-961136d53e2b
+
+2. Continue most recent session:
+   agy -c
+   # or:
+   agy --continue
+
+## Current Milestone Status:
+- Phase 1 (Setup & Architecture): 100% DONE
+- Phase 2 (VHDL RTL Modules): 100% DONE (18/18 VUnit/GHDL tests PASS)
+- Phase 3 (Vivado Integration & Bitstream): 100% DONE (cora7z_top.xsa exported with bitstream included)
+- Phase 4 (Software & Firmware): 25% DONE (Task 4.4 ARM PMU routines completed and calibrated)
+- Next Eligible Tasks:
+  * Task 4.1: ESP32 SPI data injector firmware (esp32/)
+  * Task 4.2: C/C++ reference implementations on Cortex-A9 (Scenario 1: PS puro)

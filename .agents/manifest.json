@@ -62,7 +62,9 @@
         "utils/memory/handoff/*",
         "docs/**",
         ".agents/**",
-        "cora7z/app/hw/scripts/**"
+        "cora7z/app/hw/scripts/**",
+        "SESSION.txt",
+        "SESSION_ID.txt"
       ],
       "skills": ["project-plan", "memory-protocol", "plan-agents", "plan-hooks", "git-branch-lifecycle", "git-commit-stager", "git-safety-guard"]
     },
