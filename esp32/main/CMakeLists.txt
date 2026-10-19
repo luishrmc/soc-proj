@@ -12,4 +12,5 @@ idf_component_register(
         esp_timer
         esp_system
         log
+        ui_controller
 )

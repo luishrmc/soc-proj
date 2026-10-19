@@ -1,0 +1,12 @@
+idf_component_register(
+    SRCS
+        "ui_controller.c"
+    INCLUDE_DIRS
+        "."
+    REQUIRES
+        esp_driver_gpio
+        driver
+        freertos
+        esp_timer
+        log
+)

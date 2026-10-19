@@ -14,6 +14,11 @@ Connect the ESP32 GPIOs directly to the Cora Z7-10 Shield Header J1 (Bank 34 / 3
 | **MOSI** | `GPIO 23` | `T10` | `MOSI / IO11` | Master-Out Slave-In serial data |
 | **MISO** | `GPIO 19` | `V15` | `MISO / IO12` | Master-In Slave-Out serial data |
 | **CS / SS** | `GPIO 5` | `F16` | `SS / IO10` | Active-Low Chip Select (frame framing) |
+| **BTN_TRIGGER** | `GPIO 4` | N/A | Pushbutton 1 | Trigger burst injection (Active-Low, internal pull-up) |
+| **BTN_SELECT** | `GPIO 16` | N/A | Pushbutton 2 | Cycle benchmark profile (Active-Low, internal pull-up) |
+| **LED_READY** | `GPIO 2` | N/A | Blue Onboard | Heartbeat 1 Hz (Alive & Ready indicator) |
+| **LED_TX** | `GPIO 21` | N/A | External LED | TX Active / Busy indicator |
+| **LED_STATUS** | `GPIO 22` | N/A | External LED | Profile Blink Code / Critical Error alert |
 | **GND** | `GND` | `GND` | `GND` | Common Ground Reference |
 
 > [!IMPORTANT]
@@ -21,7 +26,31 @@ Connect the ESP32 GPIOs directly to the Cora Z7-10 Shield Header J1 (Bank 34 / 3
 
 ---
 
-## 2. SPI Frame Protocol Format
+## 2. Autonomous UI & Single-Cable Bench Workflow
+
+Because the test setup utilizes **a single micro-USB cable**, the cable is time-multiplexed:
+1. **Flashing & Diagnostics**: USB cable connected to ESP32 (`/dev/ttyACM0`).
+2. **End-to-End Benchmarks**: USB cable connected to Cora Z7 (capturing Cortex-A9 PMU / UART). The ESP32 is powered independently via external 5V/VIN or 3.3V rail.
+
+### Pushbutton Controls
+- **BTN_SELECT (GPIO 16)**: Cycles the active test profile:
+  - `Profile 0`: 64 B High-Redundancy (RLE)
+  - `Profile 1`: 1 KB Pseudo-Random (LZ4)
+  - `Profile 2`: 64 KB Telemetry (AES-128-CTR)
+  - `Profile 3`: 64 KB Telemetry (ChaCha20)
+  - `Profile 4`: Full Benchmark Suite (All 4 patterns back-to-back)
+- **BTN_TRIGGER (GPIO 4)**: Injects the active burst over SPI.
+
+### Visual LED Telemetry
+- **LED_READY (GPIO 2)**: 1 Hz blinking heartbeat indicating the FreeRTOS orchestrator is ready.
+- **LED_TX (GPIO 21)**: Solid ON during packet transmission; OFF when idle.
+- **LED_STATUS (GPIO 22)**:
+  - Emits `profile + 1` pulses (e.g., 2 blinks = 1KB LZ4), followed by a 1.4s pause.
+  - Solid continuous ON in case of critical error (CRC or SPI failure).
+
+---
+
+## 3. SPI Frame Protocol Format
 
 Each frame strictly adheres to the protocol specified in `cora7z/app/hw/src/INTERFACES.md` (Section 1.3):
 
@@ -47,19 +76,11 @@ Each frame strictly adheres to the protocol specified in `cora7z/app/hw/src/INTE
 
 ---
 
-## 3. Toolchain & Development Workflow
+## 4. Toolchain & Development Workflow
 
 The project is structured according to the clean ESP-IDF model from [`luishrmc/weather_system_esp`](https://github.com/luishrmc/weather_system_esp).
 
-### 3.1 Using VS Code with ESP-IDF Extension
-
-The root `.vscode/settings.json` is preconfigured with the local ESP-IDF v6.1 installation:
-1. Open the project root in VS Code.
-2. Select **ESP-IDF: Select Current ESP-IDF Version** -> `v6.1`.
-3. Set Target device to `esp32`.
-4. Click **Build**, **Flash**, and **Monitor** from the VS Code status bar.
-
-### 3.2 Using Command Line Interface (CLI)
+### 4.1 Command Line Interface (CLI)
 
 ```bash
 # 1. Load the ESP-IDF v6.1 environment
@@ -68,12 +89,9 @@ source $HOME/.espressif/tools/activate_idf_v6.1.sh
 # 2. Navigate to the ESP32 project directory
 cd esp32
 
-# 3. Set the target chip (one-time setup)
-idf.py set-target esp32
-
-# 4. Compile the firmware
+# 3. Compile the firmware
 idf.py build
 
-# 5. Flash and open serial monitor (adjust port if needed)
-idf.py -p /dev/ttyUSB0 flash monitor
+# 4. Flash and open serial monitor via native USB-Serial (/dev/ttyACM0)
+idf.py -p /dev/ttyACM0 flash monitor
 ```
