@@ -39,3 +39,4 @@ Append-only. One line per status change.
 | 2026-10-19 | 4.2 | Em andamento -> Concluída | gate:4.2 |
 | 2026-10-19 | 4.3 | Pendente -> Em andamento | - |
 | 2026-10-19 | 4.3 | Em andamento -> Concluída | gate:4.3 |
+| 2026-10-19 | 5.0 | Em andamento -> Concluída | file:out/esp32_selftest.log |

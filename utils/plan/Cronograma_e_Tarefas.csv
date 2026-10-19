@@ -17,7 +17,8 @@ ID da Tarefa,Fase,Atividade Detalhada,Entregável Associado,Duração Estimada (
 4.2,4,Implementação de referência em C/C++ no Cortex-A9,Código C/C++,4,3.5,Concluída,Alta,2026-10-19,2026-10-19,gate:4.2,2026-10-19,"Algoritmos de referência C11 modulares (RLE, LZ4, AES-CTR, ChaCha20) e benchmark do Cenário 1 (PS puro) validados via Vitis Unified e testes de ouro."
 4.3,4,Drivers de comunicação AXI para controle dos aceleradores,Código C/C++,3,4.2,Concluída,Alta,2026-10-19,2026-10-19,gate:4.3,2026-10-19,"Drivers AXI desenvolvidos e verificados: AXI DMA (PG021), AXI Quad SPI (PG153), controladores AXI4-Lite dos 4 aceleradores e Pipeline Manager SPI-PL-PS."
 4.4,4,Rotinas de instrumentação via ARM PMU,Código C/C++,2,4.3,Concluída,Alta,2026-10-19,2026-10-19,gate:4.4,2026-10-19,Rotinas de inicializacao e calibracao do ARM PMU implementadas e testadas via Vitis Unified (overhead medio calibrado).
-5.1,5,Montagem física do enlace SPI entre ESP32 e Cora Z7,Setup Físico,1,"4.1, 4.4",Pendente,Alta,,,,,
+5.0,5,"Firmware ESP32: UI Autônoma (Botões/LEDs), Testes On-Target e Validação Sintética",Código ESP32,2,"4.1, 4.4",Concluída,Alta,2026-10-19,2026-10-19,file:out/esp32_selftest.log,2026-10-19,"Firmware ESP32 compilado no ESP-IDF v6.1 e testado fisicamente na placa via /dev/ttyACM0 com auto-teste aprovado (UI botões/LEDs, CRC-16, injeção SPI dry-run)."
+5.1,5,Montagem física do enlace SPI entre ESP32 e Cora Z7,Setup Físico,1,5.0,Pendente,Alta,,,,,
 5.2,5,Ensaios no Cenário 1 (PS puro),Dados Coletados,2,5.1,Pendente,Alta,,,,,
 5.3,5,Ensaios no Cenário 2 (PL pura),Dados Coletados,2,5.1,Pendente,Alta,,,,,
 5.4,5,Ensaios no Cenário 3 (Híbrido Co-projeto),Dados Coletados,2,5.1,Pendente,Alta,,,,,
