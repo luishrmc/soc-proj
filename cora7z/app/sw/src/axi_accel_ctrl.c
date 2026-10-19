@@ -104,3 +104,7 @@ void axi_accel_set_chacha_key_nonce(uintptr_t base_addr,
 
     AXI_IO_WRITE32(base_addr + CHACHA_REG_BLOCK_CNT, block_counter);
 }
+
+void axi_accel_set_stream_route(uint32_t route_id) {
+    AXI_IO_WRITE32(ACCEL_BASE_STREAM_MUX, route_id);
+}

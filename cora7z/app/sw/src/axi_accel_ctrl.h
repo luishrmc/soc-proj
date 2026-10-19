@@ -27,6 +27,14 @@ extern "C" {
 #define ACCEL_BASE_LZ4       0x43C10000U
 #define ACCEL_BASE_AES_CTR   0x43C20000U
 #define ACCEL_BASE_CHACHA20  0x43C30000U
+#define ACCEL_BASE_STREAM_MUX 0x43C40000U
+
+/* Stream Multiplexer Route Selection */
+#define ACCEL_MUX_ROUTE_AUTO     0U
+#define ACCEL_MUX_ROUTE_RLE      1U
+#define ACCEL_MUX_ROUTE_LZ4      2U
+#define ACCEL_MUX_ROUTE_AES_CTR  3U
+#define ACCEL_MUX_ROUTE_CHACHA   4U
 
 /* ========================================================================= */
 /* Standard Accelerator Common Register Offsets                              */
@@ -156,6 +164,12 @@ void axi_accel_set_chacha_key_nonce(uintptr_t base_addr,
                                     const uint8_t key[32],
                                     const uint8_t nonce[12],
                                     uint32_t block_counter);
+
+/**
+ * @brief Select active accelerator core route on the AXI4-Stream multiplexer.
+ * @param route_id ACCEL_MUX_ROUTE_* (0=Auto by core BUSY, 1=RLE, 2=LZ4, 3=AES, 4=ChaCha20).
+ */
+void axi_accel_set_stream_route(uint32_t route_id);
 
 #ifdef __cplusplus
 }

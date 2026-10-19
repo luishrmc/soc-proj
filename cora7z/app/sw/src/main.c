@@ -20,52 +20,6 @@
 #include "pipeline_mgr.h"
 
 /* ========================================================================= */
-/* Peripheral Base Address Definitions (Synchronized with INTERFACES.md)     */
-/* ========================================================================= */
-#ifdef XPAR_AXI_DMA_0_BASEADDR
-#define AXI_DMA_BASEADDR     XPAR_AXI_DMA_0_BASEADDR
-#else
-#define AXI_DMA_BASEADDR     0x40400000U
-#endif
-
-#ifdef XPAR_AXI_QUAD_SPI_0_BASEADDR
-#define AXI_SPI_BASEADDR     XPAR_AXI_QUAD_SPI_0_BASEADDR
-#else
-#define AXI_SPI_BASEADDR     0x41E00000U
-#endif
-
-#ifdef XPAR_RLE_ENGINE_0_BASEADDR
-#define RLE_ENGINE_BASEADDR  XPAR_RLE_ENGINE_0_BASEADDR
-#else
-#define RLE_ENGINE_BASEADDR  0x43C00000U
-#endif
-
-#ifdef XPAR_LZ4_ENGINE_0_BASEADDR
-#define LZ4_ENGINE_BASEADDR  XPAR_LZ4_ENGINE_0_BASEADDR
-#else
-#define LZ4_ENGINE_BASEADDR  0x43C10000U
-#endif
-
-#ifdef XPAR_AES_CTR_ENGINE_0_BASEADDR
-#define AES_CTR_ENGINE_BASEADDR XPAR_AES_CTR_ENGINE_0_BASEADDR
-#else
-#define AES_CTR_ENGINE_BASEADDR 0x43C20000U
-#endif
-
-#ifdef XPAR_CHACHA20_ENGINE_0_BASEADDR
-#define CHACHA20_ENGINE_BASEADDR XPAR_CHACHA20_ENGINE_0_BASEADDR
-#else
-#define CHACHA20_ENGINE_BASEADDR 0x43C30000U
-#endif
-
-/* Accelerator CSR Offsets */
-#define CSR_REG_CONTROL      0x00U
-#define CSR_REG_STATUS       0x04U
-#define CSR_REG_SRC_LEN      0x08U
-#define CSR_REG_DST_LEN      0x0CU
-#define CSR_REG_CYCLE_COUNT  0x10U
-
-/* ========================================================================= */
 /* ARM Cortex-A9 Performance Monitor Unit (PMU / CP15) Routines             */
 /* ========================================================================= */
 
@@ -144,9 +98,9 @@ static bool check_peripherals(void) {
     }
 
     /* 1. RLE Compression Engine */
-    val = Xil_In32(RLE_ENGINE_BASEADDR + CSR_REG_STATUS);
-    xil_printf("[CHECK] RLE Engine @ 0x%08X -> STATUS = 0x%08X ... ", RLE_ENGINE_BASEADDR, val);
-    if ((val & 0x01U) == 0U) { /* BUSY should be 0 at idle */
+    val = Xil_In32(ACCEL_BASE_RLE + ACCEL_REG_STATUS);
+    xil_printf("[CHECK] RLE Engine @ 0x%08X -> STATUS = 0x%08X ... ", ACCEL_BASE_RLE, val);
+    if ((val & ACCEL_STAT_BUSY_MASK) == 0U) { /* BUSY should be 0 at idle */
         xil_printf("PASS (IDLE)\r\n");
     } else {
         xil_printf("FAIL (Unexpected BUSY state)\r\n");
@@ -154,9 +108,9 @@ static bool check_peripherals(void) {
     }
 
     /* 2. LZ4 Compression Engine */
-    val = Xil_In32(LZ4_ENGINE_BASEADDR + CSR_REG_STATUS);
-    xil_printf("[CHECK] LZ4 Engine @ 0x%08X -> STATUS = 0x%08X ... ", LZ4_ENGINE_BASEADDR, val);
-    if ((val & 0x01U) == 0U) { /* BUSY should be 0 at idle */
+    val = Xil_In32(ACCEL_BASE_LZ4 + ACCEL_REG_STATUS);
+    xil_printf("[CHECK] LZ4 Engine @ 0x%08X -> STATUS = 0x%08X ... ", ACCEL_BASE_LZ4, val);
+    if ((val & ACCEL_STAT_BUSY_MASK) == 0U) { /* BUSY should be 0 at idle */
         xil_printf("PASS (IDLE)\r\n");
     } else {
         xil_printf("FAIL (Unexpected BUSY state)\r\n");
@@ -164,9 +118,9 @@ static bool check_peripherals(void) {
     }
 
     /* 3. AES-CTR Coprocessor */
-    val = Xil_In32(AES_CTR_ENGINE_BASEADDR + CSR_REG_STATUS);
-    xil_printf("[CHECK] AES Engine @ 0x%08X -> STATUS = 0x%08X ... ", AES_CTR_ENGINE_BASEADDR, val);
-    if ((val & 0x01U) == 0U) { /* BUSY should be 0 at idle */
+    val = Xil_In32(ACCEL_BASE_AES_CTR + ACCEL_REG_STATUS);
+    xil_printf("[CHECK] AES Engine @ 0x%08X -> STATUS = 0x%08X ... ", ACCEL_BASE_AES_CTR, val);
+    if ((val & ACCEL_STAT_BUSY_MASK) == 0U) { /* BUSY should be 0 at idle */
         xil_printf("PASS (IDLE)\r\n");
     } else {
         xil_printf("FAIL (Unexpected BUSY state)\r\n");
@@ -174,9 +128,9 @@ static bool check_peripherals(void) {
     }
 
     /* 4. ChaCha20 Stream Cipher Coprocessor */
-    val = Xil_In32(CHACHA20_ENGINE_BASEADDR + CSR_REG_STATUS);
-    xil_printf("[CHECK] ChaCha Engine @ 0x%08X -> STATUS = 0x%08X ... ", CHACHA20_ENGINE_BASEADDR, val);
-    if ((val & 0x01U) == 0U) { /* BUSY should be 0 at idle */
+    val = Xil_In32(ACCEL_BASE_CHACHA20 + ACCEL_REG_STATUS);
+    xil_printf("[CHECK] ChaCha Engine @ 0x%08X -> STATUS = 0x%08X ... ", ACCEL_BASE_CHACHA20, val);
+    if ((val & ACCEL_STAT_BUSY_MASK) == 0U) { /* BUSY should be 0 at idle */
         xil_printf("PASS (IDLE)\r\n");
     } else {
         xil_printf("FAIL (Unexpected BUSY state)\r\n");
@@ -184,18 +138,18 @@ static bool check_peripherals(void) {
     }
 
     /* 5. AXI Direct Memory Access (AXI DMA) */
-    val = Xil_In32(AXI_DMA_BASEADDR + 0x00U); /* MM2S_DMACR */
-    xil_printf("[CHECK] AXI DMA    @ 0x%08X -> MM2S_DMACR = 0x%08X ... ", AXI_DMA_BASEADDR, val);
+    val = Xil_In32(AXI_DMA_DEFAULT_BASEADDR + DMA_REG_MM2S_DMACR);
+    xil_printf("[CHECK] AXI DMA    @ 0x%08X -> MM2S_DMACR = 0x%08X ... ", AXI_DMA_DEFAULT_BASEADDR, val);
     /* In reset state, DMACR bit 0 (RS) is 0 */
-    if ((val & 0x01U) == 0U) {
+    if ((val & DMA_CR_RS_MASK) == 0U) {
         xil_printf("PASS (HALTED/READY)\r\n");
     } else {
         xil_printf("PASS (RUNNING)\r\n");
     }
 
     /* 6. AXI Quad SPI Slave */
-    val = Xil_In32(AXI_SPI_BASEADDR + 0x64U); /* Status Register */
-    xil_printf("[CHECK] AXI SPI    @ 0x%08X -> STATUS     = 0x%08X ... ", AXI_SPI_BASEADDR, val);
+    val = Xil_In32(AXI_SPI_DEFAULT_BASEADDR + SPI_REG_SPISR);
+    xil_printf("[CHECK] AXI SPI    @ 0x%08X -> STATUS     = 0x%08X ... ", AXI_SPI_DEFAULT_BASEADDR, val);
     xil_printf("PASS (ACCESSIBLE)\r\n");
 
     return all_ok;
@@ -209,7 +163,7 @@ int main(void) {
     xil_printf("\r\n");
     xil_printf("================================================================\r\n");
     xil_printf("  Digilent Cora Z7-10: SoC PS/PL Baseline Firmware Initialized  \r\n");
-    xil_printf("  ARM Cortex-A9 Core 0 @ 667 MHz (Bare-Metal Standalone BSP)    \r\n");
+    xil_printf("  ARM Cortex-A9 Core 0 @ 650 MHz (Bare-Metal Standalone BSP)    \r\n");
     xil_printf("================================================================\r\n\r\n");
 
     /* Initialize and calibrate ARM PMU */
@@ -231,7 +185,11 @@ int main(void) {
 
     /* Run Scenario 1: Pure Software (PS) Reference Algorithms Benchmark */
     xil_printf("--- 2. Running Scenario 1 (PS Pure) Software Benchmarks ---\r\n");
-    benchmark_ps_run_all(666666667U);
+#ifdef XPAR_CPU_CORE_CLOCK_FREQ_HZ
+    benchmark_ps_run_all(XPAR_CPU_CORE_CLOCK_FREQ_HZ);
+#else
+    benchmark_ps_run_all(650000000U);
+#endif
 
     /* Run AXI Communication Drivers Self-Test and Arming */
     xil_printf("--- 3. Testing and Initializing AXI Communication Drivers ---\r\n");

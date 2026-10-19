@@ -18,8 +18,6 @@ extern "C" {
 
 #define AES_BLOCK_SIZE     16U
 #define AES128_KEY_SIZE    16U
-#define AES128_ROUNDS      10U
-#define AES128_ROUND_KEYS  11U
 
 typedef struct {
     uint32_t round_keys[44];    /* 11 round keys * 4 words */

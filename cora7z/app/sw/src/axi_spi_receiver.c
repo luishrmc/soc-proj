@@ -127,14 +127,13 @@ int axi_spi_parse_packet(const uint8_t *raw_buf,
                                      (((uint32_t)raw_buf[7]));
 
     uint32_t plen = frame_out->header.payload_len;
-    size_t expected_total = SPI_HEADER_SIZE + (size_t)plen + SPI_TRAILER_SIZE;
-
-    if (raw_len < expected_total) {
-        return -4; /* Payload truncated */
-    }
-
     if (plen > max_payload_len) {
         return -1; /* Exceeds buffer capacity */
+    }
+
+    size_t expected_total = SPI_HEADER_SIZE + (size_t)plen + SPI_TRAILER_SIZE;
+    if (raw_len < expected_total) {
+        return -4; /* Payload truncated */
     }
 
     /* Copy payload data */
@@ -166,12 +165,11 @@ int axi_spi_drain_frame(uintptr_t base_addr,
         return -1;
     }
 
-    /* Static assembly buffer for stream assembly */
-    static uint8_t s_rx_temp[SPI_HEADER_SIZE + 65536 + SPI_TRAILER_SIZE];
+    uint8_t hdr[SPI_HEADER_SIZE];
+    uint8_t trl[SPI_TRAILER_SIZE];
     size_t rx_idx = 0;
+    uint32_t plen = 0;
     uint32_t cycles = 0;
-
-    /* 1. Synchronize to Preamble [0xAA, 0x55] */
     uint8_t b = 0;
     bool found_sync = false;
 
@@ -179,45 +177,50 @@ int axi_spi_drain_frame(uintptr_t base_addr,
         if (axi_spi_read_byte(base_addr, &b) == 0) {
             if (!found_sync) {
                 if (rx_idx == 0 && b == SPI_PREAMBLE_BYTE0) {
-                    s_rx_temp[0] = b;
+                    hdr[0] = b;
                     rx_idx = 1;
                 } else if (rx_idx == 1) {
                     if (b == SPI_PREAMBLE_BYTE1) {
-                        s_rx_temp[1] = b;
+                        hdr[1] = b;
                         rx_idx = 2;
                         found_sync = true;
                     } else if (b == SPI_PREAMBLE_BYTE0) {
-                        s_rx_temp[0] = b;
+                        hdr[0] = b;
                         rx_idx = 1;
                     } else {
                         rx_idx = 0;
                     }
                 }
-            } else {
-                /* Collect header and payload */
-                s_rx_temp[rx_idx++] = b;
-
-                /* Once header is received, determine full length */
+            } else if (rx_idx < SPI_HEADER_SIZE) {
+                hdr[rx_idx++] = b;
                 if (rx_idx == SPI_HEADER_SIZE) {
-                    uint32_t plen = (((uint32_t)s_rx_temp[4]) << 24) |
-                                    (((uint32_t)s_rx_temp[5]) << 16) |
-                                    (((uint32_t)s_rx_temp[6]) << 8)  |
-                                    (((uint32_t)s_rx_temp[7]));
-                    if (plen > max_payload_len || (SPI_HEADER_SIZE + plen + SPI_TRAILER_SIZE) > sizeof(s_rx_temp)) {
+                    frame_out->header.payload_type = hdr[2];
+                    frame_out->header.flags        = hdr[3];
+                    plen = (((uint32_t)hdr[4]) << 24) |
+                           (((uint32_t)hdr[5]) << 16) |
+                           (((uint32_t)hdr[6]) << 8)  |
+                           (((uint32_t)hdr[7]));
+                    frame_out->header.payload_len = plen;
+                    if (plen > max_payload_len) {
                         return -1; /* Payload overflow */
                     }
                 }
-
-                if (rx_idx >= SPI_HEADER_SIZE) {
-                    uint32_t plen = (((uint32_t)s_rx_temp[4]) << 24) |
-                                    (((uint32_t)s_rx_temp[5]) << 16) |
-                                    (((uint32_t)s_rx_temp[6]) << 8)  |
-                                    (((uint32_t)s_rx_temp[7]));
-                    size_t target_sz = SPI_HEADER_SIZE + plen + SPI_TRAILER_SIZE;
-                    if (rx_idx == target_sz) {
-                        /* Packet complete */
-                        return axi_spi_parse_packet(s_rx_temp, rx_idx, payload_buf, max_payload_len, frame_out);
+            } else if (rx_idx < (SPI_HEADER_SIZE + (size_t)plen)) {
+                payload_buf[rx_idx - SPI_HEADER_SIZE] = b;
+                rx_idx++;
+            } else {
+                trl[rx_idx - SPI_HEADER_SIZE - (size_t)plen] = b;
+                rx_idx++;
+                if (rx_idx == (SPI_HEADER_SIZE + (size_t)plen + SPI_TRAILER_SIZE)) {
+                    frame_out->payload = (plen > 0U) ? payload_buf : NULL;
+                    frame_out->crc16_received = (uint16_t)(((uint16_t)trl[0] << 8) | (uint16_t)trl[1]);
+                    uint16_t crc = axi_spi_crc16(hdr, SPI_HEADER_SIZE, 0xFFFFU);
+                    if (plen > 0U) {
+                        crc = axi_spi_crc16(payload_buf, plen, crc);
                     }
+                    frame_out->crc16_computed = crc;
+                    frame_out->crc_valid = (crc == frame_out->crc16_received);
+                    return frame_out->crc_valid ? 0 : -3;
                 }
             }
         } else {

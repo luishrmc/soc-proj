@@ -24,17 +24,6 @@ extern "C" {
 
 #define BENCHMARK_RUNS 10U
 
-typedef struct {
-    const char *algorithm_name;
-    size_t      block_size_bytes;
-    uint32_t    cycles_mean;
-    uint32_t    cycles_stddev;
-    float       latency_us;
-    float       throughput_mbps;
-    float       compression_ratio;
-    bool        verified;
-} benchmark_result_t;
-
 /**
  * @brief Execute the full Scenario 1 (PS puro) benchmark matrix on Cortex-A9.
  *

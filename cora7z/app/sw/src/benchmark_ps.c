@@ -18,14 +18,11 @@
 #define B_PRINTF printf
 #endif
 
-/* Static Benchmark Working Buffers in DDR */
-static uint8_t s_buf_64b[64];
-static uint8_t s_buf_1kb[1024];
-static uint8_t s_buf_64kb[65536];
-
-static uint8_t s_out_64b[128];
-static uint8_t s_out_1kb[2048];
-static uint8_t s_out_64kb[65536 + 256];
+/* Static Benchmark Working Buffers in DDR (32-byte cache-line aligned) */
+static uint8_t s_buf_64b[64]           __attribute__((aligned(32)));
+static uint8_t s_buf_1kb[1024]         __attribute__((aligned(32)));
+static uint8_t s_buf_64kb[65536]       __attribute__((aligned(32)));
+static uint8_t s_out_64kb[65536 + 256] __attribute__((aligned(32)));
 
 static inline uint32_t pmu_get_cycles(void) {
 #if defined(__arm__) || defined(__aarch64__)
@@ -112,7 +109,7 @@ static void init_test_patterns(void) {
 
 void benchmark_ps_run_all(uint32_t cpu_freq_hz) {
     if (cpu_freq_hz == 0) {
-        cpu_freq_hz = 666666667U; /* Default Cora Z7 Cortex-A9 667 MHz */
+        cpu_freq_hz = 650000000U; /* Default Cora Z7 Cortex-A9 650 MHz per xparameters.h */
     }
 
     init_test_patterns();
@@ -133,7 +130,7 @@ void benchmark_ps_run_all(uint32_t cpu_freq_hz) {
     size_t rle_out_sz = 0;
     for (uint32_t r = 0; r < BENCHMARK_RUNS; r++) {
         t_start = pmu_get_cycles();
-        rle_out_sz = rle_compress(s_buf_64b, sizeof(s_buf_64b), s_out_64b, sizeof(s_out_64b));
+        rle_out_sz = rle_compress(s_buf_64b, sizeof(s_buf_64b), s_out_64kb, 128U);
         t_end = pmu_get_cycles();
         samples[r] = (t_end >= t_start) ? (t_end - t_start) : (0xFFFFFFFFU - t_start + t_end);
     }
@@ -142,8 +139,8 @@ void benchmark_ps_run_all(uint32_t cpu_freq_hz) {
     float rle_mbps = ((float)sizeof(s_buf_64b) / (1024.0f * 1024.0f)) / (rle_us / 1000000.0f);
     float rle_ratio = (float)sizeof(s_buf_64b) / (float)rle_out_sz;
 
-    B_PRINTF("[BENCH] RLE (64 B):       Cycles: %lu +/- %lu | Latency: %d us | Throughput: %d KB/s | Ratio: %d:1\r\n",
-             (unsigned long)mean, (unsigned long)stddev, (int)rle_us, (int)(rle_mbps * 1024.0f), (int)rle_ratio);
+    B_PRINTF("[BENCH] RLE (64 B):       Cycles: %u +/- %u | Latency: %d us | Throughput: %d KB/s | Ratio: %d:1\r\n",
+             (unsigned int)mean, (unsigned int)stddev, (int)rle_us, (int)(rle_mbps * 1024.0f), (int)rle_ratio);
 
     /* ---------------------------------------------------------------------- */
     /* 2. LZ4 Compression (1 KB Pseudo-Random)                                */
@@ -151,7 +148,7 @@ void benchmark_ps_run_all(uint32_t cpu_freq_hz) {
     size_t lz4_out_sz = 0;
     for (uint32_t r = 0; r < BENCHMARK_RUNS; r++) {
         t_start = pmu_get_cycles();
-        lz4_out_sz = lz4_compress(s_buf_1kb, sizeof(s_buf_1kb), s_out_1kb, sizeof(s_out_1kb));
+        lz4_out_sz = lz4_compress(s_buf_1kb, sizeof(s_buf_1kb), s_out_64kb, 2048U);
         t_end = pmu_get_cycles();
         samples[r] = (t_end >= t_start) ? (t_end - t_start) : (0xFFFFFFFFU - t_start + t_end);
     }
@@ -159,8 +156,8 @@ void benchmark_ps_run_all(uint32_t cpu_freq_hz) {
     float lz4_us = ((float)mean * 1000000.0f) / (float)cpu_freq_hz;
     float lz4_mbps = ((float)sizeof(s_buf_1kb) / (1024.0f * 1024.0f)) / (lz4_us / 1000000.0f);
 
-    B_PRINTF("[BENCH] LZ4 (1 KB):       Cycles: %lu +/- %lu | Latency: %d us | Throughput: %d KB/s | Out: %lu B\r\n",
-             (unsigned long)mean, (unsigned long)stddev, (int)lz4_us, (int)(lz4_mbps * 1024.0f), (unsigned long)lz4_out_sz);
+    B_PRINTF("[BENCH] LZ4 (1 KB):       Cycles: %u +/- %u | Latency: %d us | Throughput: %d KB/s | Out: %u B\r\n",
+             (unsigned int)mean, (unsigned int)stddev, (int)lz4_us, (int)(lz4_mbps * 1024.0f), (unsigned int)lz4_out_sz);
 
     /* ---------------------------------------------------------------------- */
     /* 3. AES-128-CTR (64 KB Telemetry)                                       */
@@ -181,8 +178,8 @@ void benchmark_ps_run_all(uint32_t cpu_freq_hz) {
     float aes_us = ((float)mean * 1000000.0f) / (float)cpu_freq_hz;
     float aes_mbps = ((float)sizeof(s_buf_64kb) / (1024.0f * 1024.0f)) / (aes_us / 1000000.0f);
 
-    B_PRINTF("[BENCH] AES-128-CTR (64K): Cycles: %lu +/- %lu | Latency: %d ms | Throughput: %d.%02d MB/s\r\n",
-             (unsigned long)mean, (unsigned long)stddev, (int)(aes_us / 1000.0f), (int)aes_mbps, (int)((aes_mbps - (int)aes_mbps) * 100));
+    B_PRINTF("[BENCH] AES-128-CTR (64K): Cycles: %u +/- %u | Latency: %d ms | Throughput: %d.%02d MB/s\r\n",
+             (unsigned int)mean, (unsigned int)stddev, (int)(aes_us / 1000.0f), (int)aes_mbps, (int)((aes_mbps - (int)aes_mbps) * 100));
 
     /* ---------------------------------------------------------------------- */
     /* 4. ChaCha20 (64 B and 64 KB Telemetry)                                 */
@@ -197,7 +194,7 @@ void benchmark_ps_run_all(uint32_t cpu_freq_hz) {
         chacha20_init(&chacha_ctx, chacha_key, chacha_nonce, 1);
 
         t_start = pmu_get_cycles();
-        chacha20_crypt(&chacha_ctx, s_buf_64b, s_out_64b, sizeof(s_buf_64b));
+        chacha20_crypt(&chacha_ctx, s_buf_64b, s_out_64kb, sizeof(s_buf_64b));
         t_end = pmu_get_cycles();
         samples[r] = (t_end >= t_start) ? (t_end - t_start) : (0xFFFFFFFFU - t_start + t_end);
     }
@@ -205,8 +202,8 @@ void benchmark_ps_run_all(uint32_t cpu_freq_hz) {
     float chacha_64_us = ((float)mean * 1000000.0f) / (float)cpu_freq_hz;
     float chacha_64_mbps = ((float)sizeof(s_buf_64b) / (1024.0f * 1024.0f)) / (chacha_64_us / 1000000.0f);
 
-    B_PRINTF("[BENCH] ChaCha20 (64 B):   Cycles: %lu +/- %lu | Latency: %d us | Throughput: %d KB/s\r\n",
-             (unsigned long)mean, (unsigned long)stddev, (int)chacha_64_us, (int)(chacha_64_mbps * 1024.0f));
+    B_PRINTF("[BENCH] ChaCha20 (64 B):   Cycles: %u +/- %u | Latency: %d us | Throughput: %d KB/s\r\n",
+             (unsigned int)mean, (unsigned int)stddev, (int)chacha_64_us, (int)(chacha_64_mbps * 1024.0f));
 
     /* ChaCha20 64 KB */
     for (uint32_t r = 0; r < BENCHMARK_RUNS; r++) {
@@ -222,8 +219,8 @@ void benchmark_ps_run_all(uint32_t cpu_freq_hz) {
     float chacha_64k_us = ((float)mean * 1000000.0f) / (float)cpu_freq_hz;
     float chacha_64k_mbps = ((float)sizeof(s_buf_64kb) / (1024.0f * 1024.0f)) / (chacha_64k_us / 1000000.0f);
 
-    B_PRINTF("[BENCH] ChaCha20 (64 KB):  Cycles: %lu +/- %lu | Latency: %d ms | Throughput: %d.%02d MB/s\r\n",
-             (unsigned long)mean, (unsigned long)stddev, (int)(chacha_64k_us / 1000.0f), (int)chacha_64k_mbps, (int)((chacha_64k_mbps - (int)chacha_64k_mbps) * 100));
+    B_PRINTF("[BENCH] ChaCha20 (64 KB):  Cycles: %u +/- %u | Latency: %d ms | Throughput: %d.%02d MB/s\r\n",
+             (unsigned int)mean, (unsigned int)stddev, (int)(chacha_64k_us / 1000.0f), (int)chacha_64k_mbps, (int)((chacha_64k_mbps - (int)chacha_64k_mbps) * 100));
 
     B_PRINTF("================================================================================\r\n");
     B_PRINTF("  [RESULT] All Scenario 1 Software Benchmarks Completed Successfully\r\n");

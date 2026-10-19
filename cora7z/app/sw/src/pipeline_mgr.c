@@ -118,15 +118,19 @@ int pipeline_mgr_process(pipeline_scenario_t scenario,
     }
 
     uintptr_t accel_base = 0;
+    uint32_t route_id = ACCEL_MUX_ROUTE_AUTO;
     switch (algo) {
         case ALGO_RLE:
             accel_base = ACCEL_BASE_RLE;
+            route_id   = ACCEL_MUX_ROUTE_RLE;
             break;
         case ALGO_LZ4:
             accel_base = ACCEL_BASE_LZ4;
+            route_id   = ACCEL_MUX_ROUTE_LZ4;
             break;
         case ALGO_AES_CTR:
             accel_base = ACCEL_BASE_AES_CTR;
+            route_id   = ACCEL_MUX_ROUTE_AES_CTR;
             {
                 const uint8_t key[16] = {0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15};
                 const uint8_t iv[12]  = {0xF0,0xF1,0xF2,0xF3,0xF4,0xF5,0xF6,0xF7,0xF8,0xF9,0xFA,0xFB};
@@ -135,6 +139,7 @@ int pipeline_mgr_process(pipeline_scenario_t scenario,
             break;
         case ALGO_CHACHA20:
             accel_base = ACCEL_BASE_CHACHA20;
+            route_id   = ACCEL_MUX_ROUTE_CHACHA;
             {
                 uint8_t key[32];
                 for (int i = 0; i < 32; i++) key[i] = (uint8_t)i;
@@ -146,10 +151,13 @@ int pipeline_mgr_process(pipeline_scenario_t scenario,
             return -1;
     }
 
-    /* 1. Reset accelerator datapath */
+    /* 1. Configure stream multiplexer route */
+    axi_accel_set_stream_route(route_id);
+
+    /* 2. Reset accelerator datapath */
     axi_accel_reset(accel_base);
 
-    /* 2. Configure input length and pulse start */
+    /* 3. Configure input length and pulse start */
     axi_accel_start(accel_base, (uint32_t)in_len);
 
     /* 3. Execute synchronized DMA transfer (S2MM armed first, then MM2S) */

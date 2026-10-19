@@ -23,9 +23,6 @@
 extern "C" {
 #endif
 
-#define LZ4_HASH_LOG       12U
-#define LZ4_HASH_SIZE      (1U << LZ4_HASH_LOG) /* 4096 hash slots */
-#define LZ4_MIN_MATCH      4U
 #define LZ4_MAX_DISTANCE   65535U
 
 /**
