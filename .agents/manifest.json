@@ -79,6 +79,7 @@
         "cora7z/app/hw/waves/**",
         "cora7z/app/hw/run.py",
         "cora7z/app/hw/Makefile",
+        "docs/**",
         "utils/memory/modules/*",
         "utils/memory/handoff/*"
       ],

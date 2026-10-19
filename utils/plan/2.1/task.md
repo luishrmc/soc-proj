@@ -1,91 +1,72 @@
-# Task 2.1: Diagnóstico e Configuração do Block Design (PS7 + AXI SPI Escravo + AXI DMA)
+# Task 2.1: Receptor SPI Escravo com Sincronização CDC e Buffer FIFO/BRAM
 
-## 1. Identificação do Projeto Vivado Existente
+## 1. Resumo da Tarefa e Objetivos
 
-Durante a auditoria do workspace, identificamos o projeto Vivado iniciado pelo usuário em:
-- **Projeto Vivado**: [`cora7z/app/hw/vivado/soc-final.xpr`](file:///home/luis/ufmg/soc/proj/cora7z/app/hw/vivado/soc-final.xpr)
-- **Diagrama de Blocos**: `soc_final_bd_1.bd` localizado em `cora7z/app/hw/vivado/soc-final.srcs/sources_1/bd/soc_final_bd_1/soc_final_bd_1.bd`
-- **Dispositivo Alvo**: Xilinx Zynq-7010 (`xc7z010clg400-1`), placa Digilent Cora Z7-10 (`digilentinc.com:cora-z7-10:part0:1.1`).
-
----
-
-## 2. Diagnóstico das Inconsistências Identificadas no Bloco Inicial
-
-Ao inspecionar o Block Design inicial via script Tcl de diagnóstico, identificamos 5 problemas que impediam o funcionamento correto do hardware:
-
-1. **`axi_interconnect_0` com porta M01 flutuante (Erro Crítico de Validação)**:
-   - A remoção de um bloco intermediário anterior (`ahblite_axi_bridge_0`) deixou o `axi_interconnect_0` configurado com `NUM_MI = 2`.
-   - A porta `M01_AXI` e o sinal de clock `M01_ACLK` ficaram completamente desconectados, causando falha imediata no comando `validate_bd_design`.
-2. **`axi_quad_spi_0` instanciado como MESTRE (Master Mode)**:
-   - Por padrão, a automação de placa (`shield_spi`) instancia o núcleo SPI em modo Mestre (`C_SPI_MODE = 0`, `Master_mode = 1`).
-   - Como o **ESP32 externo é o Mestre** da comunicação, a FPGA Cora Z7-10 **deve operar obrigatoriamente como Escrava (Slave Mode)** para receber o clock `SCK`, o `CS_n` e os dados `MOSI`.
-3. **FIFO do SPI subdimensionada (16 palavras)**:
-   - O `C_FIFO_DEPTH` estava em 16 palavras, insuficiente para rajadas contínuas de pacotes de dados sem estourar o buffer antes do atendimento da CPU ou DMA.
-4. **Ausência de Clock Rápido de Amostragem (`ext_spi_clk`)**:
-   - `ext_spi_clk` estava amarrado ao clock de 50 MHz (`FCLK_CLK0`). Pelo guia PG153 da Xilinx, o clock de amostragem no modo escravo deve ser pelo menos 4 vezes maior que o clock do barramento SPI (para suportar até 25 MHz de SPI, `ext_spi_clk` deve ser de no mínimo 100 MHz).
-5. **Portas HP0, Interrupções e DMA Inexistentes**:
-   - O PS7 estava sem a porta de alta performance (`S_AXI_HP0`) habilitada.
-   - As interrupções de hardware da PL para a CPU (`IRQ_F2P`) estavam desabilitadas.
-   - O bloco de DMA de hardware (`axi_dma_0`) não havia sido instanciado.
+Nesta etapa, implementamos o módulo de ingresso de dados da FPGA na lógica programável (PL):
+- **Módulo RTL (`cora7z/app/hw/src/spi_receiver.vhdl`)**:
+  - Receptor SPI em modo escravo (Mode 0: CPOL=0, CPHA=0) com suporte a taxas de até 25 MHz.
+  - Sincronização estrita de domínio de clock (CDC): todos os sinais externos assíncronos (`spi_sclk_i`, `spi_cs_n_i`, `spi_mosi_i`) passam por sincronizadores de 2 estágios DFF operando no clock do sistema (`clk_i` @ 100 MHz).
+  - Detector de bordas para amostragem determinística no meio do bit de dados.
+  - Conversor serial-paralelo (deserializador) de 8 bits (MSB first).
+  - Buffer FIFO síncrono interno para amortecimento de fluxo antes do despacho.
+  - Interface de saída AXI4-Stream Master (`m_axis_tdata`, `m_axis_tvalid`, `m_axis_tready`, `m_axis_tlast`) para conexão direta com os aceleradores (RLE, LZ4) ou AXI DMA.
+  - Sinais de status: contador de bytes recebidos (`rx_byte_count_o`), indicador de frame ativo (`frame_active_o`) e detecção de sobrecarga (`overflow_o`).
+- **Banco de Testes VUnit (`cora7z/app/hw/test/tb_spi_receiver.vhdl`)**:
+  - Simulação com VUnit e GHDL cobrindo múltiplos cenários: reset, frame nominal a 25 MHz, pacotes com preâmbulo, back-pressure (`tready = '0'`) e múltiplos frames consecutivos.
+- **Documentação Teórica e Arquitetural (`docs/SPI_RECEIVER_ARCHITECTURE.md`)**:
+  - Explicação completa da teoria de recepção SPI assíncrona, sincronização CDC, cálculo de MTBF para amostragem digital a 100 MHz, máquina de estados e diagramas Mermaid.
 
 ---
 
-## 3. Correções e Configurações Realizadas via Tcl
+## 2. Entregáveis Produzidos
 
-Criamos e executamos com sucesso o script Tcl de automação em [`cora7z/app/hw/scripts/configure_block_design.tcl`](file:///home/luis/ufmg/soc/proj/cora7z/app/hw/scripts/configure_block_design.tcl). As seguintes ações foram consolidadas no hardware:
+1. **Código RTL VHDL-2008**:
+   - [`cora7z/app/hw/src/spi_receiver.vhdl`](file:///home/luis/ufmg/soc/proj/cora7z/app/hw/src/spi_receiver.vhdl)
+2. **Banco de Testes VUnit**:
+   - [`cora7z/app/hw/test/tb_spi_receiver.vhdl`](file:///home/luis/ufmg/soc/proj/cora7z/app/hw/test/tb_spi_receiver.vhdl)
+3. **Documentação Arquitetural e Teórica**:
+   - [`docs/SPI_RECEIVER_ARCHITECTURE.md`](file:///home/luis/ufmg/soc/proj/docs/SPI_RECEIVER_ARCHITECTURE.md)
+4. **Digest Técnico de Módulo**:
+   - [`utils/memory/modules/spi_receiver.md`](file:///home/luis/ufmg/soc/proj/utils/memory/modules/spi_receiver.md)
 
-### 3.1 Reconfiguração do Processing System 7 (`processing_system7_0`)
-- **Eliminação de Critical Warnings**: Eliminamos valores negativos de skew DQS nos canais 2 e 3 do DDR3 (não utilizados no pacote Zynq-7010).
-- **Habilitação da Porta HP0**: Ativada a porta escrava AXI de alta performance de 64 bits (`PCW_USE_S_AXI_HP0 = 1`).
-- **Geração de Clock de 100 MHz**: Habilitado o segundo clock da PL (`FCLK_CLK1` @ 100 MHz) para alimentar o DMA e a amostragem rápida do SPI.
-- **Habilitação de Interrupções**: Ativadas as interrupções de tecido para o processador (`PCW_USE_FABRIC_INTERRUPT = 1`, `PCW_IRQ_F2P_INTR = 1`).
+---
 
-### 3.2 Reconfiguração do AXI Quad SPI (`axi_quad_spi_0`)
-- **Modo Escravo**: `Master_mode = 0`.
-- **Buffer FIFO**: Ampliado para 256 palavras (`C_FIFO_DEPTH = 256`).
-- **Clock de Amostragem**: Desconectado dos 50 MHz e conectado ao `FCLK_CLK1` (100 MHz).
-- **Interrupção**: Sinal `ip2intc_irpt` roteado para a entrada `In0` do concentrador de interrupções (`xlconcat_0`).
+## 3. Interfaces do Módulo `spi_receiver`
 
-### 3.3 Adição e Interconexão do AXI DMA (`axi_dma_0`)
-- **Modo Direto / Simples**: Desabilitado Scatter-Gather (`c_include_sg = 0`) para máxima eficiência e economia de recursos.
-- **Canais Habilitados**:
-  - `MM2S` (Leitura de dados do DDR3 -> Envio para stream de 32 bits a 100 MHz).
-  - `S2MM` (Recepção de stream de 32 bits a 100 MHz -> Escrita no DDR3).
-- **SmartConnect HP0**: Instanciado `smartconnect_hp0` ligando `M_AXI_MM2S` e `M_AXI_S2MM` diretamente à porta `S_AXI_HP0` da DDR3.
-- **Controle AXI-Lite**: Conectado `S_AXI_LITE` à porta `M01_AXI` do `axi_interconnect_0` no endereço base `0x40400000`.
-- **Interrupções**: `mm2s_introut` e `s2mm_introut` conectadas a `In1` e `In2` do `xlconcat_0`.
-
-### 3.4 Resultado da Validação
+```vhdl
+entity spi_receiver is
+  generic (
+    g_fifo_depth : positive := 32
+  );
+  port (
+    clk_i           : in  std_logic;                    -- System clock (100 MHz)
+    rst_n_i         : in  std_logic;                    -- Active-low synchronous reset
+    -- External Physical SPI Interface (asynchronous pins)
+    spi_sclk_i      : in  std_logic;                    -- SPI serial clock (up to 25 MHz)
+    spi_cs_n_i      : in  std_logic;                    -- SPI chip select (active low)
+    spi_mosi_i      : in  std_logic;                    -- SPI Master-Out Slave-In
+    spi_miso_o      : out std_logic;                    -- SPI Master-In Slave-Out (loopback/status)
+    -- Downstream AXI4-Stream Master Interface
+    m_axis_tdata_o  : out std_logic_vector(7 downto 0); -- Received data byte
+    m_axis_tvalid_o : out std_logic;                    -- Byte valid strobe
+    m_axis_tready_i : in  std_logic;                    -- Downstream backpressure
+    m_axis_tlast_o  : out std_logic;                    -- Frame boundary marker
+    -- Status and Monitoring
+    rx_byte_count_o : out unsigned(15 downto 0);        -- Frame byte count
+    frame_active_o  : out std_logic;                    -- Asserted during active SPI frame
+    overflow_o      : out std_logic                     -- Asserted if FIFO overflows
+  );
+end entity spi_receiver;
 ```
-=== BLOCK DESIGN CONFIGURED AND VALIDATED SUCCESSFULLY ===
-```
-O único aviso restante é o esperado `S_AXIS_S2MM interface is unconnected`, que será conectado à saída do nosso primeiro núcleo acelerador (RLE na Task 2.2).
 
 ---
 
-## 4. Mapa de Endereços Atualizado e Sincronizado
+## 4. Roteiro de Verificação (Inner & Outer Loops)
 
-| Periférico no BD | Bloco AXI | Endereço Base | Endereço Final | Tamanho | Função |
-|---|---|---|---|---|---|
-| `axi_dma_0` | `S_AXI_LITE/Reg` | `0x40400000` | `0x4040FFFF` | 64 KB | Controlador de DMA para DDR3 |
-| `axi_quad_spi_0` | `AXI_LITE/Reg` | `0x41E00000` | `0x41E0FFFF` | 64 KB | Interface SPI Escrava conectada ao ESP32 |
-| `rle_engine` *(Próxima Task)* | `s_axi_lite` | `0x43C00000` | `0x43C00FFF` | 4 KB | Acelerador de Compressão RLE |
-| `lz4_engine` | `s_axi_lite` | `0x43C10000` | `0x43C10FFF` | 4 KB | Acelerador de Compressão LZ4 |
-| `aes_ctr_engine` | `s_axi_lite` | `0x43C20000` | `0x43C20FFF` | 4 KB | Coprocessador Criptográfico AES-128-CTR |
-| `chacha20_engine` | `s_axi_lite` | `0x43C30000` | `0x43C30FFF` | 4 KB | Coprocessador Criptográfico ChaCha20 |
-
----
-
-## 5. Como o Usuário Interage no Vivado GUI a Partir de Agora
-
-Ao reabrir o Vivado:
-1. Abra o projeto: `cora7z/app/hw/vivado/soc-final.xpr`.
-2. Abra o Block Design `soc_final_bd_1.bd`.
-3. Você verá o diagrama completamente conectado, com o PS7 (DDR3, clocks 50/100 MHz), o SPI em modo Escravo com FIFO 256, o AXI DMA conectado ao SmartConnect HP0 e o barramento AXI-Lite configurado.
-4. Para adicionar os aceleradores nas próximas tarefas:
-   - Adicionaremos o arquivo `.vhdl` sintetizável (ex: `rle_engine.vhdl`).
-   - Clicaremos com botão direito no Block Design -> **Add Module...** -> `rle_engine`.
-   - Conectamos:
-     - `s_axi_lite` ao `axi_interconnect_0` (porta `M02_AXI`).
-     - `s_axis` ao `axi_dma_0/M_AXIS_MM2S`.
-     - `m_axis` ao `axi_dma_0/S_AXIS_S2MM`.
+1. **Inner Loop**:
+   - Linting estático: `TASK_ID=2.1 bash .agents/hooks/vhdl-lint.sh` (zero avisos, sem latches, sem `wait for`).
+   - Simulação VUnit: `TASK_ID=2.1 bash .agents/hooks/vhdl-sim-gate.sh spi_receiver` (100% dos testes aprovados).
+2. **Outer Loop**:
+   - Verificação do isolamento: `python3 .agents/hooks/boundary-guard.py check --agent rtl-agent`.
+   - Revisão adversária técnica pelo `technical-critic-agent`.
+   - Atualização do digest técnico e avanço no cronograma via `plan-sync.py`.

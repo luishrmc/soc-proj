@@ -16,6 +16,7 @@ Protocol: `.agents/skills/memory-protocol/SKILL.md`. Limit: 40 lines.
 ## Active modules
 
 - `interfaces`: SPI ingest framing, AXI4-Lite CSR map, AXI4-Stream datapath (`modules/interfaces.md`)
+- `spi_receiver`: Synchronous SPI slave receiver with CDC and FIFO buffer (`modules/spi_receiver.md`)
 - `rle_engine`: Run-Length Encoding hardware accelerator core (`modules/rle_engine.md`)
 - `lz4_engine`: LZ4 streaming compression accelerator core (`modules/lz4_engine.md`)
 - `vitis_platform`: Vitis 2026.1 unified bare-metal platform & firmware baseline (`modules/vitis_platform.md`)
