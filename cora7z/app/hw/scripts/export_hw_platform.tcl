@@ -6,7 +6,8 @@ set script_dir [file dirname [file normalize [info script]]]
 set repo_root [file normalize "$script_dir/../../../.."]
 set xpr_path "$repo_root/cora7z/app/hw/vivado/soc-final.xpr"
 set xsa_out "$repo_root/cora7z/app/hw/vivado/cora7z_top.xsa"
-set board_repo "/home/luis/.Xilinx/Vivado/2026.1/xhub/board_store/xilinx_board_store/XilinxBoardStore/Vivado/2026.1/boards"
+set user_home $::env(HOME)
+set board_repo "$user_home/.Xilinx/Vivado/2026.1/xhub/board_store/xilinx_board_store/XilinxBoardStore/Vivado/2026.1/boards"
 
 puts "================================================================================"
 puts "=== EXPORT XSA === Opening Vivado project: $xpr_path"

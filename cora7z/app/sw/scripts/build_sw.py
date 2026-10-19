@@ -25,8 +25,8 @@ repo_root = script_dir.parents[3]
 workspace_dir = repo_root / "cora7z" / "app" / "sw" / "vitis"
 xsa_path = repo_root / "cora7z" / "app" / "hw" / "vivado" / "cora7z_top.xsa"
 src_dir = repo_root / "cora7z" / "app" / "sw" / "src"
-out_dir = repo_root / "out" / "vitis" / "task_1.4"
-
+context = sys.argv[1] if len(sys.argv) > 1 else "latest"
+out_dir = repo_root / "out" / "vitis" / context
 out_dir.mkdir(parents=True, exist_ok=True)
 workspace_dir.mkdir(parents=True, exist_ok=True)
 

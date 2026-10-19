@@ -63,7 +63,7 @@ The root `.vscode/settings.json` is preconfigured with the local ESP-IDF v6.1 in
 
 ```bash
 # 1. Load the ESP-IDF v6.1 environment
-source /home/luis/.espressif/tools/activate_idf_v6.1.sh
+source $HOME/.espressif/tools/activate_idf_v6.1.sh
 
 # 2. Navigate to the ESP32 project directory
 cd esp32

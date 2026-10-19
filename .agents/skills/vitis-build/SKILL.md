@@ -18,7 +18,7 @@ Always source `.agents/env.sh` before executing Vitis commands:
 ```bash
 source .agents/env.sh
 ```
-This loads `/home/luis/Xilinx/2026.1/Vitis/bin` and `arm-none-eabi-gcc`.
+This loads `$HOME/Xilinx/2026.1/Vitis/bin` and `arm-none-eabi-gcc`.
 
 ## 3. Automation Script (`cora7z/app/sw/scripts/build_sw.py`)
 

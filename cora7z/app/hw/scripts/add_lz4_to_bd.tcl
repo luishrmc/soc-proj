@@ -7,7 +7,8 @@
 # - Validates Block Design with zero critical warnings
 # ==============================================================================
 
-set_param board.repoPaths [list "/home/luis/.Xilinx/Vivado/2026.1/xhub/board_store/xilinx_board_store/XilinxBoardStore/Vivado/2026.1/boards/Digilent/cora-z7-10/1.1"]
+set user_home $::env(HOME)
+set_param board.repoPaths [list "$user_home/.Xilinx/Vivado/2026.1/xhub/board_store/xilinx_board_store/XilinxBoardStore/Vivado/2026.1/boards/Digilent/cora-z7-10/1.1"]
 open_project cora7z/app/hw/vivado/soc-final.xpr
 set_property board_part digilentinc.com:cora-z7-10:part0:1.1 [current_project]
 

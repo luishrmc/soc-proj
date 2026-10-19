@@ -16,11 +16,11 @@ Nesta etapa, implementamos o primeiro núcleo acelerador em hardware da FPGA:
 ## 2. Entregáveis Produzidos
 
 1. **RTL Sintetizável em VHDL-2008**:
-   - Arquivo: [`cora7z/app/hw/src/rle_engine.vhdl`](file:///home/luis/ufmg/soc/proj/cora7z/app/hw/src/rle_engine.vhdl)
+   - Arquivo: [`cora7z/app/hw/src/rle_engine.vhdl`](cora7z/app/hw/src/rle_engine.vhdl)
    - Segue estritamente as convenções de código e estilo de comentários observadas no diretório modelo (`corez7/hw/src/blink_led.vhdl`).
    - Sem latches inferidos, totalmente síncrono com borda de subida única em 100 MHz (`aclk`), reset ativo baixo (`aresetn`).
 2. **Testbench com Autochecagem VUnit**:
-   - Arquivo: [`cora7z/app/hw/test/tb_rle_engine.vhdl`](file:///home/luis/ufmg/soc/proj/cora7z/app/hw/test/tb_rle_engine.vhdl)
+   - Arquivo: [`cora7z/app/hw/test/tb_rle_engine.vhdl`](cora7z/app/hw/test/tb_rle_engine.vhdl)
    - Cobre 5 cenários exaustivos:
      - Leitura/escrita dos registradores AXI-Lite (IDLE, START, BUSY, DONE, contadores).
      - Fluxo de alta redundância (64 bytes de `'A'` comprimidos em 2 bytes `[64, 'A']`).
@@ -28,10 +28,10 @@ Nesta etapa, implementamos o primeiro núcleo acelerador em hardware da FPGA:
      - Saturação de contagem (> 255 bytes idênticos gerando múltiplas tuplas `[255, byte] + [rest, byte]`).
      - Backpressure e estol de vazão (`m_axis_tready = '0'` forçando retenção síncrona sem perda de dados).
 3. **Documento Teórico e de Arquitetura**:
-   - Arquivo: [`docs/RLE_ALGORITHM.md`](file:///home/luis/ufmg/soc/proj/docs/RLE_ALGORITHM.md)
+   - Arquivo: [`docs/RLE_ALGORITHM.md`](docs/RLE_ALGORITHM.md)
    - Explicação detalhada da teoria da informação, limites de entropia de Shannon, cálculo da taxa de compressão ($CR = L_{out}/L_{in}$), formato de tupla little-endian, máquina de estados finitos (FSM de 4 estados), diagrama temporal de handshakes AXI e procedimentos de benchmark de ciclos de clock.
 4. **Script de Automação do Vivado Block Design**:
-   - Arquivo: [`cora7z/app/hw/scripts/add_rle_to_bd.tcl`](file:///home/luis/ufmg/soc/proj/cora7z/app/hw/scripts/add_rle_to_bd.tcl)
+   - Arquivo: [`cora7z/app/hw/scripts/add_rle_to_bd.tcl`](cora7z/app/hw/scripts/add_rle_to_bd.tcl)
    - Adiciona o arquivo fonte ao projeto Vivado, instancia a referência de módulo `rle_engine_0`, realiza todas as conexões de barramentos e valida o design com zero Critical Warnings.
 
 ---

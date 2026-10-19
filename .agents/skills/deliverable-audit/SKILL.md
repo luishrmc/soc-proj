@@ -25,7 +25,7 @@ Verifies that all required artifacts for the university course deliverable exist
 
 ## 3. Hygiene & Portability Verification
 Before bundling the final package, verify:
-1. **No Absolute Paths**: Search for machine-specific path prefixes (`/home/luis/...`) in committed files.
+1. **No Absolute Paths**: Search for machine-specific path prefixes (`/home/<user>/...`) in committed files.
 2. **No Build Bloat**: Ensure `build/`, `.venv/`, `.Xil/`, `*.jou`, `*.log`, and `*.xpr` are not bundled.
 3. **Reproducibility**: Ensure `cora7z/app/hw/Makefile` and `cora7z/app/hw/run.py` run cleanly from a fresh checkout.
 

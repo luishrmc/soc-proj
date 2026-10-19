@@ -21,13 +21,13 @@ Nesta etapa, implementamos o módulo de ingresso de dados da FPGA na lógica pro
 ## 2. Entregáveis Produzidos
 
 1. **Código RTL VHDL-2008**:
-   - [`cora7z/app/hw/src/spi_receiver.vhdl`](file:///home/luis/ufmg/soc/proj/cora7z/app/hw/src/spi_receiver.vhdl)
+   - [`cora7z/app/hw/src/spi_receiver.vhdl`](cora7z/app/hw/src/spi_receiver.vhdl)
 2. **Banco de Testes VUnit**:
-   - [`cora7z/app/hw/test/tb_spi_receiver.vhdl`](file:///home/luis/ufmg/soc/proj/cora7z/app/hw/test/tb_spi_receiver.vhdl)
+   - [`cora7z/app/hw/test/tb_spi_receiver.vhdl`](cora7z/app/hw/test/tb_spi_receiver.vhdl)
 3. **Documentação Arquitetural e Teórica**:
-   - [`docs/SPI_RECEIVER_ARCHITECTURE.md`](file:///home/luis/ufmg/soc/proj/docs/SPI_RECEIVER_ARCHITECTURE.md)
+   - [`docs/SPI_RECEIVER_ARCHITECTURE.md`](docs/SPI_RECEIVER_ARCHITECTURE.md)
 4. **Digest Técnico de Módulo**:
-   - [`utils/memory/modules/spi_receiver.md`](file:///home/luis/ufmg/soc/proj/utils/memory/modules/spi_receiver.md)
+   - [`utils/memory/modules/spi_receiver.md`](utils/memory/modules/spi_receiver.md)
 
 ---
 

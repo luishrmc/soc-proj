@@ -13,7 +13,7 @@ Nesta etapa, desenvolvemos a camada completa de drivers bare-metal em C11 para c
     - Operação como escravo SPI de alta velocidade conectado aos pinos `G20` (SCLK), `T10` (MOSI), `V15` (MISO), `F16` (CS#) da Cora Z7.
     - Reset por software via registrador `SRR` (chave `0x0A`), configuração do registrador `CR` (habilitação do sistema SPI, inibição de transmissão do mestre, limpeza de FIFOs de 256 bytes).
     - Drenagem e leitura de pacotes recebidos pela FIFO `DRR` e monitoramento de `SR` (`Rx_Empty`, `Rx_Full`).
-    - Validação e desempacotamento de quadros conforme [`INTERFACES.md`](file:///home/luis/ufmg/soc/proj/cora7z/app/hw/src/INTERFACES.md) (preâmbulo `0xAA55`, flags de compressão/cifra, tamanho de 32 bits Big-Endian, payload e CRC-16-CCITT).
+    - Validação e desempacotamento de quadros conforme [`INTERFACES.md`](cora7z/app/hw/src/INTERFACES.md) (preâmbulo `0xAA55`, flags de compressão/cifra, tamanho de 32 bits Big-Endian, payload e CRC-16-CCITT).
   - **Controlador de Aceleradores AXI4-Lite (`axi_accel_ctrl`)**:
     - Abstração padronizada para os 4 módulos de aceleração da PL:
       - RLE Compression Engine (`0x43C00000`)
@@ -53,7 +53,7 @@ cora7z/app/sw/
 ## 3. Critérios de Aceitação
 
 1. **Host Mock Unit Verification**:
-   - Compilação e execução da suíte de teste [`test_axi_drivers.c`](file:///home/luis/ufmg/soc/proj/cora7z/app/sw/test/test_axi_drivers.c) no hospedeiro com `gcc -Wall -Wextra -Werror -std=c11 -O2`.
+   - Compilação e execução da suíte de teste [`test_axi_drivers.c`](cora7z/app/sw/test/test_axi_drivers.c) no hospedeiro com `gcc -Wall -Wextra -Werror -std=c11 -O2`.
    - 100% de aprovação nos testes de registradores, sequências de reset do AXI DMA, leitura/escrita de chaves e desempacotamento de quadros SPI com validação de CRC-16.
 2. **Inner Loop Static Verification**:
    - `TASK_ID=4.3 bash .agents/hooks/c-lint.sh` retorna PASS com 0 erros de compilação, 0 warnings e conformidade com zero alocação dinâmica.

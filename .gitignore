@@ -21,9 +21,7 @@ build/
 *~
 .DS_Store
 Thumbs.db
-.vscode/*
-!.vscode/settings.json
-!.vscode/c_cpp_properties.json
+.vscode/
 .clangd*
 
 # ---- ESP-IDF ESP32 build artifacts (recreated via idf.py build)

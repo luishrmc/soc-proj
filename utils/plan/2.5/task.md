@@ -16,14 +16,14 @@ Nesta etapa, implementamos o coprocessador criptográfico simétrico **ChaCha20 
     - Acumulação final: soma modular $\pmod{2^{32}}$ do estado final de 20 rodadas com o estado inicial para gerar 64 bytes de keystream (16 palavras de 32 bits).
   - Cifragem por fluxo: aplicação de XOR bit-a-bit entre o fluxo de entrada AXI4-Stream e o keystream de 64 bytes gerado.
   - Auto-incremento do contador de blocos para fluxos contínuos multi-bloco.
-  - CSRs AXI4-Lite mapeados em `0x43C30000` conforme [`cora7z/app/hw/src/INTERFACES.md`](file:///home/luis/ufmg/soc/proj/cora7z/app/hw/src/INTERFACES.md).
+  - CSRs AXI4-Lite mapeados em `0x43C30000` conforme [`cora7z/app/hw/src/INTERFACES.md`](cora7z/app/hw/src/INTERFACES.md).
 - **Arquitetura de Memória no Block Design (ADR-012)**:
   - Não infere buffers de dados em RTL; expõe interfaces AXI4-Stream padronizadas de 32 bits conectadas visualmente a blocos `axis_data_fifo` no canvas do Block Design.
 - **Banco de Testes VUnit (`cora7z/app/hw/test/tb_chacha20_engine.vhdl`)**:
   - Validação estrita contra os vetores de ouro oficiais da RFC 8439 (Seção 2.1.1, Seção 2.2.1, Seção 2.3.2 e Seção 2.4.2).
   - Testes de backpressure em AXI-Stream, reset suave e auditoria de registradores MMIO.
 - **Integração no Block Design e Bitstream (ADR-011)**:
-  - Script Tcl [`cora7z/app/hw/scripts/add_chacha_to_bd.tcl`](file:///home/luis/ufmg/soc/proj/cora7z/app/hw/scripts/add_chacha_to_bd.tcl) para instanciar o IP e FIFOs de 32 bits.
+  - Script Tcl [`cora7z/app/hw/scripts/add_chacha_to_bd.tcl`](cora7z/app/hw/scripts/add_chacha_to_bd.tcl) para instanciar o IP e FIFOs de 32 bits.
   - Execução da automação de síntese e implementação (`build_bitstream.tcl`), gerando o bitstream final consolidado da Fase 2.
 
 ---

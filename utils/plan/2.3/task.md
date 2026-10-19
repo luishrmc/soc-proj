@@ -18,11 +18,11 @@ Nesta etapa, implementamos o segundo núcleo acelerador em hardware da FPGA:
 ## 2. Entregáveis Produzidos
 
 1. **RTL Sintetizável em VHDL-2008**:
-   - Arquivo: [`cora7z/app/hw/src/lz4_engine.vhdl`](file:///home/luis/ufmg/soc/proj/cora7z/app/hw/src/lz4_engine.vhdl)
+   - Arquivo: [`cora7z/app/hw/src/lz4_engine.vhdl`](cora7z/app/hw/src/lz4_engine.vhdl)
    - Segue estritamente as convenções de código e estilo de comentários observadas no diretório modelo (`corez7/hw/src/blink_led.vhdl`).
    - Implementa buffer circular de histórico (2048 bytes), tabela hash de 1024 entradas com função de dispersão rápida de 4 bytes e empacotador de palavras de 32 bits.
 2. **Testbench com Autochecagem VUnit**:
-   - Arquivo: [`cora7z/app/hw/test/tb_lz4_engine.vhdl`](file:///home/luis/ufmg/soc/proj/cora7z/app/hw/test/tb_lz4_engine.vhdl)
+   - Arquivo: [`cora7z/app/hw/test/tb_lz4_engine.vhdl`](cora7z/app/hw/test/tb_lz4_engine.vhdl)
    - Cobre 5 cenários exaustivos:
      - Leitura/escrita dos registradores AXI-Lite (IDLE, START, BUSY, DONE, contadores).
      - Emissão de literais puros (dados não repetitivos sem casamentos).
@@ -30,13 +30,13 @@ Nesta etapa, implementamos o segundo núcleo acelerador em hardware da FPGA:
      - Fluxo estruturado (simulação de registros de telemetria).
      - Backpressure e estol de vazão (`m_axis_tready = '0'` forçando retenção síncrona sem perda de dados).
 3. **Documento Teórico e de Arquitetura**:
-   - Arquivo: [`docs/LZ4_ALGORITHM.md`](file:///home/luis/ufmg/soc/proj/docs/LZ4_ALGORITHM.md)
+   - Arquivo: [`docs/LZ4_ALGORITHM.md`](docs/LZ4_ALGORITHM.md)
    - Explicação detalhada da teoria de Lempel-Ziv (LZ77), limites assintóticos de Shannon, formato de sequências e tokens LZ4 (nibble de literal e nibble de casamento), codificação de extensões de comprimento, arquitetura de hardware em FPGA e referências bibliográficas formais.
 4. **Script de Automação de Execução e Logs**:
-   - Arquivo: [`cora7z/app/hw/scripts/run_vivado.sh`](file:///home/luis/ufmg/soc/proj/cora7z/app/hw/scripts/run_vivado.sh)
+   - Arquivo: [`cora7z/app/hw/scripts/run_vivado.sh`](cora7z/app/hw/scripts/run_vivado.sh)
    - Executa scripts Tcl em lote garantindo isolamento de diretórios de saída e relatórios em `out/vivado/<context>/`.
 5. **Script de Automação do Vivado Block Design**:
-   - Arquivo: [`cora7z/app/hw/scripts/add_lz4_to_bd.tcl`](file:///home/luis/ufmg/soc/proj/cora7z/app/hw/scripts/add_lz4_to_bd.tcl)
+   - Arquivo: [`cora7z/app/hw/scripts/add_lz4_to_bd.tcl`](cora7z/app/hw/scripts/add_lz4_to_bd.tcl)
    - Adiciona o arquivo fonte ao projeto Vivado, instancia a referência de módulo `lz4_engine_0`, realiza todas as conexões de barramentos, gera o relatório de mapa de endereços e valida o design com zero Critical Warnings.
 
 ---
@@ -62,7 +62,7 @@ Nesta etapa, implementamos o segundo núcleo acelerador em hardware da FPGA:
   ```
 
 ### 3.2 O que o usuário pode conferir e fazer no Vivado GUI
-Ao abrir o Vivado GUI em [`cora7z/app/hw/vivado/soc-final.xpr`](file:///home/luis/ufmg/soc/proj/cora7z/app/hw/vivado/soc-final.xpr) e navegar até o diagrama `soc_final_bd_1.bd`:
+Ao abrir o Vivado GUI em [`cora7z/app/hw/vivado/soc-final.xpr`](cora7z/app/hw/vivado/soc-final.xpr) e navegar até o diagrama `soc_final_bd_1.bd`:
 1. **Instância `lz4_engine_0`**:
    - O bloco `lz4_engine_0` está presente no diagrama ao lado de `rle_engine_0`.
 2. **Conexões do Controle AXI4-Lite**:

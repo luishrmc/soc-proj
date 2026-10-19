@@ -71,7 +71,7 @@ This project implements, characterizes, and compares three operating scenarios o
 ## 3. Toolchain & Setup Requirements
 
 The project uses Ubuntu Linux with:
-- **Xilinx Vivado & Vitis 2026.1**: Installed at `/home/luis/Xilinx/2026.1` (loaded via `.agents/env.sh`).
+- **Xilinx Vivado & Vitis 2026.1**: Installed at `$HOME/Xilinx/2026.1` (loaded via `.agents/env.sh`).
 - **GHDL 7.0.0-dev**: Open-source VHDL simulator for unit tests.
 - **Python 3**: With `vunit-hdl` installed in a local `.venv`.
 - **GTKWave**: Waveform viewer.

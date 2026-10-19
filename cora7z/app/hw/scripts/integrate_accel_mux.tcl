@@ -14,7 +14,8 @@
 # - Validates Block Design and saves it
 # ==============================================================================
 
-set board_repo "/home/luis/.Xilinx/Vivado/2026.1/xhub/board_store/xilinx_board_store/XilinxBoardStore/Vivado/2026.1/boards"
+set user_home $::env(HOME)
+set board_repo "$user_home/.Xilinx/Vivado/2026.1/xhub/board_store/xilinx_board_store/XilinxBoardStore/Vivado/2026.1/boards"
 if {[file exists $board_repo]} {
     set_param board.repoPaths [list $board_repo]
 }

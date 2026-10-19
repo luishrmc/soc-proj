@@ -113,7 +113,7 @@ Em conformidade com a diretriz arquitetural **ADR-012**, o módulo `aes_ctr_engi
 
 ## 4. Máquina de Estados Finita (FSM) do Coprocessador
 
-A máquina de estados implementada em [`aes_ctr_engine.vhdl`](file:///home/luis/ufmg/soc/proj/cora7z/app/hw/src/aes_ctr_engine.vhdl) opera nos seguintes estados:
+A máquina de estados implementada em [`aes_ctr_engine.vhdl`](../cora7z/app/hw/src/aes_ctr_engine.vhdl) opera nos seguintes estados:
 
 1. **`ST_IDLE`**: Repouso com `s_axis_tready = '0'` e `m_axis_tvalid = '0'`. Aguarda pulso no bit 0 do registrador `CONTROL` (`START`).
 2. **`ST_EXPAND_KEYS`**: Expande a chave de 128 bits (`KEY_0..3`) em 11 subchaves de 128 bits ($W_0..W_{43}$) armazenadas em registradores internos dedicados.
@@ -127,7 +127,7 @@ A máquina de estados implementada em [`aes_ctr_engine.vhdl`](file:///home/luis/
 
 ## 5. Validação contra Vetores Oficiais NIST SP 800-38A
 
-O banco de testes em VUnit ([`tb_aes_ctr_engine.vhdl`](file:///home/luis/ufmg/soc/proj/cora7z/app/hw/test/tb_aes_ctr_engine.vhdl)) valida o núcleo com os vetores oficiais publicados pelo NIST:
+O banco de testes em VUnit ([`tb_aes_ctr_engine.vhdl`](../cora7z/app/hw/test/tb_aes_ctr_engine.vhdl)) valida o núcleo com os vetores oficiais publicados pelo NIST:
 
 - **Chave de Cifragem ($K$)**:  
   `2b7e1516 28aed2a6 abf71588 09cf4f3c`

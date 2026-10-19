@@ -35,8 +35,7 @@ if [ "$VHDL_COUNT" -eq 0 ]; then
   echo "[WARN] No VHDL sources found yet in cora7z/app/hw/src/" >> "$LOG"
 fi
 
-# 2. Check for machine-specific path leaks (excluding .agents/env.sh which documents tool location)
-LEAKS=$(git grep -I -n "/home/luis/" -- ':!.agents/env.sh' ':!utils/plan/.bak' ':!out/' 2>/dev/null || true)
+LEAKS=$(git grep -I -n "/home/luis/" -- ':!.agents/env.sh' ':!.agents/hooks/deliverable-audit.sh' ':!utils/plan/.bak' ':!out/' 2>/dev/null || true)
 if [ -n "$LEAKS" ]; then
   echo "[ERROR][deliverable-audit] Hardcoded user paths detected in versioned files:" >> "$LOG"
   echo "$LEAKS" >> "$LOG"

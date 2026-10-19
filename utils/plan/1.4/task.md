@@ -22,13 +22,13 @@ Nesta etapa, implementamos a infraestrutura completa de software embarcado para 
 ## 2. Entregáveis Produzidos
 
 1. **Script de Automação Vitis Python**:
-   - Arquivo: [`cora7z/app/sw/scripts/build_sw.py`](file:///home/luis/ufmg/soc/proj/cora7z/app/sw/scripts/build_sw.py)
+   - Arquivo: [`cora7z/app/sw/scripts/build_sw.py`](cora7z/app/sw/scripts/build_sw.py)
    - Cria o workspace, configura o componente de plataforma, compila o BSP e constrói o binário executável `.elf`.
 2. **Código-Fonte da Aplicação de Verificação**:
-   - Arquivo: [`cora7z/app/sw/src/main.c`](file:///home/luis/ufmg/soc/proj/cora7z/app/sw/src/main.c)
+   - Arquivo: [`cora7z/app/sw/src/main.c`](cora7z/app/sw/src/main.c)
    - Implementa a rotina de boot, teste de registradores e instrumentação de ciclos do Cortex-A9.
 3. **Plano de Execução e Handoff**:
-   - Arquivo: [`utils/plan/1.4/task.md`](file:///home/luis/ufmg/soc/proj/utils/plan/1.4/task.md)
+   - Arquivo: [`utils/plan/1.4/task.md`](utils/plan/1.4/task.md)
    - Detalha os passos do fluxo CLI e como o usuário pode inspecionar e debugar o software no Vitis GUI.
 
 ---
