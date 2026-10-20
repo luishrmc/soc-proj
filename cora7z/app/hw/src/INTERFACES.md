@@ -11,12 +11,12 @@ All external SPI signals route through Bank 34 and Bank 35 with 3.3V LVCMOS volt
 
 | Signal Name | FPGA Pin | J7 Pin | Bank | Direction | Description |
 |---|---|:---:|---|---|---|
-| `shield_spi_io0_io` (MOSI) | `T10` | Pin 4 | 34 | Input | Master-Out Slave-In serial data from ESP32 (via 200Ω R110) |
-| `shield_spi_io1_io` (MISO) | `V15` | Pin 1 | 34 | Output | Master-In Slave-Out serial data to ESP32 (via 200Ω R108) |
-| `shield_spi_sck_io` (SCK) | `G20` | Pin 3 | 35 | Input | SPI Clock input from ESP32 master (Mode 0, up to 25 MHz, via 200Ω R109) |
-| `shield_spi_ss_io` (CS_n) | `F16` | Pin 5 | 35 | Input | Active-Low Slave Select framing (via 200Ω R111) |
+| `shield_spi_io0_io` (MOSI) | `T12` | Pin 4 | 34 | Input | Master-Out Slave-In serial data from ESP32 (via 200Ω R110, CK_MOSI) |
+| `shield_spi_io1_io` (MISO) | `W15` | Pin 1 | 34 | Output | Master-In Slave-Out serial data to ESP32 (via 200Ω R108, CK_MISO) |
+| `shield_spi_sck_io` (SCK) | `H15` | Pin 3 | 35 | Input | SPI Clock input from ESP32 master (Mode 0, up to 25 MHz, via 200Ω R109, CK_SCK) |
+| `shield_spi_ss_io` (CS_n) | `F16` | Pin 5 | 35 | Input | Active-Low Slave Select framing (via 200Ω R111, CK_SS) |
 | `GND` | `GND` | Pin 6 | - | Ground | Common Ground Reference |
-| *(5.0V)* | *N/A* | Pin 2 | - | Power | 5.0V power rail (**DO NOT CONNECT**) |
+| *(5.0V)* | *N/A* | Pin 2 | - | Power | 5.0V power rail (Optional VIN power for ESP32) |
 
 ### 1.2 SPI Physical Layer Protocol
 - **SPI Mode**: Mode 0 (`CPOL = 0`, `CPHA = 0`).

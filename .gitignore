@@ -57,6 +57,7 @@ xsim.dir/
 *.dcp
 *.bit
 *.bin
+*.BIN
 *.xsa
 *.sysdef
 *.hdf

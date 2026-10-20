@@ -156,6 +156,13 @@ int axi_spi_parse_packet(const uint8_t *raw_buf,
     return frame_out->crc_valid ? 0 : -3;
 }
 
+static uint8_t s_hdr[SPI_HEADER_SIZE];
+static uint8_t s_trl[SPI_TRAILER_SIZE];
+static size_t  s_rx_idx = 0;
+static uint32_t s_plen = 0;
+static bool    s_found_sync = false;
+static uint32_t s_idle_cycles = 0;
+
 int axi_spi_drain_frame(uintptr_t base_addr,
                         uint8_t *payload_buf,
                         size_t max_payload_len,
@@ -165,68 +172,81 @@ int axi_spi_drain_frame(uintptr_t base_addr,
         return -1;
     }
 
-    uint8_t hdr[SPI_HEADER_SIZE];
-    uint8_t trl[SPI_TRAILER_SIZE];
-    size_t rx_idx = 0;
-    uint32_t plen = 0;
     uint32_t cycles = 0;
     uint8_t b = 0;
-    bool found_sync = false;
 
     while (cycles < max_poll_cycles) {
         if (axi_spi_read_byte(base_addr, &b) == 0) {
-            if (!found_sync) {
-                if (rx_idx == 0 && b == SPI_PREAMBLE_BYTE0) {
-                    hdr[0] = b;
-                    rx_idx = 1;
-                } else if (rx_idx == 1) {
+            s_idle_cycles = 0;
+
+            if (!s_found_sync) {
+                if (s_rx_idx == 0 && b == SPI_PREAMBLE_BYTE0) {
+                    s_hdr[0] = b;
+                    s_rx_idx = 1;
+                } else if (s_rx_idx == 1) {
                     if (b == SPI_PREAMBLE_BYTE1) {
-                        hdr[1] = b;
-                        rx_idx = 2;
-                        found_sync = true;
+                        s_hdr[1] = b;
+                        s_rx_idx = 2;
+                        s_found_sync = true;
                     } else if (b == SPI_PREAMBLE_BYTE0) {
-                        hdr[0] = b;
-                        rx_idx = 1;
+                        s_hdr[0] = b;
+                        s_rx_idx = 1;
                     } else {
-                        rx_idx = 0;
+                        s_rx_idx = 0;
                     }
                 }
-            } else if (rx_idx < SPI_HEADER_SIZE) {
-                hdr[rx_idx++] = b;
-                if (rx_idx == SPI_HEADER_SIZE) {
-                    frame_out->header.payload_type = hdr[2];
-                    frame_out->header.flags        = hdr[3];
-                    plen = (((uint32_t)hdr[4]) << 24) |
-                           (((uint32_t)hdr[5]) << 16) |
-                           (((uint32_t)hdr[6]) << 8)  |
-                           (((uint32_t)hdr[7]));
-                    frame_out->header.payload_len = plen;
-                    if (plen > max_payload_len) {
+            } else if (s_rx_idx < SPI_HEADER_SIZE) {
+                s_hdr[s_rx_idx++] = b;
+                if (s_rx_idx == SPI_HEADER_SIZE) {
+                    frame_out->header.payload_type = s_hdr[2];
+                    frame_out->header.flags        = s_hdr[3];
+                    s_plen = (((uint32_t)s_hdr[4]) << 24) |
+                             (((uint32_t)s_hdr[5]) << 16) |
+                             (((uint32_t)s_hdr[6]) << 8)  |
+                             (((uint32_t)s_hdr[7]));
+                    frame_out->header.payload_len = s_plen;
+                    if (s_plen > max_payload_len) {
+                        s_found_sync = false;
+                        s_rx_idx = 0;
                         return -1; /* Payload overflow */
                     }
                 }
-            } else if (rx_idx < (SPI_HEADER_SIZE + (size_t)plen)) {
-                payload_buf[rx_idx - SPI_HEADER_SIZE] = b;
-                rx_idx++;
+            } else if (s_rx_idx < (SPI_HEADER_SIZE + (size_t)s_plen)) {
+                payload_buf[s_rx_idx - SPI_HEADER_SIZE] = b;
+                s_rx_idx++;
             } else {
-                trl[rx_idx - SPI_HEADER_SIZE - (size_t)plen] = b;
-                rx_idx++;
-                if (rx_idx == (SPI_HEADER_SIZE + (size_t)plen + SPI_TRAILER_SIZE)) {
-                    frame_out->payload = (plen > 0U) ? payload_buf : NULL;
-                    frame_out->crc16_received = (uint16_t)(((uint16_t)trl[0] << 8) | (uint16_t)trl[1]);
-                    uint16_t crc = axi_spi_crc16(hdr, SPI_HEADER_SIZE, 0xFFFFU);
-                    if (plen > 0U) {
-                        crc = axi_spi_crc16(payload_buf, plen, crc);
+                s_trl[s_rx_idx - SPI_HEADER_SIZE - (size_t)s_plen] = b;
+                s_rx_idx++;
+                if (s_rx_idx == (SPI_HEADER_SIZE + (size_t)s_plen + SPI_TRAILER_SIZE)) {
+                    frame_out->payload = (s_plen > 0U) ? payload_buf : NULL;
+                    frame_out->crc16_received = (uint16_t)(((uint16_t)s_trl[0] << 8) | (uint16_t)s_trl[1]);
+                    uint16_t crc = axi_spi_crc16(s_hdr, SPI_HEADER_SIZE, 0xFFFFU);
+                    if (s_plen > 0U) {
+                        crc = axi_spi_crc16(payload_buf, s_plen, crc);
                     }
                     frame_out->crc16_computed = crc;
                     frame_out->crc_valid = (crc == frame_out->crc16_received);
+
+                    /* Reset FSM for next packet */
+                    s_found_sync = false;
+                    s_rx_idx = 0;
+                    s_plen = 0;
                     return frame_out->crc_valid ? 0 : -3;
                 }
             }
         } else {
             cycles++;
+            if (s_found_sync) {
+                s_idle_cycles++;
+                /* If packet in progress stalls for > 1,000,000 cycles (~1.5 ms), reset */
+                if (s_idle_cycles > 1000000U) {
+                    s_found_sync = false;
+                    s_rx_idx = 0;
+                    s_idle_cycles = 0;
+                }
+            }
         }
     }
 
-    return -1; /* Timeout */
+    return -1; /* Timeout / In progress */
 }

@@ -18,6 +18,7 @@
 #include "xparameters.h"
 #include "benchmark_ps.h"
 #include "pipeline_mgr.h"
+#include "axi_spi_receiver.h"
 
 /* ========================================================================= */
 /* ARM Cortex-A9 Performance Monitor Unit (PMU / CP15) Routines             */
@@ -209,9 +210,46 @@ int main(void) {
         }
     }
 
-    /* Idle loop */
+    /* Active SPI Ingestion and Benchmark Loop */
+    xil_printf("\r\n================================================================\r\n");
+    xil_printf("  [SPI_RX] Listening for incoming packets from ESP32 on J7...\r\n");
+    xil_printf("  Press BTN_TRIGGER (GPIO 32) on ESP32 to inject packets.\r\n");
+    xil_printf("================================================================\r\n\r\n");
+
+    static uint8_t s_rx_payload[65536];
+    spi_frame_t rx_frame;
+    uint32_t rx_packet_count = 0;
+    uint32_t hb_ticks = 0;
+
     while (1) {
-        __asm__ volatile("wfi");
+        int drain_rc = axi_spi_drain_frame(AXI_SPI_DEFAULT_BASEADDR,
+                                           s_rx_payload,
+                                           sizeof(s_rx_payload),
+                                           &rx_frame,
+                                           10000U);
+        if (drain_rc == 0) {
+            rx_packet_count++;
+            xil_printf("[SPI_RX #%u] Frame Received! Type: 0x%02X | Flags: 0x%02X | Length: %u B | CRC: 0x%04X (VALID)\r\n",
+                       (unsigned int)rx_packet_count,
+                       (unsigned int)rx_frame.header.payload_type,
+                       (unsigned int)rx_frame.header.flags,
+                       (unsigned int)rx_frame.header.payload_len,
+                       (unsigned int)rx_frame.crc16_received);
+        } else if (drain_rc == -3) {
+            xil_printf("[SPI_RX] Frame Error: CRC mismatch! (Recv: 0x%04X != Calc: 0x%04X)\r\n",
+                       (unsigned int)rx_frame.crc16_received, (unsigned int)rx_frame.crc16_computed);
+        }
+
+        hb_ticks++;
+        if (hb_ticks >= 2000U) {
+            hb_ticks = 0;
+            uint32_t spisr = Xil_In32(AXI_SPI_DEFAULT_BASEADDR + SPI_REG_SPISR);
+            uint32_t fifo_cnt = axi_spi_rx_count(AXI_SPI_DEFAULT_BASEADDR);
+            xil_printf("[CORA_Z7] Standby | J7 SPI Listening | SPISR=0x%02X | FIFO=%u | Pkts=%u\r\n",
+                       (unsigned int)spisr,
+                       (unsigned int)fifo_cnt,
+                       (unsigned int)rx_packet_count);
+        }
     }
 
     return 0;
