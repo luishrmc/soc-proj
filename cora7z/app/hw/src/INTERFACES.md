@@ -6,15 +6,17 @@ This document defines the formal architectural contracts between the Programmabl
 
 ## 1. External SPI Ingestion Bus (ESP32 -> Cora Z7 PL)
 
-### 1.1 Physical Pin Allocation (Arduino / ChipKIT Shield Header J1)
-All external SPI signals route through Bank 34 and Bank 35 with 3.3V LVCMOS voltage levels (`IOSTANDARD LVCMOS33`) and 200 Ω series damping resistors on board:
+### 1.1 Physical Pin Allocation (Dedicated SPI Header J7)
+All external SPI signals route through Bank 34 and Bank 35 with 3.3V LVCMOS voltage levels (`IOSTANDARD LVCMOS33`) and 200 Ω series damping resistors on board, accessible directly via the 2x3 male header **J7** (labeled `SPI`):
 
-| Signal Name | FPGA Pin | Bank | Direction | Drive / Slew | Description |
-|---|---|---|---|---|---|
-| `shield_spi_io0_io` (MOSI) | `T10` | 34 | Input | - | Master-Out Slave-In serial data from ESP32 |
-| `shield_spi_io1_io` (MISO) | `V15` | 34 | Output | 8mA, SLOW | Master-In Slave-Out serial data to ESP32 (status/loopback) |
-| `shield_spi_sck_io` (SCK) | `G20` | 35 | Input | - | SPI Clock input from ESP32 master (Mode 0, up to 25 MHz) |
-| `shield_spi_ss_io` (CS_n) | `F16` | 35 | Input | - | Active-Low Slave Select (framing delineator) |
+| Signal Name | FPGA Pin | J7 Pin | Bank | Direction | Description |
+|---|---|:---:|---|---|---|
+| `shield_spi_io0_io` (MOSI) | `T10` | Pin 4 | 34 | Input | Master-Out Slave-In serial data from ESP32 (via 200Ω R110) |
+| `shield_spi_io1_io` (MISO) | `V15` | Pin 1 | 34 | Output | Master-In Slave-Out serial data to ESP32 (via 200Ω R108) |
+| `shield_spi_sck_io` (SCK) | `G20` | Pin 3 | 35 | Input | SPI Clock input from ESP32 master (Mode 0, up to 25 MHz, via 200Ω R109) |
+| `shield_spi_ss_io` (CS_n) | `F16` | Pin 5 | 35 | Input | Active-Low Slave Select framing (via 200Ω R111) |
+| `GND` | `GND` | Pin 6 | - | Ground | Common Ground Reference |
+| *(5.0V)* | *N/A* | Pin 2 | - | Power | 5.0V power rail (**DO NOT CONNECT**) |
 
 ### 1.2 SPI Physical Layer Protocol
 - **SPI Mode**: Mode 0 (`CPOL = 0`, `CPHA = 0`).

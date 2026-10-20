@@ -20,9 +20,9 @@ extern "C" {
 #endif
 
 /* ========================================================================= */
-/* Default Hardware Pin Mapping (ESP32 -> Cora Z7-10 Shield Header J1)       */
+/* Default Hardware Pin Mapping (ESP32 -> Cora Z7-10 Dedicated SPI Header J7) */
 /* ========================================================================= */
-/* Cora Z7 FPGA Pins: SCLK=G20, MOSI=T10, MISO=V15, CS_N=F16                */
+/* Cora Z7 FPGA Pins: SCLK=G20 (J7.3), MOSI=T10 (J7.4), MISO=V15 (J7.1), CS_N=F16 (J7.5) */
 #define SPI_INJECTOR_DEFAULT_SCLK_PIN  18  /* VSPI SCK  -> Cora Z7 G20 */
 #define SPI_INJECTOR_DEFAULT_MOSI_PIN  23  /* VSPI MOSI -> Cora Z7 T10 */
 #define SPI_INJECTOR_DEFAULT_MISO_PIN  19  /* VSPI MISO -> Cora Z7 V15 */

@@ -2,7 +2,7 @@
 module: interfaces
 status: verified
 sources:
-  - cora7z/app/hw/src/INTERFACES.md sha256=aa7b3e8efb6d26b66f5981f35aee171969e35021164a4ac6d027a7012109d3b5
+  - cora7z/app/hw/src/INTERFACES.md sha256=1fa85e2751315d51e622075f3c8289cd9627d00a91250a455d8c63f3be7fb640
   - docs/SYSTEM_ARCHITECTURE.md sha256=e675fd60f4b5a99a216719e7c22e968d6e0a23761e7f79ecb62a481cfb7bd990
 gates_passed: [address-map]
 ---
@@ -10,7 +10,7 @@ gates_passed: [address-map]
 # Interfaces & Architecture Digest
 
 ## 1. Physical External Bus (ESP32 SPI Ingest via AXI Quad SPI)
-- Pins (Arduino Header J1): `SCK` (G20), `MOSI` (T10), `MISO` (V15), `CS_n` (F16). LVCMOS33.
+- Pins (Dedicated SPI Header J7): `SCK` (G20, Pin 3), `MOSI` (T10, Pin 4), `MISO` (V15, Pin 1), `CS_n` (F16, Pin 5), `GND` (Pin 6). LVCMOS33.
 - Mode: Mode 0 (CPOL=0, CPHA=0), up to 25 MHz via `axi_quad_spi_0` (256-byte FIFO, ADR-012).
 - CDC: Handled internally by `axi_quad_spi_0` (`s_axi_aclk` 50 MHz, `ext_spi_clk` 100 MHz).
 - Frame Contract: `[0xAA, 0x55, TYPE, FLAGS, LEN_MSB..LSB, PAYLOAD, CRC16_MSB..LSB]`.

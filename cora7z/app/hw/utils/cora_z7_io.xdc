@@ -4,7 +4,7 @@
 # ==============================================================================
 
 # ------------------------------------------------------------------------------
-# Dedicated SPI Slave Interface from ESP32 (Arduino Shield Header J1)
+# Dedicated SPI Slave Interface from ESP32 (Dedicated SPI Header J7)
 # Referenced against docs/cora7z/Cora+Z7_sch-public.pdf and INTERFACES.md
 # ------------------------------------------------------------------------------
 

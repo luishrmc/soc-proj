@@ -6,23 +6,24 @@ Firmware for the ESP32 (ESP32-WROOM-32 / ESP32-DevKitC) acting as a high-speed S
 
 ## 1. Physical Hardware Interconnect (Pinout)
 
-Connect the ESP32 GPIOs directly to the Cora Z7-10 Shield Header J1 (Bank 34 / 35, 3.3V LVCMOS):
+Connect the ESP32 GPIOs directly to the Cora Z7-10 **Dedicated SPI Header J7** (2x3 pin header, 3.3V LVCMOS):
 
-| Signal Name | ESP32 GPIO | Cora Z7 FPGA Pin | Shield Header J1 Pin | Description |
+| Signal Name | ESP32 GPIO | Cora Z7 FPGA Pin | Cora Z7 Connector J7 | Description |
 |---|:---:|:---:|:---:|---|
-| **SCLK** | `GPIO 18` | `G20` | `SCK / IO13` | SPI Bus Clock (Mode 0, up to 25 MHz) |
-| **MOSI** | `GPIO 23` | `T10` | `MOSI / IO11` | Master-Out Slave-In serial data |
-| **MISO** | `GPIO 19` | `V15` | `MISO / IO12` | Master-In Slave-Out serial data |
-| **CS / SS** | `GPIO 5` | `F16` | `SS / IO10` | Active-Low Chip Select (frame framing) |
+| **MISO** | `GPIO 19` | `V15` | **J7 Pin 1** (`MISO`) | Master-In Slave-Out serial data (via 200Ω R108) |
+| **SCLK** | `GPIO 18` | `G20` | **J7 Pin 3** (`SCK`) | SPI Bus Clock (Mode 0, up to 25 MHz, via 200Ω R109) |
+| **MOSI** | `GPIO 23` | `T10` | **J7 Pin 4** (`MOSI`) | Master-Out Slave-In serial data (via 200Ω R110) |
+| **CS / SS** | `GPIO 5` | `F16` | **J7 Pin 5** (`SS`) | Active-Low Chip Select framing (via 200Ω R111) |
+| **GND** | `GND` | `GND` | **J7 Pin 6** (`GND`) | Common Ground Reference |
+| *(5.0V)* | *N/A* | *N/A* | **J7 Pin 2** (`5V0`) | **DO NOT CONNECT** (Power rail) |
 | **BTN_TRIGGER** | `GPIO 4` | N/A | Pushbutton 1 | Trigger burst injection (Active-Low, internal pull-up) |
 | **BTN_SELECT** | `GPIO 16` | N/A | Pushbutton 2 | Cycle benchmark profile (Active-Low, internal pull-up) |
 | **LED_READY** | `GPIO 2` | N/A | Blue Onboard | Heartbeat 1 Hz (Alive & Ready indicator) |
 | **LED_TX** | `GPIO 21` | N/A | External LED | TX Active / Busy indicator |
 | **LED_STATUS** | `GPIO 22` | N/A | External LED | Profile Blink Code / Critical Error alert |
-| **GND** | `GND` | `GND` | `GND` | Common Ground Reference |
 
 > [!IMPORTANT]
-> Both the ESP32 and the Cora Z7-10 operate on 3.3V logic levels. Ensure a solid, low-impedance common ground connection to minimize transmission ringing at 25 MHz.
+> Both the ESP32 and the Cora Z7-10 operate on 3.3V logic levels. On the Cora Z7, all four SPI lines on J7 pass through 200Ω series protection resistors ($R108 \dots R111$) directly into FPGA Banks 34 and 35. Ensure a solid, low-impedance common ground connection (J7 Pin 6 to ESP32 GND) to minimize transmission ringing at 25 MHz. **Do not connect J7 Pin 2 (5V)**.
 
 ---
 
