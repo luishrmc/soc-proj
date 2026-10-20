@@ -78,7 +78,7 @@ esp_err_t spi_injector_init(int sclk_pin, int mosi_pin, int miso_pin, int cs_pin
         .max_transfer_sz = (int)(SPI_MAX_PAYLOAD_SIZE + SPI_HEADER_SIZE + SPI_CRC_SIZE + 64),
     };
 
-    esp_err_t ret = spi_bus_initialize(SPI2_HOST, &buscfg, SPI_DMA_CH_AUTO);
+    esp_err_t ret = spi_bus_initialize(SPI3_HOST, &buscfg, SPI_DMA_CH_AUTO);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "spi_bus_initialize failed: %s", esp_err_to_name(ret));
         return ret;
@@ -94,10 +94,10 @@ esp_err_t spi_injector_init(int sclk_pin, int mosi_pin, int miso_pin, int cs_pin
         .post_cb = NULL,
     };
 
-    ret = spi_bus_add_device(SPI2_HOST, &devcfg, &s_spi_dev);
+    ret = spi_bus_add_device(SPI3_HOST, &devcfg, &s_spi_dev);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "spi_bus_add_device failed: %s", esp_err_to_name(ret));
-        spi_bus_free(SPI2_HOST);
+        spi_bus_free(SPI3_HOST);
         return ret;
     }
 
@@ -169,7 +169,7 @@ void spi_injector_deinit(void) {
             spi_bus_remove_device(s_spi_dev);
             s_spi_dev = NULL;
         }
-        spi_bus_free(SPI2_HOST);
+        spi_bus_free(SPI3_HOST);
         s_is_initialized = false;
         ESP_LOGI(TAG, "SPI injector de-initialized.");
     }

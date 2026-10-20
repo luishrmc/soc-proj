@@ -10,10 +10,10 @@ Connect the ESP32 GPIOs directly to the Cora Z7-10 **Dedicated SPI Header J7** (
 
 | Signal Name | ESP32 GPIO | Cora Z7 FPGA Pin | Cora Z7 Connector J7 | Description |
 |---|:---:|:---:|:---:|---|
-| **MISO** | `GPIO 19` | `V15` | **J7 Pin 1** (`MISO`) | Master-In Slave-Out serial data (via 200Ω R108) |
-| **SCLK** | `GPIO 18` | `G20` | **J7 Pin 3** (`SCK`) | SPI Bus Clock (Mode 0, up to 25 MHz, via 200Ω R109) |
-| **MOSI** | `GPIO 23` | `T10` | **J7 Pin 4** (`MOSI`) | Master-Out Slave-In serial data (via 200Ω R110) |
-| **CS / SS** | `GPIO 5` | `F16` | **J7 Pin 5** (`SS`) | Active-Low Chip Select framing (via 200Ω R111) |
+| **MISO** | `GPIO 19` | `W15` | **J7 Pin 1** (`MISO`) | Master-In Slave-Out serial data (via 200Ω R108, CK_MISO) |
+| **SCLK** | `GPIO 18` | `H15` | **J7 Pin 3** (`SCK`) | SPI Bus Clock (Mode 0, up to 25 MHz, via 200Ω R109, CK_SCK) |
+| **MOSI** | `GPIO 23` | `T12` | **J7 Pin 4** (`MOSI`) | Master-Out Slave-In serial data (via 200Ω R110, CK_MOSI) |
+| **CS / SS** | `GPIO 5` | `F16` | **J7 Pin 5** (`SS`) | Active-Low Chip Select framing (via 200Ω R111, CK_SS) |
 | **GND** | `GND` | `GND` | **J7 Pin 6** (`GND`) | Common Ground Reference |
 | *(5.0V)* | *N/A* | *N/A* | **J7 Pin 2** (`5V0`) | **DO NOT CONNECT** (Power rail) |
 | **BTN_TRIGGER** | `GPIO 32` | N/A | Pushbutton (to GND) | Trigger Full Benchmark Suite (Active-Low, internal pull-up) |

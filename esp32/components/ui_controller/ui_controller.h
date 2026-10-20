@@ -35,7 +35,7 @@ extern "C" {
 
 /* Polarity: 1 for Common Cathode (active HIGH), 0 for Common Anode (active LOW) */
 #ifndef UI_LED_ACTIVE_LEVEL
-#define UI_LED_ACTIVE_LEVEL     1
+#define UI_LED_ACTIVE_LEVEL     0
 #endif
 
 /* ========================================================================= */
