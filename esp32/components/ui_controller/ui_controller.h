@@ -1,9 +1,14 @@
 /**
  * @file ui_controller.h
- * @brief Autonomous User Interface (Pushbuttons & LED Telemetry) for ESP32.
+ * @brief Minimalist Autonomous User Interface (Single Button & RGB LED) for ESP32.
  *
- * Provides button debouncing (FreeRTOS) and LED visual telemetry
- * allowing standalone benchmark control without an active USB-serial connection.
+ * Designed for space-constrained breadboards. Uses:
+ *  - GPIO 32: Trigger button (Active-Low with internal pull-up to GND)
+ *  - GPIO 21: RGB LED Green channel (Activity / Heartbeat / Success)
+ *  - GPIO 22: RGB LED Red channel (Alert / Error)
+ *  - GPIO 2:  Onboard Blue LED (optional mirror of Green heartbeat)
+ *
+ * Debouncing is handled in FreeRTOS without dynamic memory allocation.
  */
 
 #ifndef UI_CONTROLLER_H
@@ -22,28 +27,29 @@ extern "C" {
 /* ========================================================================= */
 /* Hardware GPIO Pin Assignments                                            */
 /* ========================================================================= */
-#define UI_GPIO_BTN_TRIGGER     4   /* Pushbutton 1: Start/Trigger (active low, pull-up) */
-#define UI_GPIO_BTN_SELECT      16  /* Pushbutton 2: Mode/Select (active low, pull-up) */
+#define UI_GPIO_BTN_TRIGGER     32  /* Pushbutton: Trigger Full Test Suite (Active-Low, internal pull-up) */
 
-#define UI_GPIO_LED_READY       2   /* LED 1: Heartbeat / Ready (Blue On-board) */
-#define UI_GPIO_LED_TX          21  /* LED 2: TX Active / Busy */
-#define UI_GPIO_LED_STATUS      22  /* LED 3: Profile Blink Code / Error Alert */
+#define UI_GPIO_LED_GREEN       21  /* RGB LED Green Channel: Heartbeat / Busy / Success */
+#define UI_GPIO_LED_RED         22  /* RGB LED Red Channel: Alert / Critical Error */
+#define UI_GPIO_LED_READY       2   /* Onboard Blue LED: Ready Heartbeat mirror */
+
+/* Polarity: 1 for Common Cathode (active HIGH), 0 for Common Anode (active LOW) */
+#ifndef UI_LED_ACTIVE_LEVEL
+#define UI_LED_ACTIVE_LEVEL     1
+#endif
 
 /* ========================================================================= */
-/* Test Profiles and Event Types                                             */
+/* Visual Telemetry States & Events                                          */
 /* ========================================================================= */
 typedef enum {
-    UI_PROFILE_64B_RLE = 0,         /* Pattern 1: 64 B Redundant -> RLE */
-    UI_PROFILE_1KB_LZ4 = 1,         /* Pattern 2: 1 KB Random -> LZ4 */
-    UI_PROFILE_64KB_AES = 2,        /* Pattern 3: 64 KB Telemetry -> AES-128-CTR */
-    UI_PROFILE_64KB_CHACHA = 3,     /* Pattern 4: 64 KB Telemetry -> ChaCha20 */
-    UI_PROFILE_FULL_SUITE = 4,      /* Pattern 5: All 4 benchmarks sequentially */
-    UI_PROFILE_MAX = 5
-} ui_test_profile_t;
+    UI_STATE_IDLE,      /* Green Heartbeat (1 Hz), Red OFF */
+    UI_STATE_BUSY,      /* Green Solid ON during burst TX, Red OFF */
+    UI_STATE_SUCCESS,   /* Green 3 rapid blinks upon suite completion, Red OFF */
+    UI_STATE_ERROR      /* Red 5 Hz rapid blink or Solid ON, Green OFF */
+} ui_state_t;
 
 typedef enum {
     UI_EVENT_TRIGGER_PRESSED,
-    UI_EVENT_SELECT_PRESSED
 } ui_event_type_t;
 
 typedef struct {
@@ -56,44 +62,27 @@ typedef struct {
 /* ========================================================================= */
 
 /**
- * @brief Initialize GPIOs for buttons and LEDs, and launch the FreeRTOS UI task.
+ * @brief Initialize GPIOs for button and LEDs, and launch the FreeRTOS UI FSM task.
  *
- * @param out_queue Pointer to queue handle receiving UI events
+ * @param out_queue Pointer to queue handle receiving UI trigger events
  * @return esp_err_t ESP_OK on success
  */
 esp_err_t ui_controller_init(QueueHandle_t *out_queue);
 
 /**
- * @brief Update the active test profile and adjust the visual blink code.
+ * @brief Set the visual telemetry state (LED color and flashing pattern).
  */
-void ui_set_active_profile(ui_test_profile_t profile);
+void ui_controller_set_state(ui_state_t state);
 
 /**
- * @brief Get the currently active test profile.
+ * @brief Get the current visual telemetry state.
  */
-ui_test_profile_t ui_get_active_profile(void);
+ui_state_t ui_controller_get_state(void);
 
 /**
- * @brief Cycle to the next test profile.
- * @return ui_test_profile_t New active profile
+ * @brief Convert state enum to human-readable string.
  */
-ui_test_profile_t ui_cycle_profile(void);
-
-/**
- * @brief Assert or de-assert the TX Active / Busy LED indicator.
- */
-void ui_set_tx_busy(bool active);
-
-/**
- * @brief Assert or de-assert the Error alert condition.
- * When true, LED_STATUS remains continuously ON.
- */
-void ui_set_error(bool error_active);
-
-/**
- * @brief Convert profile enum to readable descriptive string.
- */
-const char *ui_profile_to_name(ui_test_profile_t profile);
+const char *ui_state_to_name(ui_state_t state);
 
 /**
  * @brief Run a self-test of all UI GPIOs (LED sequence and button read).

@@ -2,19 +2,18 @@
  * @file main.c
  * @brief ESP32 Autonomous SPI Master Injector for Cora Z7-10 SoC Benchmark.
  *
- * Implements autonomous pushbutton-driven test execution and multi-LED status telemetry,
+ * Implements single pushbutton-driven test execution and dual-channel RGB LED visual telemetry,
  * allowing full test operation without an active serial connection from the PC.
  *
  * Pinout:
- *   - VSPI SCLK: GPIO 18  -> Cora Z7 G20 (SCLK)
- *   - VSPI MOSI: GPIO 23  -> Cora Z7 T10 (MOSI)
- *   - VSPI MISO: GPIO 19  -> Cora Z7 V15 (MISO)
- *   - VSPI CS0:  GPIO 5   -> Cora Z7 F16 (CS#)
- *   - BTN_TRIGGER: GPIO 4 (active low, internal pull-up)
- *   - BTN_SELECT:  GPIO 16 (active low, internal pull-up)
- *   - LED_READY:   GPIO 2 (Heartbeat 1Hz, Blue onboard)
- *   - LED_TX:      GPIO 21 (TX Active / Busy)
- *   - LED_STATUS:  GPIO 22 (Profile Blink Code / Error)
+ *   - VSPI SCLK: GPIO 18  -> Cora Z7 J7.3 (G20)
+ *   - VSPI MOSI: GPIO 23  -> Cora Z7 J7.4 (T10)
+ *   - VSPI MISO: GPIO 19  -> Cora Z7 J7.1 (V15)
+ *   - VSPI CS0:  GPIO 5   -> Cora Z7 J7.5 (F16)
+ *   - BTN_TRIGGER: GPIO 32 (Active-Low, connected to GND with internal pull-up)
+ *   - LED_GREEN:   GPIO 21 (RGB Green: Heartbeat / Busy / Success)
+ *   - LED_RED:     GPIO 22 (RGB Red: Critical Alert / Error)
+ *   - LED_READY:   GPIO 2  (Onboard Blue LED mirror)
  */
 
 #include <stdio.h>
@@ -152,58 +151,51 @@ static esp_err_t execute_tx_64kb_chacha(uint32_t burst_id) {
 }
 
 /**
- * @brief Dispatch active benchmark burst based on selected UI profile.
+ * @brief Execute full benchmark suite sequentially across SPI.
  */
-static void dispatch_active_burst(uint32_t burst_id) {
-    ui_test_profile_t profile = ui_get_active_profile();
-
+static void execute_burst_full_suite(uint32_t burst_id) {
     ESP_LOGI(TAG, "==================================================");
-    ESP_LOGI(TAG, ">>> Triggering Burst #%lu: Profile [%d] %s",
-             (unsigned long)burst_id, profile, ui_profile_to_name(profile));
+    ESP_LOGI(TAG, ">>> Triggering Full Benchmark Suite (Burst #%lu)", (unsigned long)burst_id);
     ESP_LOGI(TAG, "==================================================");
 
-    ui_set_tx_busy(true);
+    ui_controller_set_state(UI_STATE_BUSY);
 
+    int64_t t_start = esp_timer_get_time();
     esp_err_t ret = ESP_OK;
 
-    switch (profile) {
-        case UI_PROFILE_64B_RLE:
-            ret = execute_tx_64b_rle(burst_id);
-            break;
+    /* Step 1: 64B Redundant (RLE) */
+    esp_err_t err = execute_tx_64b_rle(burst_id);
+    if (err != ESP_OK) ret = err;
+    vTaskDelay(pdMS_TO_TICKS(30));
 
-        case UI_PROFILE_1KB_LZ4:
-            ret = execute_tx_1kb_lz4(burst_id);
-            break;
+    /* Step 2: 1KB Pseudo-Random (LZ4) */
+    err = execute_tx_1kb_lz4(burst_id);
+    if (err != ESP_OK) ret = err;
+    vTaskDelay(pdMS_TO_TICKS(30));
 
-        case UI_PROFILE_64KB_AES:
-            ret = execute_tx_64kb_aes(burst_id);
-            break;
+    /* Step 3: 64KB Telemetry (AES-128-CTR) */
+    err = execute_tx_64kb_aes(burst_id);
+    if (err != ESP_OK) ret = err;
+    vTaskDelay(pdMS_TO_TICKS(30));
 
-        case UI_PROFILE_64KB_CHACHA:
-            ret = execute_tx_64kb_chacha(burst_id);
-            break;
+    /* Step 4: 64KB Telemetry (ChaCha20) */
+    err = execute_tx_64kb_chacha(burst_id);
+    if (err != ESP_OK) ret = err;
 
-        case UI_PROFILE_FULL_SUITE:
-            ret |= execute_tx_64b_rle(burst_id);
-            vTaskDelay(pdMS_TO_TICKS(30));
-            ret |= execute_tx_1kb_lz4(burst_id);
-            vTaskDelay(pdMS_TO_TICKS(30));
-            ret |= execute_tx_64kb_aes(burst_id);
-            vTaskDelay(pdMS_TO_TICKS(30));
-            ret |= execute_tx_64kb_chacha(burst_id);
-            break;
+    int64_t t_end = esp_timer_get_time();
 
-        default:
-            ESP_LOGW(TAG, "Unknown profile ID %d", profile);
-            break;
-    }
-
-    ui_set_tx_busy(false);
-
-    if (ret != ESP_OK) {
-        ui_set_error(true);
+    if (ret == ESP_OK) {
+        ESP_LOGI(TAG, "==================================================");
+        ESP_LOGI(TAG, "[BURST #%lu] Full Suite Completed Successfully! Total Latency: %lld us",
+                 (unsigned long)burst_id, (t_end - t_start));
+        ESP_LOGI(TAG, "==================================================");
+        ui_controller_set_state(UI_STATE_SUCCESS);
     } else {
-        ui_set_error(false);
+        ESP_LOGE(TAG, "==================================================");
+        ESP_LOGE(TAG, "[BURST #%lu] Full Suite Encountered Errors! Code: %s",
+                 (unsigned long)burst_id, esp_err_to_name(ret));
+        ESP_LOGE(TAG, "==================================================");
+        ui_controller_set_state(UI_STATE_ERROR);
     }
 }
 
@@ -272,27 +264,22 @@ static void app_orchestrator_task(void *pvParameters) {
     /* Execute On-Board Self-Test at boot */
     run_onboard_selftest();
 
-    ESP_LOGI(TAG, "Autonomous Orchestrator Ready. Waiting for Pushbutton Events...");
-    ESP_LOGI(TAG, "  -> Press BTN_SELECT  (GPIO 16) to change benchmark profile");
-    ESP_LOGI(TAG, "  -> Press BTN_TRIGGER (GPIO 4)  to inject synthetic burst");
+    ESP_LOGI(TAG, "Minimalist Autonomous Orchestrator Ready.");
+    ESP_LOGI(TAG, "  -> Press BTN_TRIGGER (GPIO 32) to inject Full Benchmark Suite");
 
     ui_event_t ev;
 
     while (1) {
         /* Wait up to 10 seconds for user button press */
         if (xQueueReceive(s_ui_event_queue, &ev, pdMS_TO_TICKS(10000)) == pdTRUE) {
-            if (ev.type == UI_EVENT_SELECT_PRESSED) {
-                ui_test_profile_t new_prof = ui_cycle_profile();
-                ESP_LOGI(TAG, "[UI ACTION] Mode Changed: [%d] %s",
-                         new_prof, ui_profile_to_name(new_prof));
-            } else if (ev.type == UI_EVENT_TRIGGER_PRESSED) {
+            if (ev.type == UI_EVENT_TRIGGER_PRESSED) {
                 burst_counter++;
-                dispatch_active_burst(burst_counter);
+                execute_burst_full_suite(burst_counter);
             }
         } else {
-            /* Periodic Heartbeat Log on Serial (if connected) */
-            ESP_LOGI(TAG, "[STANDBY] System Ready | Active Profile: [%d] %s",
-                     ui_get_active_profile(), ui_profile_to_name(ui_get_active_profile()));
+            /* Periodic Standby Log on Serial (if connected) */
+            ESP_LOGI(TAG, "[STANDBY] System Ready (Waiting for GPIO 32 trigger) | State: %s",
+                     ui_state_to_name(ui_controller_get_state()));
         }
     }
 }
@@ -301,17 +288,17 @@ void app_main(void) {
     ESP_LOGI(TAG, "======================================================");
     ESP_LOGI(TAG, "  Digilent Cora Z7-10 SoC Benchmark: ESP32 SPI Injector  ");
     ESP_LOGI(TAG, "  Toolchain: ESP-IDF v6.1 / FreeRTOS SMP Dual Core     ");
-    ESP_LOGI(TAG, "  Autonomous UI & On-Board Telemetry Enabled           ");
+    ESP_LOGI(TAG, "  Minimalist UI (Single BTN GPIO 32 + RGB LED 21/22)    ");
     ESP_LOGI(TAG, "======================================================");
 
-    /* 1. Initialize UI Controller (Buttons & LEDs) */
+    /* 1. Initialize UI Controller (Button GPIO 32 & LEDs GPIO 21/22) */
     esp_err_t ret = ui_controller_init(&s_ui_event_queue);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Fatal: Failed to initialize UI controller: %s", esp_err_to_name(ret));
         return;
     }
 
-    /* 2. Initialize SPI Master bus at 25 MHz with default Cora Z7 J1 pinout */
+    /* 2. Initialize SPI Master bus at 25 MHz with default Cora Z7 J7 pinout */
     ret = spi_injector_init(
         SPI_INJECTOR_DEFAULT_SCLK_PIN,
         SPI_INJECTOR_DEFAULT_MOSI_PIN,
@@ -322,7 +309,7 @@ void app_main(void) {
 
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Fatal: Failed to initialize SPI injector driver: %s", esp_err_to_name(ret));
-        ui_set_error(true);
+        ui_controller_set_state(UI_STATE_ERROR);
         return;
     }
 
@@ -339,6 +326,6 @@ void app_main(void) {
 
     if (task_ret != pdPASS) {
         ESP_LOGE(TAG, "Failed to create orchestrator task.");
-        ui_set_error(true);
+        ui_controller_set_state(UI_STATE_ERROR);
     }
 }

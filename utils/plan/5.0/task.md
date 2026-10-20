@@ -7,14 +7,13 @@ O laboratório dispõe de apenas **um único cabo micro-USB**. Isso impõe a mul
 1. **Fase 1 (Desenvolvimento e Validação do ESP32)**: O cabo USB conecta o ESP32 ao PC via `/dev/ttyACM0` (porta USB-Serial/JTAG CDC nativa). Aqui realizamos a gravação do firmware, calibração e captura dos logs de auto-teste.
 2. **Fase 2 (Integração e Benchmarks Físicos com Cora Z7)**: O cabo USB é conectado à Cora Z7 (para carregamento do bitstream, execução do firmware PS e captura de dados pelo console serial / ARM PMU). O ESP32 passará a ser alimentado de forma autônoma na bancada (via conector de alimentação ou fonte externa), **sem conexão serial ativa com o computador**.
 
-Para garantir observabilidade e controle total durante os ensaios das Fases 5 e 6 sem depender do PC, o firmware do ESP32 precisa de uma interface de usuário (UI) autônoma e determinística:
-- **Botões de Controle**:
-  - `BTN_TRIGGER` (GPIO 4): Dispara uma rajada (burst) de injeção de pacotes SPI com base no perfil ativo.
-  - `BTN_SELECT` (GPIO 16): Cicla entre os 3 perfis de dados da Matriz de Testes (`64 B Alta Redundância`, `1 KB Pseudoaleatório`, `64 KB Telemetria`).
-- **Sinalização Visual por LEDs**:
-  - `LED_READY` (GPIO 2, LED Onboard): Pulso lento (1 Hz) indicando firmware operacional e pronto para disparo.
-  - `LED_TX` (GPIO 21): Aceso durante a montagem e transmissão de quadros SPI; desliga ao término.
-  - `LED_STATUS` (GPIO 22): Código de piscadas curtas indicando o perfil ativo selecionado (1 blink = 64B, 2 blinks = 1KB, 3 blinks = 64KB AES, 4 blinks = 64KB ChaCha, 5 blinks = Sequência Completa), ou aceso fixo em caso de falha crítica.
+Para garantir observabilidade e controle total durante os ensaios das Fases 5 e 6 sem depender do PC (e atendendo à limitação de espaço físico na protoboard), o firmware do ESP32 utiliza uma interface de usuário (UI) minimalista e autônoma:
+- **Botão de Controle Único**:
+  - `BTN_TRIGGER` (GPIO 32): Conectado entre o GPIO 32 e GND (ativo em nível baixo, pull-up interno). Um único pressionamento dispara deterministicamente a suíte completa de testes sequenciais via SPI (64B RLE, 1KB LZ4, 64KB AES-128-CTR e 64KB ChaCha20).
+- **Sinalização Visual por LED RGB (2 vias de controle)**:
+  - `LED_GREEN` (GPIO 21): Heartbeat lento (1 Hz) em IDLE; aceso contínuo durante a transmissão ativa (BUSY); 3 piscadas rápidas ao concluir com sucesso a suíte de benchmarks (SUCCESS).
+  - `LED_RED` (GPIO 22): Piscada rápida a 5 Hz ou aceso contínuo em caso de falha de timeout, erro de CRC ou recusa de framing (ERROR).
+  - `LED_READY` (GPIO 2 Onboard): Espelho auxiliar da sinalização verde.
 
 ---
 

@@ -16,11 +16,10 @@ Connect the ESP32 GPIOs directly to the Cora Z7-10 **Dedicated SPI Header J7** (
 | **CS / SS** | `GPIO 5` | `F16` | **J7 Pin 5** (`SS`) | Active-Low Chip Select framing (via 200Ω R111) |
 | **GND** | `GND` | `GND` | **J7 Pin 6** (`GND`) | Common Ground Reference |
 | *(5.0V)* | *N/A* | *N/A* | **J7 Pin 2** (`5V0`) | **DO NOT CONNECT** (Power rail) |
-| **BTN_TRIGGER** | `GPIO 4` | N/A | Pushbutton 1 | Trigger burst injection (Active-Low, internal pull-up) |
-| **BTN_SELECT** | `GPIO 16` | N/A | Pushbutton 2 | Cycle benchmark profile (Active-Low, internal pull-up) |
-| **LED_READY** | `GPIO 2` | N/A | Blue Onboard | Heartbeat 1 Hz (Alive & Ready indicator) |
-| **LED_TX** | `GPIO 21` | N/A | External LED | TX Active / Busy indicator |
-| **LED_STATUS** | `GPIO 22` | N/A | External LED | Profile Blink Code / Critical Error alert |
+| **BTN_TRIGGER** | `GPIO 32` | N/A | Pushbutton (to GND) | Trigger Full Benchmark Suite (Active-Low, internal pull-up) |
+| **LED_GREEN** | `GPIO 21` | N/A | RGB LED Green Channel | Heartbeat (1 Hz) / Busy (Solid ON) / Success (3 Rapid Blinks) |
+| **LED_RED** | `GPIO 22` | N/A | RGB LED Red Channel | Alert / Critical Error (5 Hz Rapid Blink) |
+| **LED_READY** | `GPIO 2` | N/A | Blue Onboard | Onboard Ready Heartbeat mirror |
 
 > [!IMPORTANT]
 > Both the ESP32 and the Cora Z7-10 operate on 3.3V logic levels. On the Cora Z7, all four SPI lines on J7 pass through 200Ω series protection resistors ($R108 \dots R111$) directly into FPGA Banks 34 and 35. Ensure a solid, low-impedance common ground connection (J7 Pin 6 to ESP32 GND) to minimize transmission ringing at 25 MHz. **Do not connect J7 Pin 2 (5V)**.
@@ -29,25 +28,22 @@ Connect the ESP32 GPIOs directly to the Cora Z7-10 **Dedicated SPI Header J7** (
 
 ## 2. Autonomous UI & Single-Cable Bench Workflow
 
-Because the test setup utilizes **a single micro-USB cable**, the cable is time-multiplexed:
+Because the test setup utilizes **a single micro-USB cable** and limited breadboard area, the hardware UI is streamlined:
 1. **Flashing & Diagnostics**: USB cable connected to ESP32 (`/dev/ttyACM0`).
 2. **End-to-End Benchmarks**: USB cable connected to Cora Z7 (capturing Cortex-A9 PMU / UART). The ESP32 is powered independently via external 5V/VIN or 3.3V rail.
 
 ### Pushbutton Controls
-- **BTN_SELECT (GPIO 16)**: Cycles the active test profile:
-  - `Profile 0`: 64 B High-Redundancy (RLE)
-  - `Profile 1`: 1 KB Pseudo-Random (LZ4)
-  - `Profile 2`: 64 KB Telemetry (AES-128-CTR)
-  - `Profile 3`: 64 KB Telemetry (ChaCha20)
-  - `Profile 4`: Full Benchmark Suite (All 4 patterns back-to-back)
-- **BTN_TRIGGER (GPIO 4)**: Injects the active burst over SPI.
+- **BTN_TRIGGER (GPIO 32)**: Single button connected between GPIO 32 and GND. Pushing the button immediately executes the full sequential benchmark suite:
+  1. 64 B High-Redundancy block (RLE pipeline)
+  2. 1 KB Pseudo-Random block (LZ4 pipeline)
+  3. 64 KB Synthetic Telemetry block (AES-128-CTR pipeline)
+  4. 64 KB Synthetic Telemetry block (ChaCha20 pipeline)
 
-### Visual LED Telemetry
-- **LED_READY (GPIO 2)**: 1 Hz blinking heartbeat indicating the FreeRTOS orchestrator is ready.
-- **LED_TX (GPIO 21)**: Solid ON during packet transmission; OFF when idle.
-- **LED_STATUS (GPIO 22)**:
-  - Emits `profile + 1` pulses (e.g., 2 blinks = 1KB LZ4), followed by a 1.4s pause.
-  - Solid continuous ON in case of critical error (CRC or SPI failure).
+### Visual LED Telemetry (RGB LED on GPIO 21 & 22)
+- **IDLE / Ready**: Green LED (GPIO 21) pulses with a 1 Hz heartbeat; Red LED is OFF.
+- **BUSY (Transmitting)**: Green LED (GPIO 21) remains Solid ON during SPI packet injection.
+- **SUCCESS**: Green LED (GPIO 21) emits 3 rapid blinks upon completing all 4 benchmark patterns with valid handshake, then returns to IDLE heartbeat.
+- **ERROR / Alert**: Red LED (GPIO 22) flashes rapidly at 5 Hz if a timeout, CRC mismatch, or framing error occurs.
 
 ---
 

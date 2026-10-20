@@ -2,10 +2,10 @@
 module: esp32_injector
 status: verified
 sources:
-  - esp32/main/main.c sha256=9ceb5e974dbb9f664d95cc6db7023d908507bc2862c4339d2367b55df0b5244c
+  - esp32/main/main.c sha256=f57c6a51e06367f31dcd4c7dec52b385b16cf3c94da307ff4476173279cb14ea
   - esp32/main/spi_injector_master.c sha256=c572f11a8fcad3b7fa0f699a330713a2130600364d3638964f540d641d4896f2
-  - esp32/components/ui_controller/ui_controller.c sha256=15b41324bcdea4accd50a947c30f3d87099f3c3a2333514d59a794c95cc4759e
-  - esp32/components/ui_controller/ui_controller.h sha256=f0cd06a4427e29bf6a156c706b748f63351c2073597a8b30cad7a6e4cd8afe65
+  - esp32/components/ui_controller/ui_controller.c sha256=18279652e25d67948f2663a52eec18af415eaa347dc1389b77519f9533106a86
+  - esp32/components/ui_controller/ui_controller.h sha256=86617e02162bcc947343770c76b8a65606c559b5fc0cff168c3571883bf76605
 gates_passed: [esp-idf-build, esp32-selftest]
 ---
 
@@ -18,23 +18,22 @@ gates_passed: [esp-idf-build, esp32-selftest]
 
 ## 2. Pin Mapping & Hardware Interface
 - **SPI Master Bus (VSPI)**:
-  - SCLK: GPIO 18 (25 MHz) -> Cora Z7 G20
-  - MOSI: GPIO 23 -> Cora Z7 T10
-  - MISO: GPIO 19 -> Cora Z7 V15
-  - CS#: GPIO 5 -> Cora Z7 F16
-- **Autonomous User Interface (UI)**:
-  - BTN_TRIGGER: GPIO 4 (Active-low, internal pull-up, 40ms debounce) -> Start burst
-  - BTN_SELECT: GPIO 16 (Active-low, internal pull-up, 40ms debounce) -> Cycle profile
-  - LED_READY: GPIO 2 (Blue onboard, 1 Hz heartbeat)
-  - LED_TX: GPIO 21 (TX Active / Busy)
-  - LED_STATUS: GPIO 22 (Profile pulse count / Continuous ON for Error alert)
+  - SCLK: GPIO 18 (25 MHz) -> Cora Z7 J7.3 (G20)
+  - MOSI: GPIO 23 -> Cora Z7 J7.4 (T10)
+  - MISO: GPIO 19 -> Cora Z7 J7.1 (V15)
+  - CS#: GPIO 5 -> Cora Z7 J7.5 (F16)
+- **Minimalist Autonomous UI**:
+  - BTN_TRIGGER: GPIO 32 (Active-low to GND, internal pull-up, 40ms debounce) -> Dispatches Full Suite
+  - LED_GREEN: GPIO 21 (RGB Green: 1 Hz heartbeat in IDLE, Solid ON in BUSY, 3 rapid blinks in SUCCESS)
+  - LED_RED: GPIO 22 (RGB Red: 5 Hz rapid blink in ERROR / alert)
+  - LED_READY: GPIO 2 (Blue onboard mirror)
 
-## 3. Supported Test Profiles
-- `Profile 0`: 64 B High-Redundancy (`s_buf_64b` -> RLE)
-- `Profile 1`: 1 KB Pseudo-Random (`s_buf_1kb` -> LZ4)
-- `Profile 2`: 64 KB Telemetry (`s_buf_64kb` -> AES-128-CTR)
-- `Profile 3`: 64 KB Telemetry (`s_buf_64kb` -> ChaCha20)
-- `Profile 4`: Full Benchmark Suite (All 4 patterns back-to-back)
+## 3. Operational Mode
+- Single-button trigger: pressing GPIO 32 immediately transmits the full sequential benchmark suite:
+  1. 64 B High-Redundancy (`s_buf_64b` -> RLE)
+  2. 1 KB Pseudo-Random (`s_buf_1kb` -> LZ4)
+  3. 64 KB Telemetry (`s_buf_64kb` -> AES-128-CTR)
+  4. 64 KB Telemetry (`s_buf_64kb` -> ChaCha20)
 
 ## 4. On-Board Verification Evidence
 - **Build**: `idf.py build` produced `esp32_spi_injector.bin` (187,440 bytes, 82% free partition).
