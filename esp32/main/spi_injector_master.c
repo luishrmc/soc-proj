@@ -7,6 +7,7 @@
 #include <string.h>
 #include "esp_log.h"
 #include "esp_heap_caps.h"
+#include "esp_attr.h"
 #include "driver/spi_master.h"
 #include "driver/gpio.h"
 
@@ -14,6 +15,9 @@ static const char *TAG = "SPI_INJECTOR";
 
 static spi_device_handle_t s_spi_dev = NULL;
 static bool s_is_initialized = false;
+
+/* Pre-allocated DMA-capable buffer to eliminate dynamic allocation in hot path */
+static DMA_ATTR uint8_t s_dma_tx_buf[SPI_MAX_PAYLOAD_SIZE + SPI_HEADER_SIZE + SPI_CRC_SIZE + 64];
 
 /* CRC-16-CCITT Look-up Table (Polynomial: 0x1021) */
 static const uint16_t s_crc16_table[256] = {
@@ -84,12 +88,17 @@ esp_err_t spi_injector_init(int sclk_pin, int mosi_pin, int miso_pin, int cs_pin
         return ret;
     }
 
+    /* Configure CS pin pull-up so it defaults high (inactive) */
+    gpio_set_pull_mode((gpio_num_t)cs_pin, GPIO_PULLUP_ONLY);
+
     spi_device_interface_config_t devcfg = {
         .clock_speed_hz = clock_speed_hz,
         .mode = 0,                  /* Mode 0: CPOL=0, CPHA=0 */
         .spics_io_num = cs_pin,     /* Hardware CS control */
-        .queue_size = 1,
-        .flags = 0,
+        .queue_size = 4,
+        .flags = SPI_DEVICE_HALFDUPLEX,
+        .cs_ena_pretrans = 2,       /* CS active 2 SPI clock cycles before SCK toggles */
+        .cs_ena_posttrans = 2,      /* CS active 2 SPI clock cycles after SCK finishes */
         .pre_cb = NULL,
         .post_cb = NULL,
     };
@@ -120,37 +129,30 @@ esp_err_t spi_injector_send_packet(uint8_t payload_type, uint8_t flags, const ui
 
     size_t total_frame_len = SPI_HEADER_SIZE + length + SPI_CRC_SIZE;
 
-    /* Allocate DMA-capable memory buffer */
-    uint8_t *dma_buf = (uint8_t *)heap_caps_malloc(total_frame_len, MALLOC_CAP_DMA);
-    if (dma_buf == NULL) {
-        ESP_LOGE(TAG, "Failed to allocate %zu bytes DMA buffer.", total_frame_len);
-        return ESP_ERR_NO_MEM;
-    }
-
-    /* 1. Header (8 Bytes) */
-    dma_buf[0] = SPI_PREAMBLE_BYTE0;
-    dma_buf[1] = SPI_PREAMBLE_BYTE1;
-    dma_buf[2] = payload_type;
-    dma_buf[3] = flags;
-    dma_buf[4] = (uint8_t)((length >> 24) & 0xFFU);
-    dma_buf[5] = (uint8_t)((length >> 16) & 0xFFU);
-    dma_buf[6] = (uint8_t)((length >> 8)  & 0xFFU);
-    dma_buf[7] = (uint8_t)(length & 0xFFU);
+    /* 1. Header (8 Bytes) into static DMA-aligned buffer */
+    s_dma_tx_buf[0] = SPI_PREAMBLE_BYTE0;
+    s_dma_tx_buf[1] = SPI_PREAMBLE_BYTE1;
+    s_dma_tx_buf[2] = payload_type;
+    s_dma_tx_buf[3] = flags;
+    s_dma_tx_buf[4] = (uint8_t)((length >> 24) & 0xFFU);
+    s_dma_tx_buf[5] = (uint8_t)((length >> 16) & 0xFFU);
+    s_dma_tx_buf[6] = (uint8_t)((length >> 8)  & 0xFFU);
+    s_dma_tx_buf[7] = (uint8_t)(length & 0xFFU);
 
     /* 2. Payload Data */
     if (length > 0 && payload != NULL) {
-        memcpy(&dma_buf[SPI_HEADER_SIZE], payload, length);
+        memcpy(&s_dma_tx_buf[SPI_HEADER_SIZE], payload, length);
     }
 
     /* 3. CRC-16-CCITT computed over Header + Payload */
-    uint16_t crc = spi_injector_crc16(dma_buf, SPI_HEADER_SIZE + length);
-    dma_buf[SPI_HEADER_SIZE + length]     = (uint8_t)((crc >> 8) & 0xFFU);
-    dma_buf[SPI_HEADER_SIZE + length + 1] = (uint8_t)(crc & 0xFFU);
+    uint16_t crc = spi_injector_crc16(s_dma_tx_buf, SPI_HEADER_SIZE + length);
+    s_dma_tx_buf[SPI_HEADER_SIZE + length]     = (uint8_t)((crc >> 8) & 0xFFU);
+    s_dma_tx_buf[SPI_HEADER_SIZE + length + 1] = (uint8_t)(crc & 0xFFU);
 
     /* 4. Transmit via SPI Master */
     spi_transaction_t trans = {
         .length = total_frame_len * 8, /* Transaction length in bits */
-        .tx_buffer = dma_buf,
+        .tx_buffer = s_dma_tx_buf,
         .rx_buffer = NULL,
     };
 
@@ -159,7 +161,6 @@ esp_err_t spi_injector_send_packet(uint8_t payload_type, uint8_t flags, const ui
         ESP_LOGE(TAG, "spi_device_transmit failed: %s", esp_err_to_name(ret));
     }
 
-    heap_caps_free(dma_buf);
     return ret;
 }
 

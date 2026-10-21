@@ -6,17 +6,18 @@ This document defines the formal architectural contracts between the Programmabl
 
 ## 1. External SPI Ingestion Bus (ESP32 -> Cora Z7 PL)
 
-### 1.1 Physical Pin Allocation (Dedicated SPI Header J7)
-All external SPI signals route through Bank 34 and Bank 35 with 3.3V LVCMOS voltage levels (`IOSTANDARD LVCMOS33`) and 200 Ω series damping resistors on board, accessible directly via the 2x3 male header **J7** (labeled `SPI`):
+### 1.1 Physical Pin Allocation (Dedicated SPI Header J7 & PMOD JA)
+All external SPI signals route through Bank 34 and Bank 35 with 3.3V LVCMOS voltage levels (`IOSTANDARD LVCMOS33`) and 200 Ω series damping resistors on board, accessible directly via the 2x3 male header **J7** (labeled `SPI`), plus the autonomous trigger output on PMOD **JA**:
 
-| Signal Name | FPGA Pin | J7 Pin | Bank | Direction | Description |
+| Signal Name | FPGA Pin | Header / Pin | Bank | Direction | Description |
 |---|---|:---:|---|---|---|
-| `shield_spi_io0_io` (MOSI) | `T12` | Pin 4 | 34 | Input | Master-Out Slave-In serial data from ESP32 (via 200Ω R110, CK_MOSI) |
-| `shield_spi_io1_io` (MISO) | `W15` | Pin 1 | 34 | Output | Master-In Slave-Out serial data to ESP32 (via 200Ω R108, CK_MISO) |
-| `shield_spi_sck_io` (SCK) | `H15` | Pin 3 | 35 | Input | SPI Clock input from ESP32 master (Mode 0, up to 25 MHz, via 200Ω R109, CK_SCK) |
-| `shield_spi_ss_io` (CS_n) | `F16` | Pin 5 | 35 | Input | Active-Low Slave Select framing (via 200Ω R111, CK_SS) |
-| `GND` | `GND` | Pin 6 | - | Ground | Common Ground Reference |
-| *(5.0V)* | *N/A* | Pin 2 | - | Power | 5.0V power rail (Optional VIN power for ESP32) |
+| `spi_mosi_i` (MOSI) | `T12` | J7 Pin 4 | 34 | Input | Master-Out Slave-In serial data from ESP32 (via 200Ω R110, CK_MOSI) |
+| `spi_miso_o` (MISO) | `W15` | J7 Pin 1 | 34 | Output | Master-In Slave-Out serial data to ESP32 (via 200Ω R108, CK_MISO) |
+| `spi_sck_i` (SCK) | `H15` | J7 Pin 3 | 35 | Input | SPI Clock input from ESP32 master (Mode 0, up to 25 MHz, via 200Ω R109, CK_SCK) |
+| `spi_ss_i` (CS_n) | `F16` | J7 Pin 5 | 35 | Input | Active-Low Slave Select framing (via 200Ω R111, CK_SS; internal PULLUP). Connected to both `ss_i` and `spisel` on `axi_quad_spi_0`. |
+| `esp32_trigger_o` | `Y18` | JA Pin 1 | 34 | Output | Autonomous active-low burst trigger pulse (30 ms) from PS EMIO GPIO to ESP32 GPIO 32. |
+| `GND` | `GND` | J7 Pin 6 | - | Ground | Common Ground Reference |
+| *(5.0V / 3.3V)* | *VCC* | J7 Pin 2 | - | Power | Power rail (Optional supply for ESP32) |
 
 ### 1.2 SPI Physical Layer Protocol
 - **SPI Mode**: Mode 0 (`CPOL = 0`, `CPHA = 0`).
@@ -25,6 +26,7 @@ All external SPI signals route through Bank 34 and Bank 35 with 3.3V LVCMOS volt
 - **Clock Domain Crossing (CDC) & Slave IP**:
   - In PL, physical SPI communication with ESP32 is handled exclusively through the `axi_quad_spi_0` LogiCORE IP (ADR-012) in slave mode with 256-byte FIFO.
   - CDC is managed internally within `axi_quad_spi_0` with `s_axi_aclk` on `FCLK_CLK0` (50 MHz) and `ext_spi_clk` on `FCLK_CLK1` (100 MHz) for high-speed sampling up to 25 MHz.
+  - **Slave Mode Hardware Framing (`spisel`)**: In LogiCORE AXI Quad SPI (PG153), slave reception requires the active-low `spisel` input pin to be asserted. The board interface flow ties `spisel` high (`'1'`), preventing slave operation. The Block Design connects `spi_ss_i` (`F16`) to both `ss_i(0)` and `spisel`, ensuring full slave reception and shift-register operation.
 - **Maximum Bus Clock**: 25.0 MHz.
 
 ### 1.3 SPI Packet Frame Contract

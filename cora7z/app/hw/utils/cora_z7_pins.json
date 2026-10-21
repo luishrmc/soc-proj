@@ -1,0 +1,72 @@
+{
+  "board": "Digilent Cora Z7",
+  "device": "xc7z010-1clg400c",
+  "voltage_rails": {
+    "bank_34": "3.3V",
+    "bank_35": "3.3V"
+  },
+  "peripherals": {
+    "clock": [
+      {
+        "signal": "sys_clk",
+        "package_pin": "H16",
+        "bank": 35,
+        "iostandard": "LVCMOS33",
+        "frequency_mhz": 125.0,
+        "source": "Ethernet PHY (IC1 CLK125)"
+      }
+    ],
+    "buttons": [
+      {
+        "signal": "btn[0]",
+        "package_pin": "D20",
+        "bank": 35,
+        "iostandard": "LVCMOS33",
+        "active": "HIGH",
+        "description": "BTN0 (10k pulldown, momentary push-button)"
+      },
+      {
+        "signal": "btn[1]",
+        "package_pin": "D19",
+        "bank": 35,
+        "iostandard": "LVCMOS33",
+        "active": "HIGH",
+        "description": "BTN1 (10k pulldown, momentary push-button)"
+      }
+    ],
+    "rgb_leds": [
+      { "signal": "led0_r", "package_pin": "N15", "bank": 35, "iostandard": "LVCMOS33", "active": "HIGH", "description": "LD0 Red (transistor driven)" },
+      { "signal": "led0_g", "package_pin": "G17", "bank": 35, "iostandard": "LVCMOS33", "active": "HIGH", "description": "LD0 Green (transistor driven)" },
+      { "signal": "led0_b", "package_pin": "L15", "bank": 35, "iostandard": "LVCMOS33", "active": "HIGH", "description": "LD0 Blue (transistor driven)" },
+      { "signal": "led1_r", "package_pin": "M15", "bank": 35, "iostandard": "LVCMOS33", "active": "HIGH", "description": "LD1 Red (transistor driven)" },
+      { "signal": "led1_g", "package_pin": "L14", "bank": 35, "iostandard": "LVCMOS33", "active": "HIGH", "description": "LD1 Green (transistor driven)" },
+      { "signal": "led1_b", "package_pin": "G14", "bank": 35, "iostandard": "LVCMOS33", "active": "HIGH", "description": "LD1 Blue (transistor driven)" }
+    ],
+    "pmod_ja": [
+      { "pin": 1, "signal": "ja[0]", "net": "JA1_P", "package_pin": "Y18", "bank": 34, "iostandard": "LVCMOS33" },
+      { "pin": 2, "signal": "ja[1]", "net": "JA1_N", "package_pin": "Y19", "bank": 34, "iostandard": "LVCMOS33" },
+      { "pin": 3, "signal": "ja[2]", "net": "JA2_P", "package_pin": "Y16", "bank": 34, "iostandard": "LVCMOS33" },
+      { "pin": 4, "signal": "ja[3]", "net": "JA2_N", "package_pin": "Y17", "bank": 34, "iostandard": "LVCMOS33" },
+      { "pin": 7, "signal": "ja[4]", "net": "JA3_P", "package_pin": "U18", "bank": 34, "iostandard": "LVCMOS33" },
+      { "pin": 8, "signal": "ja[5]", "net": "JA3_N", "package_pin": "U19", "bank": 34, "iostandard": "LVCMOS33" },
+      { "pin": 9, "signal": "ja[6]", "net": "JA4_P", "package_pin": "W18", "bank": 34, "iostandard": "LVCMOS33" },
+      { "pin": 10, "signal": "ja[7]", "net": "JA4_N", "package_pin": "W19", "bank": 34, "iostandard": "LVCMOS33" }
+    ],
+    "pmod_jb": [
+      { "pin": 1, "signal": "jb[0]", "net": "JB1_P", "package_pin": "W14", "bank": 34, "iostandard": "LVCMOS33" },
+      { "pin": 2, "signal": "jb[1]", "net": "JB1_N", "package_pin": "Y14", "bank": 34, "iostandard": "LVCMOS33" },
+      { "pin": 3, "signal": "jb[2]", "net": "JB2_P", "package_pin": "T10", "bank": 34, "iostandard": "LVCMOS33" },
+      { "pin": 4, "signal": "jb[3]", "net": "JB2_N", "package_pin": "T11", "bank": 34, "iostandard": "LVCMOS33" },
+      { "pin": 7, "signal": "jb[4]", "net": "JB3_P", "package_pin": "V16", "bank": 34, "iostandard": "LVCMOS33" },
+      { "pin": 8, "signal": "jb[5]", "net": "JB3_N", "package_pin": "W16", "bank": 34, "iostandard": "LVCMOS33" },
+      { "pin": 9, "signal": "jb[6]", "net": "JB4_P", "package_pin": "V12", "bank": 34, "iostandard": "LVCMOS33" },
+      { "pin": 10, "signal": "jb[7]", "net": "JB4_N", "package_pin": "W13", "bank": 34, "iostandard": "LVCMOS33" }
+    ],
+    "shield_spi_header_j7": [
+      { "pin": 1, "signal": "spi_miso", "package_pin": "W15", "bank": 34, "iostandard": "LVCMOS33" },
+      { "pin": 3, "signal": "spi_sck",  "package_pin": "H15", "bank": 35, "iostandard": "LVCMOS33" },
+      { "pin": 4, "signal": "spi_mosi", "package_pin": "T12", "bank": 34, "iostandard": "LVCMOS33" },
+      { "pin": 5, "signal": "spi_ss",   "package_pin": "F16", "bank": 35, "iostandard": "LVCMOS33" }
+    ]
+  }
+}

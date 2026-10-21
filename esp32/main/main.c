@@ -304,7 +304,7 @@ void app_main(void) {
         SPI_INJECTOR_DEFAULT_MOSI_PIN,
         SPI_INJECTOR_DEFAULT_MISO_PIN,
         SPI_INJECTOR_DEFAULT_CS_PIN,
-        SPI_SPEED_25MHZ
+        SPI_SPEED_1MHZ
     );
 
     if (ret != ESP_OK) {

@@ -53,7 +53,7 @@ puts "=== BITSTREAM BUILD === Generating Block Design Targets (forced)..."
 generate_target -force all $bd_file
 
 # Ensure top wrapper is present and set as top
-set wrapper_file [make_wrapper -files $bd_file -top]
+set wrapper_file [make_wrapper -files $bd_file -top -force]
 if {[file exists $wrapper_file]} {
     add_files -norecurse $wrapper_file
     set wrapper_top [file rootname [file tail $wrapper_file]]

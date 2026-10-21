@@ -16,7 +16,7 @@ Connect the ESP32 GPIOs directly to the Cora Z7-10 **Dedicated SPI Header J7** (
 | **CS / SS** | `GPIO 5` | `F16` | **J7 Pin 5** (`SS`) | Active-Low Chip Select framing (via 200Ω R111, CK_SS) |
 | **GND** | `GND` | `GND` | **J7 Pin 6** (`GND`) | Common Ground Reference |
 | *(5.0V)* | *N/A* | *N/A* | **J7 Pin 2** (`5V0`) | **DO NOT CONNECT** (Power rail) |
-| **BTN_TRIGGER** | `GPIO 32` | N/A | Pushbutton (to GND) | Trigger Full Benchmark Suite (Active-Low, internal pull-up) |
+| **BTN_TRIGGER** | `GPIO 32` | `Y18` | **PMOD JA Pin 1** (or BTN) | Trigger Full Suite (Active-Low pulse from Cora Z7 PS EMIO or Pushbutton) |
 | **LED_GREEN** | `GPIO 21` | N/A | RGB LED Green Channel | Heartbeat (1 Hz) / Busy (Solid ON) / Success (3 Rapid Blinks) |
 | **LED_RED** | `GPIO 22` | N/A | RGB LED Red Channel | Alert / Critical Error (5 Hz Rapid Blink) |
 | **LED_READY** | `GPIO 2` | N/A | Blue Onboard | Onboard Ready Heartbeat mirror |
@@ -32,12 +32,17 @@ Because the test setup utilizes **a single micro-USB cable** and limited breadbo
 1. **Flashing & Diagnostics**: USB cable connected to ESP32 (`/dev/ttyACM0`).
 2. **End-to-End Benchmarks**: USB cable connected to Cora Z7 (capturing Cortex-A9 PMU / UART). The ESP32 is powered independently via external 5V/VIN or 3.3V rail.
 
-### Pushbutton Controls
-- **BTN_TRIGGER (GPIO 32)**: Single button connected between GPIO 32 and GND. Pushing the button immediately executes the full sequential benchmark suite:
+### Pushbutton & Autonomous Software Trigger
+- **BTN_TRIGGER (GPIO 32)**: Active-Low trigger line connected to Cora Z7 PMOD JA Pin 1 (`Y18`) or a momentary button to GND. The Cora Z7 firmware automatically pulses this pin low for 30 ms to trigger bursts sequentially, or the user can manually push the button.
   1. 64 B High-Redundancy block (RLE pipeline)
   2. 1 KB Pseudo-Random block (LZ4 pipeline)
   3. 64 KB Synthetic Telemetry block (AES-128-CTR pipeline)
   4. 64 KB Synthetic Telemetry block (ChaCha20 pipeline)
+
+### Driver & Timing Architecture (ESP-IDF v6.1)
+- **Host**: `SPI3_HOST` (VSPI) on native IOMUX pins (`GPIO 18`, `23`, `19`, `5`).
+- **Timing & Framing**: Operates in `SPI_DEVICE_HALFDUPLEX` with `.cs_ena_pretrans = 2` and `.cs_ena_posttrans = 2`. This guarantees that `CS` is held low 2 clock cycles before `SCLK` begins toggling, satisfying the AXI Quad SPI 2-stage synchronizer on `ext_spi_clk`.
+- **Zero Allocation**: Uses static `DMA_ATTR` buffers for zero-heap-allocation transmission.
 
 ### Visual LED Telemetry (RGB LED on GPIO 21 & 22)
 - **IDLE / Ready**: Green LED (GPIO 21) pulses with a 1 Hz heartbeat; Red LED is OFF.

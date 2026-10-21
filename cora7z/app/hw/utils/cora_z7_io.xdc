@@ -9,13 +9,20 @@
 # ------------------------------------------------------------------------------
 
 # SCK (Pin H15, Bank 35, 3.3V LVCMOS) - Dedicated SPI Header J7 Pin 3 (CK_SCK)
-set_property -dict { PACKAGE_PIN H15 IOSTANDARD LVCMOS33 } [get_ports { shield_spi_sck_io }];
+set_property -dict { PACKAGE_PIN H15 IOSTANDARD LVCMOS33 } [get_ports { spi_sck_i }];
 
-# MOSI / IO0 (Pin T12, Bank 34, 3.3V LVCMOS) - Dedicated SPI Header J7 Pin 4 (CK_MOSI)
-set_property -dict { PACKAGE_PIN T12 IOSTANDARD LVCMOS33 } [get_ports { shield_spi_io0_io }];
+# MOSI (Pin T12, Bank 34, 3.3V LVCMOS) - Dedicated SPI Header J7 Pin 4 (CK_MOSI)
+set_property -dict { PACKAGE_PIN T12 IOSTANDARD LVCMOS33 } [get_ports { spi_mosi_i }];
 
-# MISO / IO1 (Pin W15, Bank 34, 3.3V LVCMOS) - Dedicated SPI Header J7 Pin 1 (CK_MISO)
-set_property -dict { PACKAGE_PIN W15 IOSTANDARD LVCMOS33 } [get_ports { shield_spi_io1_io }];
+# MISO (Pin W15, Bank 34, 3.3V LVCMOS) - Dedicated SPI Header J7 Pin 1 (CK_MISO)
+set_property -dict { PACKAGE_PIN W15 IOSTANDARD LVCMOS33 } [get_ports { spi_miso_o }];
 
 # SS / CS_n (Pin F16, Bank 35, 3.3V LVCMOS) - Dedicated SPI Header J7 Pin 5 (CK_SS)
-set_property -dict { PACKAGE_PIN F16 IOSTANDARD LVCMOS33 } [get_ports { shield_spi_ss_io }];
+set_property -dict { PACKAGE_PIN F16 IOSTANDARD LVCMOS33 PULLUP true } [get_ports { spi_ss_i }];
+
+# ------------------------------------------------------------------------------
+# Autonomous ESP32 Trigger Line from Cora Z7 Cortex-A9 PS EMIO GPIO
+# PMOD JA Pin 1 (JA1_P, Package Pin Y18, Bank 34, 3.3V LVCMOS)
+# Connected directly to ESP32 GPIO 32 (Active-Low Trigger)
+# ------------------------------------------------------------------------------
+set_property -dict { PACKAGE_PIN Y18 IOSTANDARD LVCMOS33 } [get_ports { esp32_trigger_o[0] }];

@@ -16,9 +16,47 @@
 #include "xil_printf.h"
 #include "xil_io.h"
 #include "xparameters.h"
+#include "sleep.h"
 #include "benchmark_ps.h"
 #include "pipeline_mgr.h"
 #include "axi_spi_receiver.h"
+
+/* ========================================================================= */
+/* PS EMIO GPIO Hardware Trigger for ESP32 Data Injector                     */
+/* PMOD JA Pin 1 (Package Pin Y18, Bank 34, 3.3V LVCMOS)                     */
+/* Active-Low pulse sent to ESP32 BTN_TRIGGER (GPIO 32)                      */
+/* ========================================================================= */
+#define PS_GPIO_BASEADDR       0xE000A000U
+#define PS_GPIO_DATA_2_OFFSET  0x0048U  /* Bank 2 Data (EMIO [31:0]) */
+#define PS_GPIO_DIRM_2_OFFSET  0x0284U  /* Bank 2 Direction Mode */
+#define PS_GPIO_OEN_2_OFFSET   0x0288U  /* Bank 2 Output Enable */
+
+static void esp32_trigger_init(void) {
+    /* Set Bank 2 bit 0 (EMIO pin 0) as Output */
+    uint32_t dirm = Xil_In32(PS_GPIO_BASEADDR + PS_GPIO_DIRM_2_OFFSET);
+    Xil_Out32(PS_GPIO_BASEADDR + PS_GPIO_DIRM_2_OFFSET, dirm | 0x01U);
+
+    /* Enable Output for Bank 2 bit 0 */
+    uint32_t oen = Xil_In32(PS_GPIO_BASEADDR + PS_GPIO_OEN_2_OFFSET);
+    Xil_Out32(PS_GPIO_BASEADDR + PS_GPIO_OEN_2_OFFSET, oen | 0x01U);
+
+    /* Idle State: HIGH (inactive for active-low button with pull-up) */
+    uint32_t data = Xil_In32(PS_GPIO_BASEADDR + PS_GPIO_DATA_2_OFFSET);
+    Xil_Out32(PS_GPIO_BASEADDR + PS_GPIO_DATA_2_OFFSET, data | 0x01U);
+}
+
+static void trigger_esp32_burst(void) {
+    /* Drive LOW (simulates button press) */
+    uint32_t data = Xil_In32(PS_GPIO_BASEADDR + PS_GPIO_DATA_2_OFFSET);
+    Xil_Out32(PS_GPIO_BASEADDR + PS_GPIO_DATA_2_OFFSET, data & ~0x01U);
+
+    /* Hold LOW for 30 ms (debouncer threshold on ESP32 is 20ms) */
+    usleep(30000);
+
+    /* Release back to HIGH (idle) */
+    data = Xil_In32(PS_GPIO_BASEADDR + PS_GPIO_DATA_2_OFFSET);
+    Xil_Out32(PS_GPIO_BASEADDR + PS_GPIO_DATA_2_OFFSET, data | 0x01U);
+}
 
 /* ========================================================================= */
 /* ARM Cortex-A9 Performance Monitor Unit (PMU / CP15) Routines             */
@@ -210,11 +248,21 @@ int main(void) {
         }
     }
 
+    /* Initialize Autonomous ESP32 Trigger Line (PMOD JA Pin 1 -> ESP32 GPIO 32) */
+    esp32_trigger_init();
+    xil_printf("[TRIGGER] PS EMIO GPIO Initialized on PMOD JA Pin 1 (Package Pin Y18).\r\n");
+    xil_printf("[TRIGGER] Connect PMOD JA Pin 1 to ESP32 GPIO 32 for automatic burst control!\r\n\r\n");
+
     /* Active SPI Ingestion and Benchmark Loop */
-    xil_printf("\r\n================================================================\r\n");
+    xil_printf("================================================================\r\n");
     xil_printf("  [SPI_RX] Listening for incoming packets from ESP32 on J7...\r\n");
-    xil_printf("  Press BTN_TRIGGER (GPIO 32) on ESP32 to inject packets.\r\n");
+    xil_printf("  Pinout: SCLK=H15 (J7.3), MOSI=T12 (J7.4), MISO=W15 (J7.1), SS=F16 (J7.5)\r\n");
+    xil_printf("  Autonomous Trigger: PMOD JA Pin 1 (Y18) -> ESP32 GPIO 32\r\n");
     xil_printf("================================================================\r\n\r\n");
+
+    /* Trigger initial burst automatically */
+    xil_printf("[TRIGGER] Emitting initial active-low pulse (30 ms) to ESP32 on PMOD JA1...\r\n");
+    trigger_esp32_burst();
 
     static uint8_t s_rx_payload[65536];
     spi_frame_t rx_frame;
@@ -249,6 +297,10 @@ int main(void) {
                        (unsigned int)spisr,
                        (unsigned int)fifo_cnt,
                        (unsigned int)rx_packet_count);
+
+            /* Periodically pulse the trigger line if waiting for frames */
+            xil_printf("[CORA_Z7] Triggering burst on ESP32 via PMOD JA1...\r\n");
+            trigger_esp32_burst();
         }
     }
 

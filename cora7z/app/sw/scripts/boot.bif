@@ -1,6 +1,6 @@
 the_ROM_image:
 {
-    [bootloader]/home/luis/ufmg/soc/proj/cora7z/app/sw/vitis/cora7z_platform/zynq_fsbl/build/fsbl.elf
-    /home/luis/ufmg/soc/proj/cora7z/app/hw/vivado/soc-final.runs/impl_1/soc_final_bd_1_wrapper.bit
-    /home/luis/ufmg/soc/proj/cora7z/app/sw/vitis/cora7z_firmware/build/cora7z_firmware.elf
+    [bootloader]cora7z/app/sw/vitis/cora7z_platform/zynq_fsbl/build/fsbl.elf
+    cora7z/app/hw/vivado/soc-final.runs/impl_1/soc_final_bd_1_wrapper.bit
+    cora7z/app/sw/vitis/cora7z_firmware/build/cora7z_firmware.elf
 }
