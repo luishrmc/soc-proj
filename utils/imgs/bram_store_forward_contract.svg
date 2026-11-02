@@ -1,0 +1,360 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1140 680" width="100%" height="100%">
+  <defs>
+    <!-- Background Gradient -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0b0f19" />
+      <stop offset="100%" stop-color="#111827" />
+    </linearGradient>
+
+    <!-- Column Gradients -->
+    <linearGradient id="psColGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#0c4a6e" stop-opacity="0.85" />
+      <stop offset="100%" stop-color="#082f49" stop-opacity="0.95" />
+    </linearGradient>
+    <linearGradient id="bramColGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#1e1b4b" stop-opacity="0.85" />
+      <stop offset="100%" stop-color="#0f172a" stop-opacity="0.95" />
+    </linearGradient>
+    <linearGradient id="plColGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#4c1d95" stop-opacity="0.85" />
+      <stop offset="100%" stop-color="#2e1065" stop-opacity="0.95" />
+    </linearGradient>
+
+    <!-- Component Gradients -->
+    <linearGradient id="bramBoxGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1e293b" />
+      <stop offset="100%" stop-color="#0f172a" />
+    </linearGradient>
+    <linearGradient id="fsmGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#581c87" />
+      <stop offset="100%" stop-color="#3b0764" />
+    </linearGradient>
+
+    <!-- Filters -->
+    <filter id="cardShadow" x="-5%" y="-5%" width="110%" height="115%">
+      <feDropShadow dx="0" dy="6" stdDeviation="8" flood-color="#000000" flood-opacity="0.65"/>
+    </filter>
+
+    <!-- Markers -->
+    <marker id="arrCyan" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+      <path d="M1,1 L7,4 L1,7 Z" fill="#38bdf8" />
+    </marker>
+    <marker id="arrAmber" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+      <path d="M1,1 L7,4 L1,7 Z" fill="#fbbf24" />
+    </marker>
+    <marker id="arrGreen" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+      <path d="M1,1 L7,4 L1,7 Z" fill="#34d399" />
+    </marker>
+    <marker id="arrPurple" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+      <path d="M1,1 L7,4 L1,7 Z" fill="#c084fc" />
+    </marker>
+  </defs>
+
+  <!-- Background Canvas -->
+  <rect width="1140" height="680" rx="16" fill="url(#bgGrad)" stroke="#1e293b" stroke-width="2" />
+
+  <!-- Blueprint Grid -->
+  <g opacity="0.05" stroke="#94a3b8" stroke-width="1">
+    <path d="M 0,85 L 1140,85 M 0,170 L 1140,170 M 0,255 L 1140,255 M 0,340 L 1140,340 M 0,425 L 1140,425 M 0,510 L 1140,510 M 0,595 L 1140,595" />
+    <path d="M 85,0 L 85,680 M 170,0 L 170,680 M 255,0 L 255,680 M 340,0 L 340,680 M 425,0 L 425,680 M 510,0 L 510,680 M 595,0 L 595,680 M 680,0 L 680,680 M 765,0 L 765,680 M 850,0 L 850,680 M 935,0 L 935,680 M 1020,0 L 1020,680" />
+  </g>
+
+  <!-- Title Header -->
+  <text x="570" y="38" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="20" font-weight="700" fill="#f8fafc" letter-spacing="1">
+    PS-PL DUAL-PORT BRAM STORE-AND-FORWARD CONTRACT
+  </text>
+  <text x="570" y="58" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="12" fill="#94a3b8">
+    Zero-DMA Boundary ── Isolated 100 MHz Core Datapath ── Deterministic 5-Stage Transaction Lifecycle
+  </text>
+
+  <!-- ========================================================================= -->
+  <!-- COLUMN 1: PS ADDRESS SPACE & CONTROLLERS                                  -->
+  <!-- ========================================================================= -->
+  <g transform="translate(30, 80)">
+    <rect width="320" height="570" rx="12" fill="url(#psColGrad)" stroke="#0284c7" stroke-width="2" filter="url(#cardShadow)" />
+    
+    <!-- Title Badge -->
+    <rect x="15" y="15" width="290" height="34" rx="6" fill="#0369a1" stroke="#38bdf8" stroke-width="1.2" />
+    <text x="160" y="37" text-anchor="middle" font-family="system-ui, sans-serif" font-size="13" font-weight="700" fill="#f0f9ff">
+      PS ADDRESS SPACE (ARM CPU)
+    </text>
+    <text x="160" y="66" text-anchor="middle" font-family="monospace" font-size="10" fill="#7dd3fc">
+      Cortex-A9 @ 667 MHz • M_AXI_GP0
+    </text>
+
+    <!-- Block 1: DDR3 Raw Staging Buffer -->
+    <g transform="translate(15, 80)">
+      <rect width="290" height="85" rx="8" fill="#082f49" stroke="#0284c7" stroke-width="1" />
+      <text x="15" y="24" font-family="system-ui, sans-serif" font-size="12" font-weight="700" fill="#bae6fd">
+        DDR3 Memory Buffers
+      </text>
+      <text x="15" y="44" font-family="monospace" font-size="9.5" fill="#e0f2fe">• rx_raw_buf [256 B .. 1 KB]</text>
+      <text x="15" y="60" font-family="monospace" font-size="9.5" fill="#e0f2fe">• tx_cipher_buf [1 KB]</text>
+      <text x="15" y="76" font-family="monospace" font-size="9.5" fill="#7dd3fc">• Cache-coherent (L1/L2 clean/flush)</text>
+    </g>
+
+    <!-- Block 2: AXI BRAM Controller 0 (Input) -->
+    <g transform="translate(15, 185)">
+      <rect width="290" height="95" rx="8" fill="#082f49" stroke="#0284c7" stroke-width="1.2" />
+      <rect x="10" y="8" width="90" height="18" rx="4" fill="#0369a1" />
+      <text x="55" y="21" text-anchor="middle" font-family="monospace" font-size="9" font-weight="700" fill="#ffffff">
+        PORT A WRITER
+      </text>
+      <text x="110" y="22" font-family="system-ui, sans-serif" font-size="11.5" font-weight="700" fill="#bae6fd">
+        AXI BRAM Controller 0
+      </text>
+      <text x="15" y="45" font-family="monospace" font-size="9.5" fill="#e0f2fe">• Base: 0x4000_0000 (Size: 2 KB)</text>
+      <text x="15" y="62" font-family="monospace" font-size="9.5" fill="#e0f2fe">• 32-bit Word Burst memcpy</text>
+      <text x="15" y="82" font-family="monospace" font-size="9" font-weight="700" fill="#38bdf8">
+        ➔ STAGE 1: CPU Writes Raw Frame
+      </text>
+    </g>
+
+    <!-- Block 3: AXI4-Lite CSR Master -->
+    <g transform="translate(15, 300)">
+      <rect width="290" height="110" rx="8" fill="#082f49" stroke="#0284c7" stroke-width="1.2" />
+      <rect x="10" y="8" width="90" height="18" rx="4" fill="#0369a1" />
+      <text x="55" y="21" text-anchor="middle" font-family="monospace" font-size="9" font-weight="700" fill="#ffffff">
+        CSR MASTER
+      </text>
+      <text x="110" y="22" font-family="system-ui, sans-serif" font-size="11.5" font-weight="700" fill="#bae6fd">
+        AXI4-Lite CSR Master
+      </text>
+      <text x="15" y="45" font-family="monospace" font-size="9.5" fill="#e0f2fe">• Write SRC_LEN = payload length</text>
+      <text x="15" y="62" font-family="monospace" font-size="9.5" fill="#fbbf24">• Pulse CONTROL.START = '1' (Stage 2)</text>
+      <text x="15" y="80" font-family="monospace" font-size="9.5" fill="#e0f2fe">• Poll STATUS.DONE = '1'</text>
+      <text x="15" y="98" font-family="monospace" font-size="9.5" fill="#34d399">• Read DST_LEN &amp; CYCLE_COUNT (Stage 5)</text>
+    </g>
+
+    <!-- Block 4: AXI BRAM Controller 1 (Output) -->
+    <g transform="translate(15, 430)">
+      <rect width="290" height="95" rx="8" fill="#082f49" stroke="#0284c7" stroke-width="1.2" />
+      <rect x="10" y="8" width="90" height="18" rx="4" fill="#0369a1" />
+      <text x="55" y="21" text-anchor="middle" font-family="monospace" font-size="9" font-weight="700" fill="#ffffff">
+        PORT A READER
+      </text>
+      <text x="110" y="22" font-family="system-ui, sans-serif" font-size="11.5" font-weight="700" fill="#bae6fd">
+        AXI BRAM Controller 1
+      </text>
+      <text x="15" y="45" font-family="monospace" font-size="9.5" fill="#e0f2fe">• Base: 0x4200_0000 (Size: 2 KB)</text>
+      <text x="15" y="62" font-family="monospace" font-size="9.5" fill="#e0f2fe">• Drains DST_LEN bytes into DDR3</text>
+      <text x="15" y="82" font-family="monospace" font-size="9" font-weight="700" fill="#34d399">
+        ➔ STAGE 5: CPU Reads Result
+      </text>
+    </g>
+
+    <rect x="25" y="535" width="270" height="22" rx="11" fill="#0369a1" />
+    <text x="160" y="550" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10" font-weight="700" fill="#ffffff">
+      ZERO DMA HANGS • STABLE MEMCPY
+    </text>
+  </g>
+
+  <!-- ========================================================================= -->
+  <!-- COLUMN 2: TRUE DUAL-PORT BLOCK RAM BOUNDARY (INTERCONNECT)                -->
+  <!-- ========================================================================= -->
+  <g transform="translate(380, 80)">
+    <rect width="380" height="570" rx="12" fill="url(#bramColGrad)" stroke="#38bdf8" stroke-width="2" filter="url(#cardShadow)" />
+    
+    <!-- Title Badge -->
+    <rect x="15" y="15" width="350" height="34" rx="6" fill="#1e1b4b" stroke="#818cf8" stroke-width="1.2" />
+    <text x="190" y="37" text-anchor="middle" font-family="system-ui, sans-serif" font-size="13" font-weight="700" fill="#e0e7ff">
+      DUAL-PORT BRAM MEMORY BOUNDARY
+    </text>
+    <text x="190" y="66" text-anchor="middle" font-family="monospace" font-size="10" fill="#a5b4fc">
+      Hardware Decoupling Buffer • Port A (PS) / Port B (PL)
+    </text>
+
+    <!-- Sub-Box 1: 2 KB Input BRAM -->
+    <g transform="translate(15, 85)">
+      <rect width="350" height="135" rx="8" fill="url(#bramBoxGrad)" stroke="#0ea5e9" stroke-width="1.5" />
+      <text x="175" y="24" text-anchor="middle" font-family="system-ui, sans-serif" font-size="12.5" font-weight="700" fill="#38bdf8">
+        2 KB True Dual-Port Input BRAM (blk_mem_gen)
+      </text>
+      
+      <!-- Port A side -->
+      <rect x="15" y="40" width="150" height="78" rx="6" fill="#082f49" stroke="#0284c7" stroke-width="1" />
+      <text x="90" y="58" text-anchor="middle" font-family="monospace" font-size="10" font-weight="700" fill="#bae6fd">
+        PORT A (PS Side)
+      </text>
+      <text x="25" y="78" font-family="monospace" font-size="9" fill="#e0f2fe">• 32-bit @ 50 MHz</text>
+      <text x="25" y="93" font-family="monospace" font-size="9" fill="#e0f2fe">• Write Access (memcpy)</text>
+      <text x="25" y="108" font-family="monospace" font-size="8.5" fill="#38bdf8">➔ Ingest Frame Data</text>
+
+      <!-- Port B side -->
+      <rect x="185" y="40" width="150" height="78" rx="6" fill="#2e1065" stroke="#9333ea" stroke-width="1" />
+      <text x="260" y="58" text-anchor="middle" font-family="monospace" font-size="10" font-weight="700" fill="#e9d5ff">
+        PORT B (PL Side)
+      </text>
+      <text x="195" y="78" font-family="monospace" font-size="9" fill="#f3e8ff">• 8/32-bit @ 100 MHz</text>
+      <text x="195" y="93" font-family="monospace" font-size="9" fill="#f3e8ff">• Single-Cycle Read</text>
+      <text x="195" y="108" font-family="monospace" font-size="8.5" fill="#c084fc">➔ Feeds Core FSM</text>
+    </g>
+
+    <!-- Sub-Box 2: AXI4-Lite CSR Register Block -->
+    <g transform="translate(15, 235)">
+      <rect width="350" height="145" rx="8" fill="url(#bramBoxGrad)" stroke="#fbbf24" stroke-width="1.5" />
+      <text x="175" y="24" text-anchor="middle" font-family="system-ui, sans-serif" font-size="12.5" font-weight="700" fill="#fbbf24">
+        AXI4-Lite Control &amp; Status Registers (CSR)
+      </text>
+
+      <!-- Regs mini-table -->
+      <g transform="translate(15, 38)" font-family="monospace" font-size="9.5">
+        <rect width="320" height="22" rx="4" fill="#1e293b" />
+        <text x="10" y="15" fill="#cbd5e1" font-weight="700">Offset</text>
+        <text x="80" y="15" fill="#cbd5e1" font-weight="700">Register</text>
+        <text x="170" y="15" fill="#cbd5e1" font-weight="700">Type</text>
+        <text x="220" y="15" fill="#cbd5e1" font-weight="700">Function</text>
+
+        <text x="10" y="38" fill="#fbbf24">0x00</text>
+        <text x="80" y="38" fill="#f8fafc">CONTROL</text>
+        <text x="170" y="38" fill="#94a3b8">R/W</text>
+        <text x="220" y="38" fill="#e2e8f0">bit 0: START (pulse)</text>
+
+        <text x="10" y="55" fill="#34d399">0x04</text>
+        <text x="80" y="55" fill="#f8fafc">STATUS</text>
+        <text x="170" y="55" fill="#94a3b8">RO</text>
+        <text x="220" y="55" fill="#e2e8f0">bit 0: BUSY, bit 1: DONE</text>
+
+        <text x="10" y="72" fill="#38bdf8">0x08</text>
+        <text x="80" y="72" fill="#f8fafc">SRC_LEN</text>
+        <text x="170" y="72" fill="#94a3b8">R/W</text>
+        <text x="220" y="72" fill="#e2e8f0">Input payload length</text>
+
+        <text x="10" y="89" fill="#c084fc">0x0C</text>
+        <text x="80" y="89" fill="#f8fafc">DST_LEN</text>
+        <text x="170" y="89" fill="#94a3b8">RO</text>
+        <text x="220" y="89" fill="#e2e8f0">Output payload length</text>
+
+        <text x="10" y="106" fill="#f43f5e">0x10</text>
+        <text x="80" y="106" fill="#f8fafc">CYCLE_COUNT</text>
+        <text x="170" y="106" fill="#94a3b8">RO</text>
+        <text x="220" y="106" fill="#e2e8f0">32-bit hardware cycles</text>
+      </g>
+    </g>
+
+    <!-- Sub-Box 3: 2 KB Output BRAM -->
+    <g transform="translate(15, 395)">
+      <rect width="350" height="135" rx="8" fill="url(#bramBoxGrad)" stroke="#10b981" stroke-width="1.5" />
+      <text x="175" y="24" text-anchor="middle" font-family="system-ui, sans-serif" font-size="12.5" font-weight="700" fill="#34d399">
+        2 KB True Dual-Port Output BRAM (blk_mem_gen)
+      </text>
+
+      <!-- Port B side -->
+      <rect x="15" y="40" width="150" height="78" rx="6" fill="#2e1065" stroke="#9333ea" stroke-width="1" />
+      <text x="90" y="58" text-anchor="middle" font-family="monospace" font-size="10" font-weight="700" fill="#e9d5ff">
+        PORT B (PL Side)
+      </text>
+      <text x="25" y="78" font-family="monospace" font-size="9" fill="#f3e8ff">• 8/32-bit @ 100 MHz</text>
+      <text x="25" y="93" font-family="monospace" font-size="9" fill="#f3e8ff">• Single-Cycle Write</text>
+      <text x="25" y="108" font-family="monospace" font-size="8.5" fill="#c084fc">➔ Core Streams Output</text>
+
+      <!-- Port A side -->
+      <rect x="185" y="40" width="150" height="78" rx="6" fill="#082f49" stroke="#0284c7" stroke-width="1" />
+      <text x="260" y="58" text-anchor="middle" font-family="monospace" font-size="10" font-weight="700" fill="#bae6fd">
+        PORT A (PS Side)
+      </text>
+      <text x="195" y="78" font-family="monospace" font-size="9" fill="#e0f2fe">• 32-bit @ 50 MHz</text>
+      <text x="195" y="93" font-family="monospace" font-size="9" fill="#e0f2fe">• Read Access (memcpy)</text>
+      <text x="195" y="108" font-family="monospace" font-size="8.5" fill="#34d399">➔ Harvest Result</text>
+    </g>
+
+    <rect x="35" y="540" width="310" height="20" rx="10" fill="#312e81" />
+    <text x="190" y="554" text-anchor="middle" font-family="system-ui, sans-serif" font-size="9.5" font-weight="700" fill="#c7d2fe">
+      NO SHARED BUS CONTENTION • TRUE DUAL-PORT PRIVILEGE
+    </text>
+  </g>
+
+  <!-- ========================================================================= -->
+  <!-- COLUMN 3: PL HARDWARE COPROCESSOR CORE                                    -->
+  <!-- ========================================================================= -->
+  <g transform="translate(790, 80)">
+    <rect width="320" height="570" rx="12" fill="url(#plColGrad)" stroke="#a855f7" stroke-width="2" filter="url(#cardShadow)" />
+    
+    <!-- Title Badge -->
+    <rect x="15" y="15" width="290" height="34" rx="6" fill="#6b21a8" stroke="#c084fc" stroke-width="1.2" />
+    <text x="160" y="37" text-anchor="middle" font-family="system-ui, sans-serif" font-size="13" font-weight="700" fill="#faf5ff">
+      PL ACCELERATOR (100 MHz)
+    </text>
+    <text x="160" y="66" text-anchor="middle" font-family="monospace" font-size="10" fill="#d8b4fe">
+      lzss_accel OR aes_accel
+    </text>
+
+    <!-- FSM Datapath Card -->
+    <g transform="translate(15, 85)">
+      <rect width="290" height="235" rx="8" fill="url(#fsmGrad)" stroke="#a855f7" stroke-width="1.5" />
+      <text x="145" y="24" text-anchor="middle" font-family="system-ui, sans-serif" font-size="12" font-weight="700" fill="#f3e8ff">
+        Dedicated Core Processing FSM
+      </text>
+
+      <!-- FSM States Box -->
+      <g transform="translate(15, 38)" font-family="monospace" font-size="9.5">
+        <rect width="260" height="26" rx="4" fill="#3b0764" stroke="#9333ea" stroke-width="1" />
+        <text x="130" y="17" text-anchor="middle" fill="#d8b4fe" font-weight="700">IDLE: Waits for START pulse</text>
+
+        <rect y="34" width="260" height="48" rx="4" fill="#3b0764" stroke="#9333ea" stroke-width="1" />
+        <text x="130" y="50" text-anchor="middle" fill="#38bdf8" font-weight="700">STAGE 3: READ &amp; COMPUTE</text>
+        <text x="15" y="66" fill="#f5d0fe">• Fetch from In BRAM Port B</text>
+        <text x="15" y="78" fill="#f5d0fe">• LZSS Match / AES-CTR XOR</text>
+
+        <rect y="90" width="260" height="42" rx="4" fill="#3b0764" stroke="#9333ea" stroke-width="1" />
+        <text x="130" y="106" text-anchor="middle" fill="#34d399" font-weight="700">WRITE OUTPUT BRAM</text>
+        <text x="15" y="122" fill="#f5d0fe">• Write to Out BRAM Port B</text>
+
+        <rect y="140" width="260" height="48" rx="4" fill="#3b0764" stroke="#9333ea" stroke-width="1" />
+        <text x="130" y="156" text-anchor="middle" fill="#facc15" font-weight="700">STAGE 4: COMPLETE &amp; LATCH</text>
+        <text x="15" y="172" fill="#fef08a">• Assert STATUS.DONE = '1'</text>
+        <text x="15" y="184" fill="#fef08a">• Latch DST_LEN &amp; Freeze Cycles</text>
+      </g>
+    </g>
+
+    <!-- Cycle Counter Box -->
+    <g transform="translate(15, 335)">
+      <rect width="290" height="100" rx="8" fill="#2e1065" stroke="#f43f5e" stroke-width="1.2" />
+      <text x="15" y="24" font-family="system-ui, sans-serif" font-size="11.5" font-weight="700" fill="#fca5a5">
+        32-bit HW Cycle Counter
+      </text>
+      <text x="15" y="44" font-family="monospace" font-size="9.5" fill="#fecdd3">• Clock: Synchronous 100 MHz</text>
+      <text x="15" y="60" font-family="monospace" font-size="9.5" fill="#fecdd3">• Starts precisely on IDLE ➔ RUN</text>
+      <text x="15" y="76" font-family="monospace" font-size="9.5" fill="#fecdd3">• Freezes on asserting DONE</text>
+      <text x="15" y="92" font-family="monospace" font-size="9" font-weight="700" fill="#f87171">
+        ✓ 100% Isolated Pure Hardware Metrics
+      </text>
+    </g>
+
+    <!-- Datapath Features -->
+    <g transform="translate(15, 450)">
+      <rect width="290" height="75" rx="8" fill="#2e1065" stroke="#a855f7" stroke-width="1" />
+      <text x="15" y="22" font-family="system-ui, sans-serif" font-size="11.5" font-weight="700" fill="#e9d5ff">
+        Key Architectural Features
+      </text>
+      <text x="15" y="40" font-family="monospace" font-size="9.5" fill="#f3e8ff">• Single-cycle RAM latency</text>
+      <text x="15" y="55" font-family="monospace" font-size="9.5" fill="#f3e8ff">• Zero AXI descriptor overhead</text>
+      <text x="15" y="70" font-family="monospace" font-size="9.5" fill="#f3e8ff">• Variable length safe (no TLAST hang)</text>
+    </g>
+
+    <rect x="25" y="535" width="270" height="22" rx="11" fill="#7c3aed" />
+    <text x="160" y="550" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10" font-weight="700" fill="#ffffff">
+      AUTONOMOUS HARDWARE ENGINE
+    </text>
+  </g>
+
+  <!-- ========================================================================= -->
+  <!-- TRANSACTION PATHWAYS & BUS ARROWS                                         -->
+  <!-- ========================================================================= -->
+
+  <!-- Step 1 Arrow: PS AXI BRAM Ctrl 0 -> Input BRAM Port A -->
+  <path d="M 320,290 L 395,210" fill="none" stroke="#38bdf8" stroke-width="2.5" marker-end="url(#arrCyan)" />
+
+  <!-- Step 2 Arrow: PS CSR Master -> CSR Registers -->
+  <path d="M 320,380 L 395,335" fill="none" stroke="#fbbf24" stroke-width="2.5" marker-end="url(#arrAmber)" />
+
+  <!-- Step 3 Arrow: Input BRAM Port B -> Core FSM -->
+  <path d="M 745,210 L 790,210" fill="none" stroke="#c084fc" stroke-width="2.5" marker-end="url(#arrPurple)" />
+
+  <!-- Step 4 Arrow: Core FSM -> Output BRAM Port B -->
+  <path d="M 790,490 L 745,490" fill="none" stroke="#c084fc" stroke-width="2.5" marker-end="url(#arrPurple)" />
+
+  <!-- Step 5 Arrow: Output BRAM Port A -> PS AXI BRAM Ctrl 1 -->
+  <path d="M 395,490 L 320,490" fill="none" stroke="#34d399" stroke-width="2.5" marker-end="url(#arrGreen)" />
+
+</svg>

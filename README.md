@@ -34,38 +34,28 @@ The platform integrates two physical hardware subsystems: an external **ESP32-WR
 
 ![System Topology](utils/imgs/system_topology.svg)
 
-### 1.1 Hardware Partitioning & Responsibilities
+### 1.1 Hardware Partitioning & Execution Domains
 
 The system is partitioned into three distinct execution domains:
 
-```
-+─────────────────────────────────────────────────────────────────────────────+
-|                               SYSTEM DOMAINS                                |
-|                                                                             |
-|  +--------------------+                     +----------------------------+  |
-|  |    ESP32-WROOM     |                     |       CORA Z7 (ZYNQ-7000)  |  |
-|  |                    |                     |                            |  |
-|  | [Synthetic Telem]  |                     |  +----------------------+  |  |
-|  | [SPI Master Feed]  | ─── SPI (EMIO) ───> |  |  ARM Cortex-A9 PS    |  |  |
-|  | [Console Reporter] | <── Status/Data ─── |  |  (Bare-Metal Driver) |  |  |
-|  +--------------------+                     |  +----------┬-----------+  |  |
-|           ▲                                 |             │ AXI GP0 Bus  |  |
-|           │ Hardware Trigger Pulse          |  +----------▼-----------+  |  |
-|           └──────────────────────────────── |  |  Artix-7 FPGA PL     |  |  |
-|                  (PMOD JA1 -> GPIO 32)      |  |  [LZSS]     [AES-CTR]|  |  |
-|                                             |  +----------------------+  |  |
-|                                             +----------------------------+  |
-+─────────────────────────────────────────────────────────────────────────────+
-```
+![System Execution Domains](utils/imgs/system_execution_domains.svg)
+
+The following table summarizes the architectural profile, execution model, and primary responsibilities of each domain:
+
+| Domain | Subsystem / Hardware | Clock Frequency | Execution Environment | Core Responsibilities |
+| :--- | :--- | :---: | :--- | :--- |
+| **Domain 1: Ingestion Harness** | Espressif ESP32-WROOM | 240 MHz | Dual Xtensa LX6 (ESP-IDF v6.1) | Autonomous synthetic telemetry generation (256 B–1 KB), SPI Master (Mode 0, up to 25 MHz), hardware trigger reception, UART console metrics logging |
+| **Domain 2: System Supervisor** | Zynq-7000 Processing System (PS) | 667 MHz | Dual ARM Cortex-A9 (Bare-Metal C11) | Native SPI1 EMIO interface, DDR3 staging buffers, software baseline execution (LZSS & AES-CTR), burst `memcpy` via `M_AXI_GP0`, ARM PMU instrumentation |
+| **Domain 3: Coprocessor Fabric** | Zynq-7000 Programmable Logic (PL) | 100 MHz | AMD Xilinx Artix-7 Fabric | Decoupled `lzss_accel` & `aes_accel`, True Dual-Port BRAM buffers (Port A: PS, Port B: Core), 32-bit hardware cycle counters, zero-arbitration processing |
 
 #### A. ESP32-WROOM (Autonomous Test Harness & Data Injector)
-* **Isolated Environment:** Operates independently of external cloud or Wi-Fi networks to ensure repeatable, deterministic benchmark timings.
-* **Telemetry Storage:** Holds pre-generated synthetic telemetry frames (fixed sizes: 256 B, 512 B, 1024 B) structured with realistic floating-point physical quantities, UNIX timestamps, station tags, and status words.
+* **Isolated Environment:** Operates completely decoupled from external cloud or Wi-Fi networks, guaranteeing deterministic and jitter-free transmission timing.
+* **Telemetry Storage:** Houses pre-generated synthetic telemetry frames (standardized sizes: 256 B, 512 B, 1024 B) structured with realistic floating-point sensor metrics, UNIX timestamps, station tags, and status words.
 * **SPI Master:** Feeds frames to the Cora Z7 over SPI Mode 0 (up to 25 MHz) upon receiving an autonomous trigger pulse from the Cora Z7 PS.
-* **Egress Verification:** Reads back ciphertext packets, compression ratios, and cycle counts, logging performance reports to a host terminal over UART.
+* **Egress Verification:** Reads back ciphertext packets, compression ratios, and cycle counts, logging performance reports to a host terminal over UART (115200 bps).
 
 #### B. Processing System (PS: Dual ARM Cortex-A9 @ 667 MHz)
-* **SPI Ingress / Egress:** Receives external frames via the native Zynq `SPI1` controller routed through EMIO to dedicated physical board headers.
+* **SPI Ingress / Egress:** Receives external frames via the native Zynq `SPI1` controller routed through EMIO to dedicated physical board headers (Header J7).
 * **Software Baseline Execution:** Runs standalone C11 reference implementations of LZSS/Heatshrink and AES-128-CTR to measure CPU-bound baseline performance.
 * **Memory Staging & Offload Supervisor:** Manages frame handoffs between DDR3 staging buffers and PL coprocessors via fast memory copies over the 32-bit `M_AXI_GP0` bus, completely bypassing brittle DMA scatter-gather engines.
 * **Cycle-Accurate Benchmarking:** Measures CPU cycles using the ARM Performance Monitor Unit (PMU / CP15 `PMCCNTR`) and polls PL hardware cycle registers.
@@ -90,27 +80,44 @@ Dynamic streaming multiplexers (`axis_accel_mux`) and AXI DMA engines have been 
 
 Data and control movement across the PS-PL boundary follows a strict store-and-forward contract:
 
-```
-       PS Address Space (ARM CPU)                    PL Hardware Interface (FPGA Fabric)
-┌──────────────────────────────────────┐        ┌─────────────────────────────────────────┐
-│ AXI BRAM Controller 0 (Base In)      │ ──A──> │ 2 KB True Dual-Port Input BRAM          │
-└──────────────────────────────────────┘        └────────────────────┬────────────────────┘
-                                                                     │ Port B (100 MHz)
-                                                                     ▼
-                                                           [Core Processing FSM]
-                                                                     │
-                                                                     ▼ Port B (100 MHz)
-┌──────────────────────────────────────┐        ┌─────────────────────────────────────────┐
-│ AXI BRAM Controller 1 (Base Out)     │ ──A──> │ 2 KB True Dual-Port Output BRAM         │
-└──────────────────────────────────────┘        └─────────────────────────────────────────┘
-┌──────────────────────────────────────┐        ┌─────────────────────────────────────────┐
-│ AXI4-Lite CSR Slave Interface        │ ─────> │ [CONTROL / STATUS / CYCLES / LENGTHS]   │
-└──────────────────────────────────────┘        └─────────────────────────────────────────┘
-```
+![Store-and-Forward BRAM Protocol](utils/imgs/bram_store_forward_contract.svg)
 
-1. **Port A (PS Access):** Memory-mapped into the ARM Cortex-A9 address space via standard Xilinx AXI BRAM Controllers. The CPU stages raw frames into Input BRAM and drains processed frames from Output BRAM using high-speed burst `memcpy`.
-2. **Port B (PL Core Access):** Directly wired to the accelerator core in the 100 MHz clock domain (`clk_accel`), providing single-cycle read and write access without bus arbitration contention.
-3. **AXI4-Lite Control:** Dedicated 32-bit memory-mapped registers expose `CONTROL`, `STATUS`, `SRC_LEN`, `DST_LEN`, and `CYCLE_COUNT`.
+#### Store-and-Forward Transaction Lifecycle
+
+The interaction between the ARM Cortex-A9 CPU and the PL accelerators progresses through five deterministic, sequential phases:
+
+| Phase | Operation Name | Initiator | Bus / Port | Transaction Description | Latency & Synchronization |
+| :---: | :--- | :--- | :--- | :--- | :--- |
+| **Stage 1** | **Ingest & Stage** | ARM Cortex-A9 | `M_AXI_GP0` $\to$ Port A | CPU copies raw frame from DDR3 to Input BRAM (32-bit burst `memcpy`) | Deterministic memory write; bypasses DMA descriptor rings |
+| **Stage 2** | **Arm & Dispatch** | ARM Cortex-A9 | `M_AXI_GP0` $\to$ AXI4-Lite | Writes `SRC_LEN` and pulses `CONTROL.START = '1'` (`0x00`) | Single MMIO write; resets internal cycle counter |
+| **Stage 3** | **Autonomous Compute** | Core FSM (`lzss` / `aes`) | Port B (100 MHz) | Core reads from Input BRAM Port B, executes algorithm, writes to Output BRAM Port B | Single-cycle synchronous RAM; zero bus contention |
+| **Stage 4** | **Completion Latch** | Core FSM | Internal CSR Logic | Core asserts `STATUS.DONE = '1'`, latches output byte count in `DST_LEN`, freezes `CYCLE_COUNT` | Cycle-accurate measurement; no CPU interrupt jitter |
+| **Stage 5** | **Harvest & Drain** | ARM Cortex-A9 | `M_AXI_GP0` $\to$ Port A | CPU detects `DONE = '1'`, reads `CYCLE_COUNT` & `DST_LEN`, drains Output BRAM to DDR3 | Complete isolation from variable-length stream issues |
+
+#### Memory & Port Interface Definition
+
+1. **Port A (PS CPU Interface):**
+   - Memory-mapped into the ARM Cortex-A9 physical address space via standard AMD Xilinx AXI BRAM Controllers (`0x40000000` for Input BRAM, `0x42000000` for Output BRAM).
+   - Operates in the 50 MHz `FCLK_CLK0` domain with 32-bit data width.
+   - Used exclusively by the CPU for burst `memcpy` staging and harvesting.
+2. **Port B (PL Accelerator Interface):**
+   - Directly wired to the accelerator core datapath in the 100 MHz `clk_accel` domain (`FCLK_CLK1`).
+   - Provides deterministic, single-cycle read and write access without bus arbiters, crossbars, or contention.
+3. **AXI4-Lite Control & Status Registers (CSR):**
+   - Dedicated 32-bit memory-mapped registers expose control signals, status flags, payload lengths, and cycle metrics:
+
+| Register Offset | Register Name | Access Type | Reset Value | Description |
+| :---: | :--- | :---: | :---: | :--- |
+| `0x00` | `CONTROL` | R/W | `0x00000000` | Control register: bit 0 = `START` (self-clearing pulse), bit 1 = `RESET_CORE` |
+| `0x04` | `STATUS` | RO | `0x00000000` | Status register: bit 0 = `BUSY`, bit 1 = `DONE`, bit 2 = `ERR` |
+| `0x08` | `SRC_LEN` | R/W | `0x00000000` | Input block length in bytes (32-bit unsigned integer) |
+| `0x0C` | `DST_LEN` | RO | `0x00000000` | Processed output block length in bytes (latched upon completion) |
+| `0x10` | `CYCLE_COUNT` | RO | `0x00000000` | Hardware latency: active 100 MHz clock cycles during computation |
+| `0x14`–`0x30` | `KEY_x` / `IV_x` | R/W | `0x00000000` | Cryptographic key, IV, and initial counter words (AES-128 core only) |
+
+> [!NOTE]
+> **Why Store-and-Forward Dual-Port BRAM Eliminates DMA Failure Modes:**
+> Compression algorithms on real-world telemetry produce variable-length output blocks that cannot be predicted a priori. In conventional streaming DMA pipelines (e.g., AXI DMA in Simple or Scatter-Gather mode), an under-length or over-length stream without a perfectly aligned `TLAST` packet boundary leads to DMA receiver hangs, unserviced interrupts, and CPU bus lockups. With Dual-Port BRAM, the hardware core autonomously determines the final length, writes the exact byte count to `DST_LEN`, and flags `DONE`. The CPU then safely reads the exact number of bytes produced.
 
 ### 2.2 Core Technical Breakdown
 
@@ -199,7 +206,9 @@ The repository adheres to a clean, decoupled layout separating synthesizable RTL
 └── utils/                      # Governance, project plan, and vector assets
     ├── imgs/                   # Responsive SVG system architecture diagrams
     │   ├── system_topology.svg
+    │   ├── system_execution_domains.svg
     │   ├── bram_pipeline_architecture.svg
+    │   ├── bram_store_forward_contract.svg
     │   └── benchmark_matrix_flow.svg
     ├── memory/                 # Technical memory, ADR log, and lessons learned
     │   ├── INDEX.md
