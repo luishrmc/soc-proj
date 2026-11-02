@@ -20,6 +20,8 @@
 #include "sleep.h"
 #include "axi_spi_receiver.h"
 #include "aes_ctr.h"
+#include "pipeline_mgr.h"
+#include "test_sw_pipeline.h"
 
 /* ========================================================================= */
 /* PS EMIO GPIO Hardware Trigger for ESP32 Data Injector                     */
@@ -183,6 +185,12 @@ int main(void) {
     /* Run baseline cryptographic software test */
     test_software_aes_ctr();
 
+    /* Run Comprehensive Pure-Software Pipeline Test Suite */
+    test_sw_pipeline_run_all();
+
+    /* Initialize Compress-then-Encrypt Software Pipeline */
+    pipeline_init();
+
     /* Initialize Autonomous ESP32 Trigger Line (PMOD JA Pin 1 -> ESP32 GPIO 32) */
     esp32_trigger_init();
     xil_printf("[TRIGGER] PS EMIO GPIO Initialized on PMOD JA Pin 1 (Package Pin Y18).\r\n");
@@ -226,19 +234,47 @@ int main(void) {
             metrics.valid_packets++;
             uint16_t rx_seq = ntohs(rx_frame.seq_id);
             uint16_t rx_len = ntohs(rx_frame.payload_len);
-            uint16_t rx_crc = ntohs(rx_frame.crc16);
 
             /* Stage ACK response (0x81) into TX FIFO with mirrored seq_id */
             axi_spi_stage_ack(AXI_SPI_DEFAULT_BASEADDR, rx_seq, 0x00U);
 
-            xil_printf("[SPI_RX #%u] Valid Frame! Seq: %u | Type: 0x%02X | Len: %u B | CRC: 0x%04X -> ACK Staged! [Valid: %u/%u]\r\n",
-                       (unsigned int)metrics.valid_packets,
-                       (unsigned int)rx_seq,
-                       (unsigned int)rx_frame.pkt_type,
-                       (unsigned int)rx_len,
-                       (unsigned int)rx_crc,
-                       (unsigned int)metrics.valid_packets,
-                       (unsigned int)metrics.total_packets_received);
+            /* Execute Pure-Software Compress-then-Encrypt Pipeline */
+            static uint8_t s_ciphertext[PIPELINE_MAX_FRAME_SIZE];
+            size_t cipher_len = 0;
+            pipeline_metrics_t pm = {0};
+
+            int pipe_rc = pipeline_process_frame(rx_frame.payload,
+                                                 (size_t)rx_len,
+                                                 s_ciphertext,
+                                                 sizeof(s_ciphertext),
+                                                 &cipher_len,
+                                                 &pm);
+
+            if (pipe_rc == PIPELINE_SUCCESS) {
+                int cr_pct = (int)(pm.compression_ratio * 100.0f);
+                int tp_int = (int)pm.throughput_mbs;
+                int tp_frac = (int)((pm.throughput_mbs - (float)tp_int) * 100.0f);
+                if (tp_frac < 0) tp_frac = -tp_frac;
+
+                xil_printf("[SPI_RX #%u] Seq: %u | Raw: %u B -> Comp: %u B -> Cipher: %u B | T_comp: %u us (%u cyc), T_crypt: %u us (%u cyc) | CR: %d%% | %d.%02d MB/s\r\n",
+                           (unsigned int)metrics.valid_packets,
+                           (unsigned int)rx_seq,
+                           (unsigned int)pm.raw_len,
+                           (unsigned int)pm.comp_len,
+                           (unsigned int)pm.crypt_len,
+                           (unsigned int)pm.comp_time_us,
+                           (unsigned int)pm.comp_cycles,
+                           (unsigned int)pm.crypt_time_us,
+                           (unsigned int)pm.crypt_cycles,
+                           cr_pct,
+                           tp_int,
+                           tp_frac);
+            } else {
+                xil_printf("[SPI_RX #%u] Seq: %u | Pipeline Processing Error: %d\r\n",
+                           (unsigned int)metrics.valid_packets,
+                           (unsigned int)rx_seq,
+                           pipe_rc);
+            }
         } else if (rc == -2) {
             metrics.total_packets_received++;
             metrics.frame_errors++;

@@ -42,3 +42,14 @@ Append-only. One line per status change.
 | 2026-10-19 | 5.0 | Em andamento -> Concluída | file:out/esp32_selftest.log |
 | 2026-10-20 | 5.1 | Pendente -> Em andamento | - |
 | 2026-10-20 | 5.1 | Em andamento -> Concluída | gate:5.1 |
+| 2026-11-02 | 1.1 | Em andamento -> Concluída | file:cora7z/app/sw/src/spi_frame.h |
+| 2026-11-02 | 1.2 | Pendente -> Em andamento | - |
+| 2026-11-02 | 1.2 | Em andamento -> Concluída | file:cora7z/app/sw/src/axi_spi_receiver.c |
+| 2026-11-02 | 1.3 | Pendente -> Em andamento | - |
+| 2026-11-02 | 1.4 | Pendente -> Em andamento | - |
+| 2026-11-02 | 1.3 | Em andamento -> Concluída | file:cora7z/app/sw/src/lzss_sw.c |
+| 2026-11-02 | 1.4 | Em andamento -> Concluída | file:cora7z/app/sw/src/aes_ctr_sw.c |
+| 2026-11-02 | 1.5 | Pendente -> Em andamento | - |
+| 2026-11-02 | 1.5 | Em andamento -> Concluída | file:cora7z/app/sw/src/pipeline_mgr.c |
+| 2026-11-02 | 1.6 | Pendente -> Em andamento | - |
+| 2026-11-02 | 1.6 | Em andamento -> Concluída | file:cora7z/app/sw/src/test_sw_pipeline.c |

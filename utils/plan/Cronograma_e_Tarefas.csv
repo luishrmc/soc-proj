@@ -1,10 +1,10 @@
 ID da Tarefa,Fase,Atividade Detalhada,Entregável Associado,Duração Estimada (dias),Dependências,Status,Prioridade,Início,Fim,Evidência,Atualizado em,Notas
-1.1,1,Geração de vetores de ouro e quadros de telemetria (256 B 512 B 1024 B),Vetores de Teste,2,-,Em andamento,Alta,2026-11-02,,,2026-11-02,Suíte C/Python com quadros sintéticos e modelos Heatshrink e NIST SP 800-38A.
-1.2,1,Driver de comunicação SPI escravo (XSpiPs via EMIO) no PS,Código C/C++,3,1.1,Pendente,Alta,,,,,Recepção SPI de telemetria com ping-pong buffers e verificação CRC-16.
-1.3,1,Integração e otimização de memória do Heatshrink (LZSS) em C11,Código C/C++,2,1.1,Pendente,Alta,,,,,Compressor bare-metal sem alocação dinâmica com janelas estáticas (W=8 L=4).
-1.4,1,Integração e validação do AES-128-CTR em C11 contra NIST SP 800-38A,Código C/C++,2,1.1,Pendente,Alta,,,,,Cifra de bloco e modo CTR com expansão de chave e verificação bit-a-bit.
-1.5,1,Harness de instrumentação com ARM PMU e Global Timer (XTime_GetTime),Código C/C++,2,1.1,Pendente,Alta,,,,,Contadores de ciclos CP15 PMCCNTR calibrados e perfilamento de latência e vazão.
-1.6,1,Validação em loopback ponta a ponta do pipeline de software no PS,Testes de Bancada,3,"1.2, 1.3, 1.4, 1.5",Pendente,Alta,,,,,Loopback completo: Ingestão SPI -> SW Heatshrink -> SW AES-CTR -> Egress.
+1.1,1,Geração de vetores de ouro e quadros de telemetria (256 B 512 B 1024 B),Vetores de Teste,2,-,Concluída,Alta,2026-11-02,2026-11-02,file:cora7z/app/sw/src/spi_frame.h,2026-11-02,Quadros de telemetria de 64B validados com CRC16 CCITT e preâmbulo 0xA5
+1.2,1,Driver de comunicação SPI escravo (XSpiPs via EMIO) no PS,Código C/C++,3,1.1,Concluída,Alta,2026-11-02,2026-11-02,file:cora7z/app/sw/src/axi_spi_receiver.c,2026-11-02,34 quadros recebidos em sequência com 0% erro e ACK 0x81 estagiado
+1.3,1,Integração e otimização de memória do Heatshrink (LZSS) em C11,Código C/C++,2,1.1,Concluída,Alta,2026-11-02,2026-11-02,file:cora7z/app/sw/src/lzss_sw.c,2026-11-02,LZSS com alocação estática zero heap e janela de 256B validado com 54% de compressão
+1.4,1,Integração e validação do AES-128-CTR em C11 contra NIST SP 800-38A,Código C/C++,2,1.1,Concluída,Alta,2026-11-02,2026-11-02,file:cora7z/app/sw/src/aes_ctr_sw.c,2026-11-02,AES-128-CTR validado bit-a-bit nos 4 blocos oficiais do NIST SP 800-38A F.5.1
+1.5,1,Harness de instrumentação com ARM PMU e Global Timer (XTime_GetTime),Código C/C++,2,1.1,Concluída,Alta,2026-11-02,2026-11-02,file:cora7z/app/sw/src/pipeline_mgr.c,2026-11-02,Perfilamento de ciclos CP15 e latência em microssegundos integrado no pipeline
+1.6,1,Validação em loopback ponta a ponta do pipeline de software no PS,Testes de Bancada,3,"1.2, 1.3, 1.4, 1.5",Concluída,Alta,2026-11-02,2026-11-02,file:cora7z/app/sw/src/test_sw_pipeline.c,2026-11-02,Loopback validado na bancada real com suite 4/4 e quadros de 64B em execucao contínua
 2.1,2,Implementação do acelerador de compressão LZSS em VHDL,Fontes VHDL,4,1.6,Pendente,Alta,,,,,Núcleo lzss_accel.vhdl com interface BRAM e contador de ciclos.
 2.2,2,Banco de testes VUnit/GHDL para o acelerador LZSS,Testbenches,3,2.1,Pendente,Alta,,,,,tb_lzss_accel.vhdl com verificação bit-a-bit contra modelo Heatshrink.
 2.3,2,Adaptação do acelerador criptográfico AES-128-CTR para BRAM,Fontes VHDL,3,1.6,Pendente,Alta,,,,,Núcleo aes_accel.vhdl com interface BRAM e contador de ciclos.

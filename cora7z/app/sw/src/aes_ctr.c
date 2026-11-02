@@ -161,8 +161,8 @@ static void aes128_encrypt_block(const uint32_t w[44], const uint8_t in[16], uin
 }
 
 static void increment_counter(uint8_t counter[16]) {
-    /* 32-bit Big-Endian counter increment at the end of the block (counter[12..15]) */
-    for (int i = 15; i >= 12; i--) {
+    /* 128-bit Big-Endian counter increment per NIST SP 800-38A Section B.2 */
+    for (int i = 15; i >= 0; i--) {
         counter[i]++;
         if (counter[i] != 0U) {
             break;
