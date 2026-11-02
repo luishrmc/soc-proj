@@ -77,12 +77,16 @@ void spi_injector_build_frame(TelemetryFrame *frame, uint8_t pkt_type, uint16_t 
         len = SPI_MAX_PAYLOAD_LEN;
     }
 
+    uint8_t *raw = (uint8_t *)frame;
+
+    /* 8-byte Header */
     frame->preamble = SPI_FRAME_PREAMBLE;
     frame->pkt_type = pkt_type;
     frame->seq_id = htons(seq_id);
     frame->payload_len = htons(len);
     frame->reserved_align = 0;
 
+    /* Payload: bytes 8 .. 8+len-1 */
     if (payload != NULL) {
         memcpy(frame->payload, payload, len);
     } else {
@@ -92,13 +96,17 @@ void spi_injector_build_frame(TelemetryFrame *frame, uint8_t pkt_type, uint16_t 
         }
     }
 
-    /* Zero pad any remaining bytes in fixed payload buffer */
-    if (len < SPI_MAX_PAYLOAD_LEN) {
-        memset(&frame->payload[len], 0, SPI_MAX_PAYLOAD_LEN - len);
-    }
+    /* Compute CRC-16-CCITT over Header (8) + Payload (len) = 8 + len bytes */
+    uint16_t crc = compute_crc16_ccitt((const uint8_t *)frame, 8U + (size_t)len);
 
-    /* Compute CRC-16-CCITT over [preamble ... payload] */
-    uint16_t crc = compute_crc16_ccitt((const uint8_t *)frame, TELEMETRY_FRAME_CRC_OFFSET);
+    /* Store CRC-16 in Big-Endian at offset 8 + len */
+    raw[8U + (size_t)len] = (uint8_t)((crc >> 8) & 0xFFU);
+    raw[8U + (size_t)len + 1U] = (uint8_t)(crc & 0xFFU);
+
+    /* Store EOF Delimiter (0x5A) at offset 8 + len + 2 */
+    raw[8U + (size_t)len + 2U] = SPI_FRAME_EOF_DELIM;
+
+    /* Synchronize struct members for inspection and logging */
     frame->crc16 = htons(crc);
     frame->eof_delim = SPI_FRAME_EOF_DELIM;
 }
@@ -112,11 +120,16 @@ esp_err_t spi_injector_transfer_frame(const TelemetryFrame *tx_frame, TelemetryF
         return ESP_ERR_INVALID_ARG;
     }
 
-    memcpy(s_dma_tx_buf, tx_frame, sizeof(TelemetryFrame));
-    memset(s_dma_rx_buf, 0, sizeof(TelemetryFrame));
+    size_t tx_bytes = 8U + (size_t)ntohs(tx_frame->payload_len) + 3U;
+    if (tx_bytes > sizeof(s_dma_tx_buf)) {
+        return ESP_ERR_INVALID_SIZE;
+    }
+
+    memcpy(s_dma_tx_buf, tx_frame, tx_bytes);
+    memset(s_dma_rx_buf, 0, tx_bytes);
 
     spi_transaction_t trans = {
-        .length = sizeof(TelemetryFrame) * 8, /* Transaction length in bits */
+        .length = tx_bytes * 8, /* Transaction length in bits */
         .tx_buffer = s_dma_tx_buf,
         .rx_buffer = s_dma_rx_buf,
     };
@@ -128,21 +141,16 @@ esp_err_t spi_injector_transfer_frame(const TelemetryFrame *tx_frame, TelemetryF
     }
 
     if (rx_ack_frame != NULL) {
-        /* If slave returned an immediate valid ACK during this full-duplex transfer (pipelined) */
-        if (s_dma_rx_buf[0] == SPI_FRAME_PREAMBLE && s_dma_rx_buf[1] == SPI_PKT_TYPE_ACK) {
-            memcpy(rx_ack_frame, s_dma_rx_buf, sizeof(TelemetryFrame));
-            return ESP_OK;
-        }
+        /* Provide 1000 us turnaround for Cora Z7 PS to drain FIFO, verify CRC, and stage ACK in DTR */
+        esp_rom_delay_us(1000);
 
-        /* Provide 500 us turnaround for Cora Z7 PS to drain FIFO, verify CRC, and stage ACK in DTR */
-        esp_rom_delay_us(500);
-
-        /* Send dummy transaction (73 bytes) to clock the ACK response out of slave TX FIFO */
-        memset(s_dma_tx_buf, 0, sizeof(TelemetryFrame));
+        /* Expected ACK packet length: 15 bytes (8B header + 4B payload + 2B CRC + 1B EOF) + 5B margin */
+        size_t ack_bytes = 20U;
+        memset(s_dma_tx_buf, 0, ack_bytes);
         memset(s_dma_rx_buf, 0, sizeof(TelemetryFrame));
 
         spi_transaction_t ack_trans = {
-            .length = sizeof(TelemetryFrame) * 8,
+            .length = ack_bytes * 8, /* 20 * 8 = 160 bits */
             .tx_buffer = s_dma_tx_buf,
             .rx_buffer = s_dma_rx_buf,
         };
@@ -154,6 +162,19 @@ esp_err_t spi_injector_transfer_frame(const TelemetryFrame *tx_frame, TelemetryF
         }
 
         memcpy(rx_ack_frame, s_dma_rx_buf, sizeof(TelemetryFrame));
+
+        /* If dynamic ACK layout was received, sync crc16 and eof_delim in struct */
+        for (size_t offset = 0; offset <= 4; offset++) {
+            if (s_dma_rx_buf[offset] == SPI_FRAME_PREAMBLE && s_dma_rx_buf[offset + 1] == SPI_PKT_TYPE_ACK) {
+                uint16_t plen = (uint16_t)(((uint16_t)s_dma_rx_buf[offset + 4] << 8) | s_dma_rx_buf[offset + 5]);
+                if (plen <= SPI_MAX_PAYLOAD_LEN) {
+                    size_t crc_off = offset + 8U + (size_t)plen;
+                    memcpy(&rx_ack_frame->crc16, &s_dma_rx_buf[crc_off], 2);
+                    rx_ack_frame->eof_delim = s_dma_rx_buf[crc_off + 2];
+                }
+                break;
+            }
+        }
     }
 
     return ESP_OK;
@@ -162,34 +183,38 @@ esp_err_t spi_injector_transfer_frame(const TelemetryFrame *tx_frame, TelemetryF
 bool spi_injector_validate_ack(const TelemetryFrame *ack_frame, uint16_t expected_seq_id) {
     if (ack_frame == NULL) return false;
 
-    const uint8_t *raw = (const uint8_t *)ack_frame;
-    if (raw[0] != SPI_FRAME_PREAMBLE) {
-        return false;
-    }
-    if (raw[1] != SPI_PKT_TYPE_ACK) {
-        return false;
-    }
-    uint16_t rx_seq = (uint16_t)(((uint16_t)raw[2] << 8) | raw[3]);
-    if (rx_seq != expected_seq_id) {
-        return false;
-    }
+    const uint8_t *buf = (const uint8_t *)ack_frame;
 
-    /* Check dynamic layout first (e.g. 15-byte ACK with 4-byte payload) */
-    uint16_t plen = (uint16_t)(((uint16_t)raw[4] << 8) | raw[5]);
-    if (plen <= SPI_MAX_PAYLOAD_LEN) {
-        size_t crc_off = 8U + (size_t)plen;
-        size_t eof_off = crc_off + 2U;
-        if (raw[eof_off] == SPI_FRAME_EOF_DELIM) {
-            uint16_t expected_crc = (uint16_t)(((uint16_t)raw[crc_off] << 8) | raw[crc_off + 1]);
-            uint16_t computed_crc = compute_crc16_ccitt(raw, crc_off);
-            if (expected_crc == computed_crc) {
-                return true;
+    /* Scan up to first 4 bytes for preamble in case of any clock alignment offset */
+    for (size_t offset = 0; offset <= 4; offset++) {
+        if (buf[offset] == SPI_FRAME_PREAMBLE && buf[offset + 1] == SPI_PKT_TYPE_ACK) {
+            const uint8_t *raw = &buf[offset];
+            uint16_t rx_seq = (uint16_t)(((uint16_t)raw[2] << 8) | raw[3]);
+            if (rx_seq != expected_seq_id) {
+                return false;
+            }
+
+            /* Check dynamic layout (e.g. 15-byte ACK with 4-byte payload) */
+            uint16_t plen = (uint16_t)(((uint16_t)raw[4] << 8) | raw[5]);
+            if (plen <= SPI_MAX_PAYLOAD_LEN) {
+                size_t crc_off = 8U + (size_t)plen;
+                size_t eof_off = crc_off + 2U;
+                if (raw[eof_off] == SPI_FRAME_EOF_DELIM) {
+                    uint16_t expected_crc = (uint16_t)(((uint16_t)raw[crc_off] << 8) | raw[crc_off + 1]);
+                    uint16_t computed_crc = compute_crc16_ccitt(raw, crc_off);
+                    if (expected_crc == computed_crc) {
+                        return true;
+                    }
+                }
             }
         }
     }
 
     /* Fallback check for fixed-capacity frame */
-    if (ack_frame->eof_delim == SPI_FRAME_EOF_DELIM) {
+    if (ack_frame->eof_delim == SPI_FRAME_EOF_DELIM &&
+        ack_frame->preamble == SPI_FRAME_PREAMBLE &&
+        ack_frame->pkt_type == SPI_PKT_TYPE_ACK &&
+        ntohs(ack_frame->seq_id) == expected_seq_id) {
         uint16_t expected_crc = ntohs(ack_frame->crc16);
         uint16_t computed_crc = compute_crc16_ccitt((const uint8_t *)ack_frame, TELEMETRY_FRAME_CRC_OFFSET);
         return (expected_crc == computed_crc);

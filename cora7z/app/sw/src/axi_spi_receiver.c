@@ -35,6 +35,7 @@ int axi_spi_read_frame(uintptr_t base_addr,
     while (cycles < max_poll_cycles) {
         uint8_t b = 0;
         if (axi_spi_read_byte(base_addr, &b) == 0) {
+            cycles = 0; /* Reset timeout on valid byte to enforce inter-byte timeout */
             if (!found_preamble) {
                 if (b == SPI_FRAME_PREAMBLE) {
                     raw_buf[0] = b;

@@ -77,3 +77,5 @@ Append-only. One line per status change.
 | 2026-11-02 | 4.2 | Em andamento -> Concluída | gate:4.2 |
 | 2026-11-02 | 4.3 | Pendente -> Em andamento | - |
 | 2026-11-02 | 4.3 | Em andamento -> Concluída | gate:4.3 |
+| 2026-11-02 | 5.1 | Pendente -> Em andamento | - |
+| 2026-11-02 | 5.1 | Em andamento -> Concluída | gate:5.1 |

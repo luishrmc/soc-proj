@@ -58,7 +58,7 @@ esp_err_t spi_injector_init(int sclk_pin, int mosi_pin, int miso_pin, int cs_pin
  * @param pkt_type Packet type (0x01: Echo, 0x02: Telemetry)
  * @param seq_id Monotonic sequence counter
  * @param payload Optional payload buffer (if NULL, generates 0x00, 0x01, ..., 0xN)
- * @param len Length in bytes (must be <= SPI_BRINGUP_PAYLOAD_LEN)
+ * @param len Length in bytes (must be <= SPI_MAX_PAYLOAD_LEN)
  */
 void spi_injector_build_frame(TelemetryFrame *frame, uint8_t pkt_type, uint16_t seq_id, const uint8_t *payload, uint16_t len);
 

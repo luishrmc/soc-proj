@@ -33,6 +33,10 @@ static const char *TAG = "ESP32_MASTER";
 static TelemetryFrame s_tx_frame;
 static TelemetryFrame s_rx_ack_frame;
 
+/* Benchmark Payload Profiles (64 B, 256 B, 512 B, 1024 B) */
+static const uint16_t s_payload_sizes[] = {64U, 256U, 512U, 1024U};
+static const size_t s_num_payload_sizes = sizeof(s_payload_sizes) / sizeof(s_payload_sizes[0]);
+
 /* Metrics Counters */
 static uint32_t s_total_sent = 0;
 static uint32_t s_acks_received = 0;
@@ -45,14 +49,19 @@ static void spi_master_task(void *pvParameters) {
     vTaskDelay(pdMS_TO_TICKS(1000));
 
     uint16_t seq_id = 0;
+    size_t size_idx = 0;
 
     while (1) {
+        uint16_t payload_len = s_payload_sizes[size_idx % s_num_payload_sizes];
+
         /* Assemble test frame with incremental payload */
         spi_injector_build_frame(&s_tx_frame,
                                  SPI_PKT_TYPE_LOOPBACK,
                                  seq_id,
                                  NULL, /* Generates incremental pattern 0x00, 0x01, ... */
-                                 SPI_BRINGUP_PAYLOAD_LEN);
+                                 payload_len);
+
+        size_t total_frame_bytes = 8U + (size_t)payload_len + 3U;
 
         int64_t t_start = esp_timer_get_time();
         esp_err_t err = spi_injector_transfer_frame(&s_tx_frame, &s_rx_ack_frame);
@@ -65,9 +74,10 @@ static void spi_master_task(void *pvParameters) {
             if (ack_ok) {
                 s_acks_received++;
                 ui_controller_set_state(UI_STATE_SUCCESS);
-                ESP_LOGI(TAG, "[TX #%u] SENT %u B | CRC: 0x%04X | ACK RECEIVED (Echo Seq: %u, Latency: %lld us) [ACKs: %lu/%lu]",
+                ESP_LOGI(TAG, "[TX #%u] SENT %u B (Payload: %u B) | CRC: 0x%04X | ACK RECEIVED (Echo Seq: %u, Latency: %lld us) [ACKs: %lu/%lu]",
                          seq_id,
-                         (unsigned int)TELEMETRY_FRAME_TOTAL_SIZE,
+                         (unsigned int)total_frame_bytes,
+                         payload_len,
                          ntohs(s_tx_frame.crc16),
                          ntohs(s_rx_ack_frame.seq_id),
                          (t_end - t_start),
@@ -79,9 +89,10 @@ static void spi_master_task(void *pvParameters) {
                     s_ack_errors++;
                     ui_controller_set_state(UI_STATE_ERROR);
                 }
-                ESP_LOGI(TAG, "[TX #%u] SENT %u B | CRC: 0x%04X | Slave RX: PktType=0x%02X Seq=%u CRC=0x%04X [Total: %lu]",
+                ESP_LOGI(TAG, "[TX #%u] SENT %u B (Payload: %u B) | CRC: 0x%04X | Slave RX: PktType=0x%02X Seq=%u CRC=0x%04X [Total: %lu]",
                          seq_id,
-                         (unsigned int)TELEMETRY_FRAME_TOTAL_SIZE,
+                         (unsigned int)total_frame_bytes,
+                         payload_len,
                          ntohs(s_tx_frame.crc16),
                          s_rx_ack_frame.pkt_type,
                          ntohs(s_rx_ack_frame.seq_id),
@@ -95,6 +106,7 @@ static void spi_master_task(void *pvParameters) {
         }
 
         seq_id++;
+        size_idx++;
 
         /* Transmit periodically every 500 ms */
         vTaskDelay(pdMS_TO_TICKS(500));

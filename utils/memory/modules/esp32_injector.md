@@ -2,8 +2,8 @@
 module: esp32_injector
 status: verified
 sources:
-  - esp32/main/main.c sha256=3a9f33b16054c3b69cbc6b6d4ea66f5099d355698f12789b93c1e328f5b144c7
-  - esp32/main/spi_injector_master.c sha256=32dfc7a9609043c518868466f48714eb375f7d40bd9058106faca5709fd8817e
+  - esp32/main/main.c sha256=904531b5f51fe1503b3c62816574e9a2713457b9ea2b624bfe8ebd74508df531
+  - esp32/main/spi_injector_master.c sha256=fa309efaddd801b59edccaa84f0f68e696f408fffd56e0e6655feaf4501aaa6f
   - esp32/components/ui_controller/ui_controller.c sha256=18279652e25d67948f2663a52eec18af415eaa347dc1389b77519f9533106a86
   - esp32/components/ui_controller/ui_controller.h sha256=986db277793083dfa065a0b31287bc20b47526631c6fe6cbf5098b9a5bd9cb2a
 gates_passed: [esp-idf-build, esp32-selftest]
