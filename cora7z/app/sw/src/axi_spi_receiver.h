@@ -13,6 +13,7 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <stdbool.h>
+#include "spi_frame.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -92,9 +93,65 @@ typedef struct {
     bool         crc_valid;
 } spi_frame_t;
 
+/**
+ * @brief Telemetry link statistics counters.
+ */
+typedef struct {
+    uint32_t total_packets_received;
+    uint32_t valid_packets;
+    uint32_t crc_mismatches;
+    uint32_t frame_errors;
+} axi_spi_metrics_t;
+
 /* ========================================================================= */
 /* Driver Function Prototypes                                                */
 /* ========================================================================= */
+
+/**
+ * @brief Reset the SPI TX FIFO.
+ * @param base_addr Base address of AXI Quad SPI core.
+ */
+void axi_spi_reset_tx_fifo(uintptr_t base_addr);
+
+/**
+ * @brief Reset the SPI RX FIFO.
+ * @param base_addr Base address of AXI Quad SPI core.
+ */
+void axi_spi_reset_rx_fifo(uintptr_t base_addr);
+
+/**
+ * @brief Read and validate an incoming 73-byte packed TelemetryFrame from SPI RX FIFO.
+ *
+ * Aligns to preamble (0xA5), reads the packed binary frame, verifies the EOF delimiter (0x5A),
+ * and checks the CRC-16-CCITT checksum over the header and payload bytes.
+ *
+ * @param base_addr Base address of AXI Quad SPI core.
+ * @param[out] frame_out Pointer to TelemetryFrame destination buffer.
+ * @param max_poll_cycles Maximum poll cycle count before timing out.
+ * @return 0 on success and CRC valid,
+ *        -1 on timeout / incomplete,
+ *        -2 on EOF framing delimiter error,
+ *        -3 on CRC-16 checksum mismatch.
+ */
+int axi_spi_read_frame(uintptr_t base_addr,
+                       TelemetryFrame *frame_out,
+                       uint32_t max_poll_cycles);
+
+/**
+ * @brief Build and stage an ACK response frame (0x81) into the AXI Quad SPI TX FIFO.
+ *
+ * Flushes stale bytes from the TX FIFO and loads the complete 73-byte ACK packet
+ * (with mirrored seq_id, status code, and valid CRC-16-CCITT) so that it shifts out
+ * to the ESP32 Master on the subsequent SPI transaction.
+ *
+ * @param base_addr Base address of AXI Quad SPI core.
+ * @param seq_id Sequence ID of the frame being acknowledged.
+ * @param status_code 0 for Success / OK, non-zero for error code.
+ * @return 0 on success, -1 if TX FIFO overflow occurred.
+ */
+int axi_spi_stage_ack(uintptr_t base_addr,
+                      uint16_t seq_id,
+                      uint8_t status_code);
 
 /**
  * @brief Initialize AXI Quad SPI IP in slave Mode 0 (CPOL=0, CPHA=0).

@@ -138,7 +138,7 @@ static bool test_software_aes_ctr(void) {
     };
     static const uint8_t expected_cipher[16] = {
         0x87, 0x4d, 0x61, 0x91, 0xb6, 0x20, 0xe3, 0x26,
-        0x1b, 0xef, 0x68, 0x64, 0x99, 0xfb, 0x67, 0xc1
+        0x1b, 0xef, 0x68, 0x64, 0x99, 0x0d, 0xb6, 0xce
     };
 
     uint8_t ciphertext[16];
@@ -194,32 +194,65 @@ int main(void) {
     xil_printf("  Pinout: SCLK=H15 (J7.3), MOSI=T12 (J7.4), MISO=W15 (J7.1), SS=F16 (J7.5)\r\n");
     xil_printf("================================================================\r\n\r\n");
 
+    /* Verify PL programming state before accessing AXI Quad SPI over M_AXI_GP0 */
+    if (!is_pl_programmed()) {
+        xil_printf("[AXI_SPI] WARNING: PL bitstream is NOT loaded (PCFG_DONE=0).\r\n");
+        xil_printf("[AXI_SPI] Cannot initialize AXI Quad SPI at 0x%08X without PL bitstream.\r\n",
+                   (unsigned int)AXI_SPI_DEFAULT_BASEADDR);
+        xil_printf("[AXI_SPI] Waiting for PL to be programmed via JTAG/DevC...\r\n");
+        while (!is_pl_programmed()) {
+            usleep(100000);
+        }
+        xil_printf("[AXI_SPI] PL bitstream detected! Proceeding with initialization.\r\n");
+    }
+
+    /* Initialize AXI Quad SPI in Slave Mode 0 */
+    axi_spi_init(AXI_SPI_DEFAULT_BASEADDR);
+    xil_printf("[AXI_SPI] AXI Quad SPI core at 0x%08X initialized in Slave Mode 0.\r\n",
+               (unsigned int)AXI_SPI_DEFAULT_BASEADDR);
+
     /* Trigger initial burst automatically */
     xil_printf("[TRIGGER] Emitting initial active-low pulse (30 ms) to ESP32 on PMOD JA1...\r\n");
     trigger_esp32_burst();
 
-    static uint8_t s_rx_payload[65536];
-    spi_frame_t rx_frame;
-    uint32_t rx_packet_count = 0;
+    static TelemetryFrame rx_frame;
+    static axi_spi_metrics_t metrics = {0};
     uint32_t hb_ticks = 0;
 
     while (1) {
-        int drain_rc = axi_spi_drain_frame(AXI_SPI_DEFAULT_BASEADDR,
-                                           s_rx_payload,
-                                           sizeof(s_rx_payload),
-                                           &rx_frame,
-                                           10000U);
-        if (drain_rc == 0) {
-            rx_packet_count++;
-            xil_printf("[SPI_RX #%u] Frame Received! Type: 0x%02X | Flags: 0x%02X | Length: %u B | CRC: 0x%04X (VALID)\r\n",
-                       (unsigned int)rx_packet_count,
-                       (unsigned int)rx_frame.header.payload_type,
-                       (unsigned int)rx_frame.header.flags,
-                       (unsigned int)rx_frame.header.payload_len,
-                       (unsigned int)rx_frame.crc16_received);
-        } else if (drain_rc == -3) {
-            xil_printf("[SPI_RX] Frame Error: CRC mismatch! (Recv: 0x%04X != Calc: 0x%04X)\r\n",
-                       (unsigned int)rx_frame.crc16_received, (unsigned int)rx_frame.crc16_computed);
+        int rc = axi_spi_read_frame(AXI_SPI_DEFAULT_BASEADDR, &rx_frame, 5000U);
+        if (rc == 0) {
+            metrics.total_packets_received++;
+            metrics.valid_packets++;
+            uint16_t rx_seq = ntohs(rx_frame.seq_id);
+            uint16_t rx_len = ntohs(rx_frame.payload_len);
+            uint16_t rx_crc = ntohs(rx_frame.crc16);
+
+            /* Stage ACK response (0x81) into TX FIFO with mirrored seq_id */
+            axi_spi_stage_ack(AXI_SPI_DEFAULT_BASEADDR, rx_seq, 0x00U);
+
+            xil_printf("[SPI_RX #%u] Valid Frame! Seq: %u | Type: 0x%02X | Len: %u B | CRC: 0x%04X -> ACK Staged! [Valid: %u/%u]\r\n",
+                       (unsigned int)metrics.valid_packets,
+                       (unsigned int)rx_seq,
+                       (unsigned int)rx_frame.pkt_type,
+                       (unsigned int)rx_len,
+                       (unsigned int)rx_crc,
+                       (unsigned int)metrics.valid_packets,
+                       (unsigned int)metrics.total_packets_received);
+        } else if (rc == -2) {
+            metrics.total_packets_received++;
+            metrics.frame_errors++;
+            xil_printf("[SPI_RX] Frame Error! Bad EOF delimiter (expected 0x5A, got 0x%02X) [Err: %u/%u]\r\n",
+                       (unsigned int)rx_frame.eof_delim,
+                       (unsigned int)metrics.frame_errors,
+                       (unsigned int)metrics.total_packets_received);
+        } else if (rc == -3) {
+            metrics.total_packets_received++;
+            metrics.crc_mismatches++;
+            xil_printf("[SPI_RX] Checksum Error! CRC mismatch (Recv: 0x%04X) [CRC Err: %u/%u]\r\n",
+                       (unsigned int)ntohs(rx_frame.crc16),
+                       (unsigned int)metrics.crc_mismatches,
+                       (unsigned int)metrics.total_packets_received);
         }
 
         hb_ticks++;
@@ -227,10 +260,12 @@ int main(void) {
             hb_ticks = 0;
             uint32_t spisr = Xil_In32(AXI_SPI_DEFAULT_BASEADDR + SPI_REG_SPISR);
             uint32_t fifo_cnt = axi_spi_rx_count(AXI_SPI_DEFAULT_BASEADDR);
-            xil_printf("[CORA_Z7] Standby | J7 SPI Listening | SPISR=0x%02X | FIFO=%u | Pkts=%u\r\n",
+            xil_printf("[CORA_Z7] Standby | J7 SPI Listening | SPISR=0x%02X | FIFO=%u | Valid: %u | CRC Err: %u | Frame Err: %u\r\n",
                        (unsigned int)spisr,
                        (unsigned int)fifo_cnt,
-                       (unsigned int)rx_packet_count);
+                       (unsigned int)metrics.valid_packets,
+                       (unsigned int)metrics.crc_mismatches,
+                       (unsigned int)metrics.frame_errors);
 
             /* Periodically pulse the trigger line if waiting for frames */
             xil_printf("[CORA_Z7] Triggering burst on ESP32 via PMOD JA1...\r\n");

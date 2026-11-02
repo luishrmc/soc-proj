@@ -7,6 +7,97 @@
 #include "axi_io.h"
 #include <string.h>
 
+void axi_spi_reset_tx_fifo(uintptr_t base_addr) {
+    uint32_t cr = AXI_IO_READ32(base_addr + SPI_REG_SPICR);
+    AXI_IO_WRITE32(base_addr + SPI_REG_SPICR, cr | SPI_CR_TXFIFO_RST_MASK);
+    AXI_IO_WRITE32(base_addr + SPI_REG_SPICR, cr);
+}
+
+void axi_spi_reset_rx_fifo(uintptr_t base_addr) {
+    uint32_t cr = AXI_IO_READ32(base_addr + SPI_REG_SPICR);
+    AXI_IO_WRITE32(base_addr + SPI_REG_SPICR, cr | SPI_CR_RXFIFO_RST_MASK);
+    AXI_IO_WRITE32(base_addr + SPI_REG_SPICR, cr);
+}
+
+int axi_spi_read_frame(uintptr_t base_addr,
+                       TelemetryFrame *frame_out,
+                       uint32_t max_poll_cycles) {
+    if (frame_out == NULL) {
+        return -1;
+    }
+
+    uint8_t *raw_buf = (uint8_t *)frame_out;
+    uint32_t cycles = 0;
+    size_t rx_idx = 0;
+    bool found_preamble = false;
+
+    while (cycles < max_poll_cycles) {
+        uint8_t b = 0;
+        if (axi_spi_read_byte(base_addr, &b) == 0) {
+            if (!found_preamble) {
+                if (b == SPI_FRAME_PREAMBLE) {
+                    raw_buf[0] = b;
+                    rx_idx = 1;
+                    found_preamble = true;
+                }
+            } else {
+                raw_buf[rx_idx++] = b;
+                if (rx_idx == sizeof(TelemetryFrame)) {
+                    /* Check EOF Delimiter */
+                    if (frame_out->eof_delim != SPI_FRAME_EOF_DELIM) {
+                        return -2; /* Framing / EOF delimiter error */
+                    }
+
+                    /* Verify CRC-16-CCITT */
+                    uint16_t expected_crc = ntohs(frame_out->crc16);
+                    uint16_t computed_crc = compute_crc16_ccitt(raw_buf, TELEMETRY_FRAME_CRC_OFFSET);
+                    if (expected_crc != computed_crc) {
+                        return -3; /* Checksum mismatch */
+                    }
+
+                    return 0; /* Success */
+                }
+            }
+        } else {
+            cycles++;
+        }
+    }
+
+    return -1; /* Timeout */
+}
+
+int axi_spi_stage_ack(uintptr_t base_addr,
+                      uint16_t seq_id,
+                      uint8_t status_code) {
+    TelemetryFrame ack_frame;
+    memset(&ack_frame, 0, sizeof(ack_frame));
+
+    ack_frame.preamble = SPI_FRAME_PREAMBLE;
+    ack_frame.pkt_type = SPI_PKT_TYPE_ACK;
+    ack_frame.seq_id = htons(seq_id);
+    ack_frame.payload_len = htons(4);
+    ack_frame.payload[0] = status_code;
+    ack_frame.payload[1] = 0x00;
+    ack_frame.payload[2] = 0x00;
+    ack_frame.payload[3] = 0x00;
+
+    uint16_t crc = compute_crc16_ccitt((const uint8_t *)&ack_frame, TELEMETRY_FRAME_CRC_OFFSET);
+    ack_frame.crc16 = htons(crc);
+    ack_frame.eof_delim = SPI_FRAME_EOF_DELIM;
+
+    /* Flush any stale bytes from TX FIFO so ACK starts immediately at word 0 */
+    axi_spi_reset_tx_fifo(base_addr);
+
+    const uint8_t *raw = (const uint8_t *)&ack_frame;
+    for (size_t i = 0; i < sizeof(TelemetryFrame); i++) {
+        if (axi_spi_write_byte(base_addr, raw[i]) != 0) {
+            return -1; /* TX FIFO Full */
+        }
+    }
+
+    return 0;
+}
+
 /* CRC-16-CCITT Look-up Table (Polynomial: 0x1021) matching ESP32 injector */
 static const uint16_t s_crc16_table[256] = {
     0x0000, 0x1021, 0x2042, 0x3063, 0x4084, 0x50A5, 0x60C6, 0x70E7,
