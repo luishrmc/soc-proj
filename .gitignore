@@ -95,3 +95,12 @@ cora7z/app/test_results/raw/
 .agent/
 utils/plan/.bak/
 utils/memory/handoff/done/
+
+# ---- LaTeX intermediate build artifacts
+*.aux
+*.toc
+*.out
+*.synctex.gz
+*.fls
+*.fdb_latexmk
+

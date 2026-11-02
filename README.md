@@ -72,7 +72,7 @@ The following table summarizes the architectural profile, execution model, and p
 
 ## 2. Decoupled Hardware Coprocessors (PL)
 
-Dynamic streaming multiplexers (`axis_accel_mux`) and AXI DMA engines have been retired in favor of **Shared Dual-Port Block RAM Coprocessors** ([ADR-017](file:///home/luis/ufmg/soc/proj/utils/memory/decisions.md)). Compression of non-stationary telemetry yields non-deterministic output lengths; streaming AXI DMA S2MM channels hang if the transferred byte count does not match programmed descriptors, leading to CPU bus lockups. Shared True Dual-Port BRAM buffers eliminate this vulnerability entirely.
+Dynamic streaming multiplexers (`axis_accel_mux`) and AXI DMA engines have been retired in favor of **Shared Dual-Port Block RAM Coprocessors** ([ADR-017](utils/memory/decisions.md)). Compression of non-stationary telemetry yields non-deterministic output lengths; streaming AXI DMA S2MM channels hang if the transferred byte count does not match programmed descriptors, leading to CPU bus lockups. Shared True Dual-Port BRAM buffers eliminate this vulnerability entirely.
 
 ![BRAM Pipeline Architecture](utils/imgs/bram_pipeline_architecture.svg)
 
@@ -225,8 +225,8 @@ The repository adheres to a clean, decoupled layout separating synthesizable RTL
 ### 4.1 Dynamic Pin Mapping Policy
 
 To maintain portability and avoid board routing faults, **pin numbers, base addresses, and clock frequencies are never hardcoded in documentation or source files**. All hardware connections are dynamically verified against:
-* [`cora7z/app/hw/utils/cora_z7_pins.json`](file:///home/luis/ufmg/soc/proj/cora7z/app/hw/utils/cora_z7_pins.json)
-* [`cora7z/app/hw/utils/cora_z7_io.xdc`](file:///home/luis/ufmg/soc/proj/cora7z/app/hw/utils/cora_z7_io.xdc)
+* [`cora7z/app/hw/utils/cora_z7_pins.json`](cora7z/app/hw/utils/cora_z7_pins.json)
+* [`cora7z/app/hw/utils/cora_z7_io.xdc`](cora7z/app/hw/utils/cora_z7_io.xdc)
 
 | Signal Name | Cora Z7 FPGA Pin | Header / Pin | Standard | Direction | Description |
 | :--- | :---: | :---: | :---: | :---: | :--- |
