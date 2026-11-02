@@ -40,10 +40,13 @@ s.rst("-s")
 time.sleep(1)
 
 # Target 4: FPGA
-s.targets(4)
-print("[3/6] Programming FPGA bitstream...")
-s.fpga(str(bitstream))
-print("[3/6] FPGA bitstream programmed successfully (DONE=1).")
+if bitstream.is_file():
+    s.targets(4)
+    print("[3/6] Programming FPGA bitstream...")
+    s.fpga(str(bitstream))
+    print("[3/6] FPGA bitstream programmed successfully (DONE=1).")
+else:
+    print(f"[3/6] Bitstream '{bitstream.name}' not found; keeping active FPGA fabric configuration.")
 
 # Target 2: Cortex-A9 #0
 s.targets(2)

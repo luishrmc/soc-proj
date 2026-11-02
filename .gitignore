@@ -1,7 +1,7 @@
 # =====================================================================
 # Reproducibility policy: only sources, scripts, constraints, plans,
-# memory and docs are versioned. Everything a tool can regenerate from
-# them (Vivado project, Vitis workspace, simulation output) is ignored.
+# memory, docs, and the golden hardware container (.xsa) are versioned.
+# Heavy transient intermediate runs and caches are ignored.
 # =====================================================================
 
 # ---- Python virtual environment (recreate with `make -C app/hw venv`)
@@ -29,7 +29,6 @@ esp32/build/
 esp32/sdkconfig
 esp32/sdkconfig.old
 
-
 # ---- VUnit / GHDL simulation outputs
 cora7z/app/hw/build/
 cora7z/app/hw/vunit_out/
@@ -40,9 +39,13 @@ cora7z/app/hw/vunit_out/
 *.o
 *.cf
 
-# ---- Vivado: the project is regenerated from app/hw/scripts/*.tcl
+# ---- Vivado: intermediate compilation runs and caches are ignored
 cora7z/app/hw/vivado/*
 !cora7z/app/hw/vivado/.gitkeep
+# Preserve the golden exported hardware platform container (359 KB)
+# Allows immediate software build & flashing without requiring a 3-minute Vivado synthesis run
+!cora7z/app/hw/vivado/cora7z_top.xsa
+
 *.xpr
 *.runs/
 *.cache/
@@ -58,7 +61,6 @@ xsim.dir/
 *.bit
 *.bin
 *.BIN
-*.xsa
 *.sysdef
 *.hdf
 *.ltx
@@ -69,6 +71,10 @@ xsim.dir/
 vivado_pid*.str
 hs_err_pid*.log
 nlviewcommon.logfile
+
+# Ignore arbitrary intermediate XSA containers, but keep the authoritative platform
+*.xsa
+!cora7z/app/hw/vivado/cora7z_top.xsa
 
 # ---- Vitis: the workspace is regenerated from app/sw/scripts/*
 # Versioned: app/sw/src/ and app/sw/scripts/
