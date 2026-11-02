@@ -22,4 +22,7 @@ Tool quirks and recurring errors. Keep under 80 lines. Format: `symptom -> cause
 - Vitis Unified 2026.1 workspace lock stalls build scripts -> unexpected termination leaves stale `_ide/.wsdata/.lock` -> add pre-build check in `build_sw.py` to unlink `.lock` before calling `vitis.create_client()`.
 - Dual-Port BRAM concurrent access collision -> Cortex-A9 accessing BRAM while PL core FSM is writing produces data corruption -> enforce strict AXI4-Lite handshake: PS accesses BRAM only when core status indicates idle/done (`BUSY = 0`).
 - LZSS bitstream packing endianness -> Heatshrink packs variable-length token tags and bit-level offsets into bytes -> bit-level mismatch with VHDL shift registers corrupts decompression -> validate bit-level packing using golden test vectors before RTL integration.
+- BRAM read data sampled 1 cycle too early in FSM -> synchronous Block RAM requires 1 clock cycle latency (T_co) -> insert 1-cycle wait state (`bram_wait_r`) before sampling `bram_in_dout`.
+- `Xil_DCacheInvalidateRange` called after CPU writes causes silent data drop -> invalidates cache lines without dirty writeback, reading stale DDR data -> use `Xil_DCacheFlushRange` for dirty writeback or bypass cache operations on direct MMIO to BRAM.
+- Plan-sync state machine rejects direct `Pendente` -> `Concluída` -> strict lifecycle transition required -> transition task to `Em andamento` first before setting `Concluída`.
 

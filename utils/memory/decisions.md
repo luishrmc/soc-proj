@@ -62,5 +62,13 @@ Reason: Technical audits (docs/auditoria_tecnica_gemini.pdf and docs/auditoria_t
 ## ADR-018 | 2026-11-02 | strategy | Strategy Shift: PS-First Development and Pure Software Baseline Verification
 Reason: To eliminate architectural risk and establish deterministic reference baselines before implementing custom synthesizable RTL, development priority shifts to executing the Processing System (PS) and SPI ingestion pipeline as Phase 1 of active implementation. The ARM Cortex-A9 (@ 667 MHz) acts as root orchestrator: it ingests telemetry frames over SPI via EMIO, executes pure software baseline algorithms (C11 Heatshrink LZSS and NIST AES-128-CTR), manages store-and-forward DDR3 ping-pong staging, and instruments performance using the ARM PMU (PMCCNTR) and Global Timer (XTime_GetTime). Validating the full software loopback first establishes bit-exact golden vectors, verified memory footprints, and empirical performance baselines against which future FPGA coprocessors (lzss_accel and aes_accel) will be verified.
 
+## ADR-019 | 2026-11-02 | architecture | Synchronous BRAM 1-Cycle Read Latency Pipeline Alignment and 4-Scenario Hybrid Co-Design Parity
+Reason: During Task 3.1 hybrid offload integration on Cora Z7 target, Case 4 (Full Hardware Acceleration: LZSS PL + AES PL) produced a ciphertext mismatch against Case 2 (LZSS PL + AES SW) at byte 3. Investigation confirmed that Xilinx True Dual-Port Block RAM (`blk_mem_gen`) primitives have a mandatory 1-clock-cycle synchronous read latency (T_co). When the accelerator FSM asserted memory read enable (`bram_in_en = '1'`), it sampled `bram_in_dout` on the very next cycle, reading stale data from the previous address.
+Resolution:
+1. Implemented a 1-cycle pipeline wait state using `bram_wait_r` across all 4 memory read state pairs in `cora7z/app/hw/src/lzss_accel.vhdl` (`ST_INIT_LA_WAIT`, `ST_LOAD_LA_WAIT`, `ST_SEARCH_WAIT`, `ST_CMP_WAIT`).
+2. Updated VUnit self-checking testbench `cora7z/app/hw/test/tb_lzss_accel.vhdl` with a 64-byte payload pattern; verified 11/11 tests pass in GHDL simulation.
+3. Closed timing ($WNS = +0.551$ ns) and verified hardware execution on Cora Z7 target across all 5 verification suites, achieving 100% bit-exact parity across the 4 co-design scenarios (SW/SW, HW/SW, SW/HW, HW/HW) and zero CRC frame errors under continuous ESP32 SPI streaming.
+
+
 
 

@@ -38,15 +38,22 @@ def lines(p):
 
 
 def update(module):
-    f = MEM / "modules" / f"{module}.md"
-    out = []
-    for line in f.read_text().splitlines():
-        m = SRC_RE.match(line)
-        if m and (ROOT / m.group(1)).is_file():
-            line = f"  - {m.group(1)} sha256={sha(m.group(1))}"
-        out.append(line)
-    f.write_text("\n".join(out) + "\n")
-    print(f"[OK][memory-check] Updated hashes in {f.relative_to(ROOT)}")
+    if module == "all":
+        targets = sorted((MEM / "modules").glob("*.md"))
+    else:
+        targets = [MEM / "modules" / f"{module}.md"]
+    for f in targets:
+        if not f.is_file():
+            print(f"[WARN][memory-check] Digest file not found: {f.relative_to(ROOT)}", file=sys.stderr)
+            continue
+        out = []
+        for line in f.read_text().splitlines():
+            m = SRC_RE.match(line)
+            if m and (ROOT / m.group(1)).is_file():
+                line = f"  - {m.group(1)} sha256={sha(m.group(1))}"
+            out.append(line)
+        f.write_text("\n".join(out) + "\n")
+        print(f"[OK][memory-check] Updated hashes in {f.relative_to(ROOT)}")
 
 
 def main():

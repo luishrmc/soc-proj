@@ -2,8 +2,8 @@
 module: lzss_accel
 status: verified
 sources:
-  - cora7z/app/hw/src/lzss_accel.vhdl sha256=e13dbef2fbadb4e8d9f99b44529f7a67707778c40d0425371132065e0d4f28c6
-  - cora7z/app/hw/test/tb_lzss_accel.vhdl sha256=9df2a85fcb698b56a1f81ddc43bd987f0d59c2f9dd1ca8d9ceebc99606f31f86
+  - cora7z/app/hw/src/lzss_accel.vhdl sha256=dd6a2076e632bea93154a773e21ae8a417dc61c187fb0e70357a0016af59f545
+  - cora7z/app/hw/test/tb_lzss_accel.vhdl sha256=4530aa0cbeecced6b62e4ec368014798ab33b0dd540082744215ad1f2a996772
 gates_passed: [vhdl-lint, vhdl-sim, vivado-build]
 ---
 

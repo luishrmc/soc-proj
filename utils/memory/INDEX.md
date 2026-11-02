@@ -20,6 +20,7 @@ Protocol: `.agents/skills/memory-protocol/SKILL.md`. Limit: 40 lines.
 - `aes_accel`: AES-128-CTR cryptographic coprocessor with BRAM interface (`modules/aes_accel.md`)
 - `vitis_platform`: Vitis 2026.1 unified bare-metal platform & firmware baseline (`modules/vitis_platform.md`)
 - `esp32_injector`: ESP32 autonomous SPI synthetic data injector & telemetry logger (`modules/esp32_injector.md`)
+- `pipeline_mgr`: Hybrid co-design driver & 4-scenario execution pipeline (`modules/pipeline_mgr.md`)
 
 
 ## Active handoffs
