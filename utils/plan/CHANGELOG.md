@@ -53,3 +53,11 @@ Append-only. One line per status change.
 | 2026-11-02 | 1.5 | Em andamento -> Concluída | file:cora7z/app/sw/src/pipeline_mgr.c |
 | 2026-11-02 | 1.6 | Pendente -> Em andamento | - |
 | 2026-11-02 | 1.6 | Em andamento -> Concluída | file:cora7z/app/sw/src/test_sw_pipeline.c |
+| 2026-11-02 | 2.1 | Pendente -> Em andamento | - |
+| 2026-11-02 | 2.1 | Em andamento -> Concluída | gate:2.1 |
+| 2026-11-02 | 2.3 | Pendente -> Em andamento | - |
+| 2026-11-02 | 2.3 | Em andamento -> Concluída | gate:2.3 |
+| 2026-11-02 | 2.2 | Pendente -> Em andamento | - |
+| 2026-11-02 | 2.2 | Em andamento -> Concluída | gate:2.2 |
+| 2026-11-02 | 2.4 | Pendente -> Em andamento | - |
+| 2026-11-02 | 2.4 | Em andamento -> Concluída | gate:2.4 |
