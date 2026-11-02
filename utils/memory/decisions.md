@@ -59,5 +59,8 @@ Reason: Technical audits (docs/auditoria_tecnica_gemini.pdf and docs/auditoria_t
 5. Internal Hardware Instrumentation: Each PL core instantiates a dedicated 32-bit hardware cycle counter that increments strictly while its computing FSM is active and latches upon asserting DONE. This decouples algorithmic compute latency from PS-PL bus transfer latency.
 6. 2x2 Factorial Benchmark Matrix: Establishes a clean comparative evaluation across 4 configurations (Pure Software, Compression Offload, Encryption Offload, Full Hardware Acceleration) over standardized frame sizes (256 B, 512 B, 1024 B).
 
+## ADR-018 | 2026-11-02 | strategy | Strategy Shift: PS-First Development and Pure Software Baseline Verification
+Reason: To eliminate architectural risk and establish deterministic reference baselines before implementing custom synthesizable RTL, development priority shifts to executing the Processing System (PS) and SPI ingestion pipeline as Phase 1 of active implementation. The ARM Cortex-A9 (@ 667 MHz) acts as root orchestrator: it ingests telemetry frames over SPI via EMIO, executes pure software baseline algorithms (C11 Heatshrink LZSS and NIST AES-128-CTR), manages store-and-forward DDR3 ping-pong staging, and instruments performance using the ARM PMU (PMCCNTR) and Global Timer (XTime_GetTime). Validating the full software loopback first establishes bit-exact golden vectors, verified memory footprints, and empirical performance baselines against which future FPGA coprocessors (lzss_accel and aes_accel) will be verified.
+
 
 

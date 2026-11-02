@@ -1,8 +1,8 @@
-# Task 1.4: Definição dos Vetores de Ouro e Estrutura dos Quadros de Telemetria
+# Task 1.1: Geração de Vetores de Ouro e Estrutura dos Quadros de Telemetria
 
 ## 1. Resumo da Tarefa e Objetivos
 
-Nesta etapa (última atividade da Fase 1 - Planejamento e Sincronização), estabelecemos os vetores de ouro e a especificação dos quadros de dados sintéticos de telemetria que nortearão toda a verificação funcional do projeto nas Fases 2 (RTL/Simulação), 3 (Integração BD), 4 (Firmware PS) e 5 (Validação Ponta a Ponta):
+Nesta etapa (primeira atividade da Fase 1 - PS Infrastructure & Pure Software Pipeline), estabelecemos os vetores de ouro e a especificação dos quadros de dados sintéticos de telemetria que nortearão toda a verificação funcional do projeto nas Fases 2 (RTL/Simulação), 3 (Integração BD), 4 (Firmware PS) e 5 (Validação Ponta a Ponta):
 
 - **Estrutura dos Quadros de Telemetria Sintética**:
   - Dimensões padronizadas: 256 B, 512 B e 1024 B (1 KB).

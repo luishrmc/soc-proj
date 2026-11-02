@@ -1,8 +1,10 @@
 {
-  "1.1": "Concluída",
-  "1.2": "Concluída",
-  "1.3": "Concluída",
-  "1.4": "Em andamento",
+  "1.1": "Em andamento",
+  "1.2": "Pendente",
+  "1.3": "Pendente",
+  "1.4": "Pendente",
+  "1.5": "Pendente",
+  "1.6": "Pendente",
   "2.1": "Pendente",
   "2.2": "Pendente",
   "2.3": "Pendente",
@@ -15,7 +17,6 @@
   "4.1": "Pendente",
   "4.2": "Pendente",
   "4.3": "Pendente",
-  "4.4": "Pendente",
   "5.1": "Pendente",
   "5.2": "Pendente",
   "5.3": "Pendente"
