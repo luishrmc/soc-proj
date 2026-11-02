@@ -36,5 +36,5 @@ None.
 
 ## Open risks
 
-None.
+- **R9** (task 4.3): Latência de execução do acelerador de compressão PL (LZSS) excede a linha de base de software do PS (Cenários 2 e 4 mais lentos que Cenário 1)
 
