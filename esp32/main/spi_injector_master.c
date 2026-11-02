@@ -73,14 +73,15 @@ esp_err_t spi_injector_init(int sclk_pin, int mosi_pin, int miso_pin, int cs_pin
 void spi_injector_build_frame(TelemetryFrame *frame, uint8_t pkt_type, uint16_t seq_id, const uint8_t *payload, uint16_t len) {
     if (frame == NULL) return;
 
-    if (len > SPI_BRINGUP_PAYLOAD_LEN) {
-        len = SPI_BRINGUP_PAYLOAD_LEN;
+    if (len > SPI_MAX_PAYLOAD_LEN) {
+        len = SPI_MAX_PAYLOAD_LEN;
     }
 
     frame->preamble = SPI_FRAME_PREAMBLE;
     frame->pkt_type = pkt_type;
     frame->seq_id = htons(seq_id);
     frame->payload_len = htons(len);
+    frame->reserved_align = 0;
 
     if (payload != NULL) {
         memcpy(frame->payload, payload, len);
@@ -92,8 +93,8 @@ void spi_injector_build_frame(TelemetryFrame *frame, uint8_t pkt_type, uint16_t 
     }
 
     /* Zero pad any remaining bytes in fixed payload buffer */
-    if (len < SPI_BRINGUP_PAYLOAD_LEN) {
-        memset(&frame->payload[len], 0, SPI_BRINGUP_PAYLOAD_LEN - len);
+    if (len < SPI_MAX_PAYLOAD_LEN) {
+        memset(&frame->payload[len], 0, SPI_MAX_PAYLOAD_LEN - len);
     }
 
     /* Compute CRC-16-CCITT over [preamble ... payload] */
@@ -161,22 +162,40 @@ esp_err_t spi_injector_transfer_frame(const TelemetryFrame *tx_frame, TelemetryF
 bool spi_injector_validate_ack(const TelemetryFrame *ack_frame, uint16_t expected_seq_id) {
     if (ack_frame == NULL) return false;
 
-    if (ack_frame->preamble != SPI_FRAME_PREAMBLE) {
+    const uint8_t *raw = (const uint8_t *)ack_frame;
+    if (raw[0] != SPI_FRAME_PREAMBLE) {
         return false;
     }
-    if (ack_frame->pkt_type != SPI_PKT_TYPE_ACK) {
+    if (raw[1] != SPI_PKT_TYPE_ACK) {
         return false;
     }
-    if (ntohs(ack_frame->seq_id) != expected_seq_id) {
-        return false;
-    }
-    if (ack_frame->eof_delim != SPI_FRAME_EOF_DELIM) {
+    uint16_t rx_seq = (uint16_t)(((uint16_t)raw[2] << 8) | raw[3]);
+    if (rx_seq != expected_seq_id) {
         return false;
     }
 
-    uint16_t expected_crc = ntohs(ack_frame->crc16);
-    uint16_t computed_crc = compute_crc16_ccitt((const uint8_t *)ack_frame, TELEMETRY_FRAME_CRC_OFFSET);
-    return (expected_crc == computed_crc);
+    /* Check dynamic layout first (e.g. 15-byte ACK with 4-byte payload) */
+    uint16_t plen = (uint16_t)(((uint16_t)raw[4] << 8) | raw[5]);
+    if (plen <= SPI_MAX_PAYLOAD_LEN) {
+        size_t crc_off = 8U + (size_t)plen;
+        size_t eof_off = crc_off + 2U;
+        if (raw[eof_off] == SPI_FRAME_EOF_DELIM) {
+            uint16_t expected_crc = (uint16_t)(((uint16_t)raw[crc_off] << 8) | raw[crc_off + 1]);
+            uint16_t computed_crc = compute_crc16_ccitt(raw, crc_off);
+            if (expected_crc == computed_crc) {
+                return true;
+            }
+        }
+    }
+
+    /* Fallback check for fixed-capacity frame */
+    if (ack_frame->eof_delim == SPI_FRAME_EOF_DELIM) {
+        uint16_t expected_crc = ntohs(ack_frame->crc16);
+        uint16_t computed_crc = compute_crc16_ccitt((const uint8_t *)ack_frame, TELEMETRY_FRAME_CRC_OFFSET);
+        return (expected_crc == computed_crc);
+    }
+
+    return false;
 }
 
 void spi_injector_deinit(void) {

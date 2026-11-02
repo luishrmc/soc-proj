@@ -30,16 +30,44 @@ static uint8_t s_comp_buf[PIPELINE_MAX_FRAME_SIZE] __attribute__((aligned(4)));
 static uint8_t s_dec_buf[PIPELINE_MAX_FRAME_SIZE] __attribute__((aligned(4)));
 static lzss_workspace_t s_lzss_ws;
 
-/* Standard 128-bit Symmetric Key and Base IV (NIST SP 800-38A compliant) */
+/* Standard 128-bit Symmetric Key (NIST SP 800-38A compliant) */
 static const uint8_t s_pipeline_key[AES_CTR_KEY_SIZE] = {
     0x2b, 0x7e, 0x15, 0x16, 0x28, 0xae, 0xd2, 0xa6,
     0xab, 0xf7, 0x15, 0x88, 0x09, 0xcf, 0x4f, 0x3c
 };
 
-static const uint8_t s_pipeline_iv[AES_CTR_BLOCK_SIZE] = {
-    0xf0, 0xf1, 0xf2, 0xf3, 0xf4, 0xf5, 0xf6, 0xf7,
-    0xf8, 0xf9, 0xfa, 0xfb, 0xfc, 0xfd, 0xfe, 0xff
-};
+/* Active dynamic 128-bit Initial Counter Block (NIST SP 800-38A compliant) */
+static uint8_t s_active_iv[AES_CTR_BLOCK_SIZE] __attribute__((aligned(4)));
+static uint16_t s_pipeline_seq_id = 1U;
+
+void pipeline_set_frame_seq_id(uint16_t seq_id) {
+    s_pipeline_seq_id = seq_id;
+}
+
+uint16_t pipeline_get_frame_seq_id(void) {
+    return s_pipeline_seq_id;
+}
+
+void pipeline_generate_frame_iv(uint16_t seq_id, uint8_t iv_out[AES_CTR_BLOCK_SIZE]) {
+    if (iv_out == NULL) {
+        return;
+    }
+    /* Fixed 80-bit base nonce prefix (bytes 0..9) */
+    static const uint8_t s_base_nonce_prefix[10] = {
+        0xf0, 0xf1, 0xf2, 0xf3, 0xf4, 0xf5, 0xf6, 0xf7, 0xf8, 0xf9
+    };
+    memcpy(iv_out, s_base_nonce_prefix, 10);
+
+    /* Inject 16-bit sequence counter into bytes 10-11 (Big-Endian network order) */
+    iv_out[10] = (uint8_t)((seq_id >> 8) & 0xFFU);
+    iv_out[11] = (uint8_t)(seq_id & 0xFFU);
+
+    /* Initial 32-bit counter value 0x00000001 into bytes 12-15 */
+    iv_out[12] = 0x00U;
+    iv_out[13] = 0x00U;
+    iv_out[14] = 0x00U;
+    iv_out[15] = 0x01U;
+}
 
 /* ========================================================================= */
 /* Low-Level Helper Functions                                                */
@@ -167,6 +195,7 @@ int pipeline_init(void) {
     memset(s_comp_buf, 0, sizeof(s_comp_buf));
     memset(s_dec_buf, 0, sizeof(s_dec_buf));
     memset(&s_lzss_ws, 0, sizeof(s_lzss_ws));
+    pipeline_generate_frame_iv(s_pipeline_seq_id, s_active_iv);
 
     /* If PL is ready, execute soft reset on hardware coprocessors */
     if (pipeline_is_pl_ready()) {
@@ -414,16 +443,19 @@ int pipeline_process_frame_scenario(pipeline_scenario_t scenario,
     uint32_t t_crypt_start_cyc = read_pmu_cycles();
     int crypt_rc;
 
+    /* Generate dynamic IV for active sequence ID (NIST SP 800-38A compliant) */
+    pipeline_generate_frame_iv(s_pipeline_seq_id, s_active_iv);
+
     if (scenario == PIPELINE_SCENARIO_SW_HW || scenario == PIPELINE_SCENARIO_HW_HW) {
         crypt_rc = pipeline_aes_hw_crypt(s_pipeline_key,
-                                         s_pipeline_iv,
+                                         s_active_iv,
                                          s_comp_buf,
                                          comp_len,
                                          cipher_out,
                                          &crypt_hw_cycles);
     } else {
         crypt_rc = aes_128_ctr_crypt(s_pipeline_key,
-                                     s_pipeline_iv,
+                                     s_active_iv,
                                      s_comp_buf,
                                      cipher_out,
                                      comp_len);
@@ -508,7 +540,7 @@ int pipeline_reverse_frame(const uint8_t *cipher_in,
 
     /* 1. Decrypt ciphertext -> intermediate compressed stream */
     int crypt_rc = aes_128_ctr_crypt(s_pipeline_key,
-                                     s_pipeline_iv,
+                                     s_active_iv,
                                      cipher_in,
                                      s_dec_buf,
                                      cipher_len);
@@ -535,6 +567,9 @@ int pipeline_verify_all_scenarios(const uint8_t *raw_in, size_t raw_len) {
     if (raw_in == NULL || raw_len == 0U || raw_len > ACCEL_BRAM_CAPACITY_BYTES) {
         return PIPELINE_ERR_PARAM;
     }
+
+    /* Lock sequence ID to deterministic test value so all 4 scenarios use identical IV */
+    pipeline_set_frame_seq_id(0x0001U);
 
     static uint8_t ct_sw_sw[PIPELINE_MAX_FRAME_SIZE];
     static uint8_t ct_hw_sw[PIPELINE_MAX_FRAME_SIZE];

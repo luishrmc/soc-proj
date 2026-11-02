@@ -30,6 +30,7 @@ int axi_spi_read_frame(uintptr_t base_addr,
     uint32_t cycles = 0;
     size_t rx_idx = 0;
     bool found_preamble = false;
+    uint16_t payload_len = 0;
 
     while (cycles < max_poll_cycles) {
         uint8_t b = 0;
@@ -40,23 +41,45 @@ int axi_spi_read_frame(uintptr_t base_addr,
                     rx_idx = 1;
                     found_preamble = true;
                 }
-            } else {
+            } else if (rx_idx < TELEMETRY_FRAME_HEADER_SIZE) {
                 raw_buf[rx_idx++] = b;
-                if (rx_idx == sizeof(TelemetryFrame)) {
-                    /* Check EOF Delimiter */
-                    if (frame_out->eof_delim != SPI_FRAME_EOF_DELIM) {
-                        return -2; /* Framing / EOF delimiter error */
+                if (rx_idx == TELEMETRY_FRAME_HEADER_SIZE) {
+                    /* Header fully received (8 bytes: preamble, pkt_type, seq_id, payload_len, reserved_align) */
+                    payload_len = ntohs(frame_out->payload_len);
+                    if (payload_len > SPI_MAX_PAYLOAD_LEN) {
+                        return -2; /* Framing / length error: exceeds maximum payload capacity */
                     }
-
-                    /* Verify CRC-16-CCITT */
-                    uint16_t expected_crc = ntohs(frame_out->crc16);
-                    uint16_t computed_crc = compute_crc16_ccitt(raw_buf, TELEMETRY_FRAME_CRC_OFFSET);
-                    if (expected_crc != computed_crc) {
-                        return -3; /* Checksum mismatch */
-                    }
-
-                    return 0; /* Success */
                 }
+            } else if (rx_idx < (TELEMETRY_FRAME_HEADER_SIZE + (size_t)payload_len)) {
+                /* Reading payload bytes directly into frame_out->payload */
+                frame_out->payload[rx_idx - TELEMETRY_FRAME_HEADER_SIZE] = b;
+                rx_idx++;
+            } else if (rx_idx == (TELEMETRY_FRAME_HEADER_SIZE + (size_t)payload_len)) {
+                /* CRC-16 MSB */
+                frame_out->crc16 = (uint16_t)((uint16_t)b << 8);
+                rx_idx++;
+            } else if (rx_idx == (TELEMETRY_FRAME_HEADER_SIZE + (size_t)payload_len + 1U)) {
+                /* CRC-16 LSB */
+                frame_out->crc16 |= (uint16_t)b;
+                rx_idx++;
+            } else if (rx_idx == (TELEMETRY_FRAME_HEADER_SIZE + (size_t)payload_len + 2U)) {
+                /* EOF Delimiter */
+                frame_out->eof_delim = b;
+                rx_idx++;
+
+                /* Check EOF Delimiter */
+                if (frame_out->eof_delim != SPI_FRAME_EOF_DELIM) {
+                    return -2; /* Framing / EOF delimiter error */
+                }
+
+                /* Verify CRC-16-CCITT computed over header (8 bytes) + payload (payload_len bytes) */
+                uint16_t expected_crc = frame_out->crc16;
+                uint16_t computed_crc = compute_crc16_ccitt(raw_buf, TELEMETRY_FRAME_HEADER_SIZE + (size_t)payload_len);
+                if (expected_crc != computed_crc) {
+                    return -3; /* Checksum mismatch */
+                }
+
+                return 0; /* Success */
             }
         } else {
             cycles++;
@@ -69,28 +92,42 @@ int axi_spi_read_frame(uintptr_t base_addr,
 int axi_spi_stage_ack(uintptr_t base_addr,
                       uint16_t seq_id,
                       uint8_t status_code) {
-    TelemetryFrame ack_frame;
-    memset(&ack_frame, 0, sizeof(ack_frame));
+    /* Padded layout ACK packet (15 bytes total):
+     * [0]    Preamble (0xA5)
+     * [1]    Packet Type (0x81: ACK)
+     * [2..3] Sequence ID (Big-Endian)
+     * [4..5] Payload Length (4 bytes, Big-Endian)
+     * [6..7] Reserved alignment padding (0x0000)
+     * [8..11] Payload (status_code, 0, 0, 0)
+     * [12..13] CRC-16-CCITT over [0..11] (Big-Endian)
+     * [14]   EOF Delimiter (0x5A)
+     */
+    uint8_t ack_pkt[15];
+    uint16_t plen = 4U;
 
-    ack_frame.preamble = SPI_FRAME_PREAMBLE;
-    ack_frame.pkt_type = SPI_PKT_TYPE_ACK;
-    ack_frame.seq_id = htons(seq_id);
-    ack_frame.payload_len = htons(4);
-    ack_frame.payload[0] = status_code;
-    ack_frame.payload[1] = 0x00;
-    ack_frame.payload[2] = 0x00;
-    ack_frame.payload[3] = 0x00;
+    ack_pkt[0] = SPI_FRAME_PREAMBLE;
+    ack_pkt[1] = SPI_PKT_TYPE_ACK;
+    ack_pkt[2] = (uint8_t)((seq_id >> 8) & 0xFFU);
+    ack_pkt[3] = (uint8_t)(seq_id & 0xFFU);
+    ack_pkt[4] = (uint8_t)((plen >> 8) & 0xFFU);
+    ack_pkt[5] = (uint8_t)(plen & 0xFFU);
+    ack_pkt[6] = 0x00U; /* reserved_align */
+    ack_pkt[7] = 0x00U; /* reserved_align */
+    ack_pkt[8] = status_code;
+    ack_pkt[9] = 0x00U;
+    ack_pkt[10] = 0x00U;
+    ack_pkt[11] = 0x00U;
 
-    uint16_t crc = compute_crc16_ccitt((const uint8_t *)&ack_frame, TELEMETRY_FRAME_CRC_OFFSET);
-    ack_frame.crc16 = htons(crc);
-    ack_frame.eof_delim = SPI_FRAME_EOF_DELIM;
+    uint16_t crc = compute_crc16_ccitt(ack_pkt, 8U + (size_t)plen);
+    ack_pkt[12] = (uint8_t)((crc >> 8) & 0xFFU);
+    ack_pkt[13] = (uint8_t)(crc & 0xFFU);
+    ack_pkt[14] = SPI_FRAME_EOF_DELIM;
 
     /* Flush any stale bytes from TX FIFO so ACK starts immediately at word 0 */
     axi_spi_reset_tx_fifo(base_addr);
 
-    const uint8_t *raw = (const uint8_t *)&ack_frame;
-    for (size_t i = 0; i < sizeof(TelemetryFrame); i++) {
-        if (axi_spi_write_byte(base_addr, raw[i]) != 0) {
+    for (size_t i = 0; i < sizeof(ack_pkt); i++) {
+        if (axi_spi_write_byte(base_addr, ack_pkt[i]) != 0) {
             return -1; /* TX FIFO Full */
         }
     }

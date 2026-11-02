@@ -202,3 +202,43 @@ int test_sw_pipeline_run_all(void) {
 
     return failures;
 }
+
+int test_sw_pipeline_benchmark_sweep(void) {
+    LOG_PRINT("\r\n================================================================\r\n");
+    LOG_PRINT("  Executing 12-Combination Benchmark Sweep (256B, 512B, 1024B)  \r\n");
+    LOG_PRINT("================================================================\r\n");
+
+    static const size_t sweep_sizes[] = { 256U, 512U, 1024U };
+    const size_t num_sizes = sizeof(sweep_sizes) / sizeof(sweep_sizes[0]);
+
+    static uint8_t sweep_buf[1024] __attribute__((aligned(4)));
+    int total_failures = 0;
+
+    for (size_t s = 0; s < num_sizes; s++) {
+        size_t sz = sweep_sizes[s];
+        LOG_PRINT("\r\n--- Benchmark Sweep Iteration [%u/3]: Payload Size = %u Bytes ---\r\n",
+                  (unsigned int)(s + 1), (unsigned int)sz);
+
+        /* Generate realistic synthetic telemetry pattern with structured redundancy */
+        for (size_t i = 0; i < sz; i++) {
+            sweep_buf[i] = (uint8_t)((((i % 32) ^ (i / 16)) + (uint8_t)sz) & 0xFFU);
+        }
+
+        int rc = pipeline_verify_all_scenarios(sweep_buf, sz);
+        if (rc != PIPELINE_SUCCESS) {
+            LOG_PRINT("[SWEEP ERROR] Verification failed for payload size %u B (code %d)\r\n",
+                      (unsigned int)sz, rc);
+            total_failures++;
+        }
+    }
+
+    LOG_PRINT("\r\n================================================================\r\n");
+    if (total_failures == 0) {
+        LOG_PRINT("  [SWEEP COMPLETE] All 12 Benchmark Combinations Verified PASS! \r\n");
+    } else {
+        LOG_PRINT("  [SWEEP FAILURE] %d / 3 payload sweeps failed!                 \r\n", total_failures);
+    }
+    LOG_PRINT("================================================================\r\n\r\n");
+
+    return total_failures;
+}

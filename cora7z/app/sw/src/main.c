@@ -191,6 +191,9 @@ int main(void) {
     /* Initialize Compress-then-Encrypt Software Pipeline */
     pipeline_init();
 
+    /* Execute Full 12-Combination Benchmark Sweep (256B, 512B, 1024B across all 4 scenarios) */
+    test_sw_pipeline_benchmark_sweep();
+
     /* Initialize Autonomous ESP32 Trigger Line (PMOD JA Pin 1 -> ESP32 GPIO 32) */
     esp32_trigger_init();
     xil_printf("[TRIGGER] PS EMIO GPIO Initialized on PMOD JA Pin 1 (Package Pin Y18).\r\n");
@@ -223,7 +226,7 @@ int main(void) {
     xil_printf("[TRIGGER] Emitting initial active-low pulse (30 ms) to ESP32 on PMOD JA1...\r\n");
     trigger_esp32_burst();
 
-    static TelemetryFrame rx_frame;
+    static TelemetryFrame rx_frame __attribute__((aligned(4)));
     static axi_spi_metrics_t metrics = {0};
     uint32_t hb_ticks = 0;
 
@@ -234,6 +237,9 @@ int main(void) {
             metrics.valid_packets++;
             uint16_t rx_seq = ntohs(rx_frame.seq_id);
             uint16_t rx_len = ntohs(rx_frame.payload_len);
+
+            /* Set dynamic frame sequence ID for AES-128-CTR IV generation */
+            pipeline_set_frame_seq_id(rx_seq);
 
             /* Stage ACK response (0x81) into TX FIFO with mirrored seq_id */
             axi_spi_stage_ack(AXI_SPI_DEFAULT_BASEADDR, rx_seq, 0x00U);

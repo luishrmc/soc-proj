@@ -26,6 +26,17 @@ extern "C" {
  */
 int test_sw_pipeline_run_all(void);
 
+/**
+ * @brief Execute comprehensive 12-combination benchmark sweep across 256B, 512B, and 1024B.
+ *
+ * Runs all 4 scenarios (SW/SW, HW/SW, SW/HW, HW/HW) across 3 canonical payload lengths
+ * (256 B, 512 B, 1024 B), verifying bit-exact ciphertext parity, loopback recovery,
+ * and reporting PMU CPU cycles alongside Dual-Port BRAM PL execution cycles.
+ *
+ * @return 0 if all 12 combinations pass, non-zero failure count otherwise.
+ */
+int test_sw_pipeline_benchmark_sweep(void);
+
 #ifdef __cplusplus
 }
 #endif

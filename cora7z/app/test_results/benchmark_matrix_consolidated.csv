@@ -1,0 +1,13 @@
+Cenário,Configuração do Pipeline,Tamanho do Bloco,Perfil de Dados,Latência (ms),Ciclos ARM PMU,Ciclos PL HW,Razão de Compressão (%),Vazão (MB/s),Recursos FPGA (LUTs/FFs/BRAMs)
+Cenário 1: SW Puro,SW LZSS + SW AES-CTR,256 B,Telemetria IoT,0.596,397343,0,55.5%,0.41,N/A
+Cenário 1: SW Puro,SW LZSS + SW AES-CTR,512 B,Telemetria IoT,2.024,1349888,0,55.1%,0.24,N/A
+Cenário 1: SW Puro,SW LZSS + SW AES-CTR,1024 B,Telemetria IoT,4.846,3232400,0,54.9%,0.20,N/A
+Cenário 2: Offload Compressão,PL LZSS + SW AES-CTR,256 B,Telemetria IoT,0.951,634308,25631,55.5%,0.26,"2,840 LUTs / 1,420 FFs / 2 BRAMs"
+Cenário 2: Offload Compressão,PL LZSS + SW AES-CTR,512 B,Telemetria IoT,3.210,2141194,107539,55.1%,0.15,"2,840 LUTs / 1,420 FFs / 2 BRAMs"
+Cenário 2: Offload Compressão,PL LZSS + SW AES-CTR,1024 B,Telemetria IoT,7.695,5132354,269675,54.9%,0.13,"2,840 LUTs / 1,420 FFs / 2 BRAMs"
+Cenário 3: Offload Cifragem,SW LZSS + PL AES-CTR,256 B,Telemetria IoT,0.381,254021,217,55.5%,0.64,"3,410 LUTs / 2,150 FFs / 2 BRAMs"
+Cenário 3: Offload Cifragem,SW LZSS + PL AES-CTR,512 B,Telemetria IoT,1.580,1054168,421,55.1%,0.31,"3,410 LUTs / 2,150 FFs / 2 BRAMs"
+Cenário 3: Offload Cifragem,SW LZSS + PL AES-CTR,1024 B,Telemetria IoT,3.953,2636750,829,54.9%,0.25,"3,410 LUTs / 2,150 FFs / 2 BRAMs"
+Cenário 4: Aceleração HW Total,PL LZSS + PL AES-CTR,256 B,Telemetria IoT,0.734,489777,25848,55.5%,0.33,"8,856 LUTs / 12,047 FFs / 9 BRAMs"
+Cenário 4: Aceleração HW Total,PL LZSS + PL AES-CTR,512 B,Telemetria IoT,2.767,1845887,107960,55.1%,0.18,"8,856 LUTs / 12,047 FFs / 9 BRAMs"
+Cenário 4: Aceleração HW Total,PL LZSS + PL AES-CTR,1024 B,Telemetria IoT,6.794,4531431,270504,54.9%,0.14,"8,856 LUTs / 12,047 FFs / 9 BRAMs"

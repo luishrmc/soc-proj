@@ -40,6 +40,10 @@ extern "C" {
 #define PIPELINE_MAX_FRAME_SIZE      2048U
 #define ACCEL_BRAM_CAPACITY_BYTES    2048U
 
+#ifndef AES_CTR_BLOCK_SIZE
+#define AES_CTR_BLOCK_SIZE           16U
+#endif
+
 /* ========================================================================= */
 /* Hardware Address Map Definitions (ADR-012, ADR-017)                       */
 /* ========================================================================= */
@@ -122,7 +126,7 @@ extern "C" {
 #define ACCEL_STATUS_ERROR           (1U << 2)  /* Processing or framing error */
 
 /* Core Watchdog Polling Limit (iterations) */
-#define ACCEL_WATCHDOG_MAX_ITERS     1000000U
+#define ACCEL_WATCHDOG_MAX_ITERS     1200000U
 
 /* ========================================================================= */
 /* Pipeline Execution Scenarios & Metrics                                    */
@@ -167,6 +171,29 @@ typedef struct {
  * @return PIPELINE_SUCCESS (0) on success, negative error code on failure.
  */
 int pipeline_init(void);
+
+/**
+ * @brief Generate a dynamic AES-128-CTR Initial Counter Block (IV) from sequence ID.
+ *
+ * Injects seq_id in Big-Endian into bytes 10-11 of the 96-bit nonce, with initial
+ * counter 0x00000001 in bytes 12-15 per NIST SP 800-38A recommendations.
+ *
+ * @param[in]  seq_id 16-bit frame sequence counter.
+ * @param[out] iv_out 16-byte buffer receiving initialized counter block.
+ */
+void pipeline_generate_frame_iv(uint16_t seq_id, uint8_t iv_out[AES_CTR_BLOCK_SIZE]);
+
+/**
+ * @brief Set the active frame sequence ID used for dynamic IV generation.
+ * @param[in] seq_id Sequence identifier for the current frame.
+ */
+void pipeline_set_frame_seq_id(uint16_t seq_id);
+
+/**
+ * @brief Get the active frame sequence ID currently in use.
+ * @return Current 16-bit sequence counter.
+ */
+uint16_t pipeline_get_frame_seq_id(void);
 
 /**
  * @brief Check if Programmable Logic (PL) bitstream is loaded.

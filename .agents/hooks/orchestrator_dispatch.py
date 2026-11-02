@@ -206,9 +206,12 @@ def generate_critic_review(task_id, verdict_file=None):
 
         print(f"OPTIMIZATIONS: {len(optimizations)}")
         for o in optimizations:
-            loc = o.get("location", "unknown")
-            desc = o.get("description", "")
-            print(f"  - {loc}: {desc}")
+            if isinstance(o, dict):
+                loc = o.get("location", "unknown")
+                desc = o.get("description", "")
+                print(f"  - {loc}: {desc}")
+            else:
+                print(f"  - {o}")
 
         if verdict == "APPROVE" and len(blockers) == 0:
             print("\n[OK][critic] Task approved by Technical Critic.")
