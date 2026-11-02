@@ -1,7 +1,7 @@
 Item,Descrição,Formato,Status de Conformidade,Observações
-Fontes VHDL,Códigos RTL dos aceleradores lzss_accel e aes_accel com interfaces BRAM dual-port e CSRs AXI4-Lite,.vhd / .vhdl,Pendente,Implementação em VHDL-2008 conforme arquitetura BRAM True Dual-Port desacoplada
-Testbenches,Arquivos de simulação VUnit/GHDL com verificação bit-a-bit contra vetores de ouro,.vhd / .vhdl,Pendente,"tb_lzss_accel com vetores Heatshrink e tb_aes_accel com vetores NIST SP 800-38A"
-Código C/C++,Firmware bare-metal Cortex-A9 (modelos de referência SW drivers BRAM benchmark 4 cenários) e injetor ESP32,.c / .h,Pendente,"Firmware PS Vitis 2026.1 e firmware ESP32 ESP-IDF v6.1"
-Diagrama de Blocos,Diagrama visual de blocos documentando a arquitetura do SoC interconexão BRAM dual-port e barramentos AXI,.png / .jpg,Pendente,Diagrama visual de blocos gerado a partir do Vivado Block Design e arquitetura de sistema
+Fontes VHDL,Códigos RTL dos aceleradores lzss_accel e aes_accel com interfaces BRAM dual-port e CSRs AXI4-Lite,.vhd / .vhdl,Conforme,Implementação em VHDL-2008 conforme arquitetura BRAM True Dual-Port desacoplada em cora7z/app/hw/src/
+Testbenches,Arquivos de simulação VUnit/GHDL com verificação bit-a-bit contra vetores de ouro,.vhd / .vhdl,Conforme,"tb_lzss_accel com vetores Heatshrink e tb_aes_accel com vetores NIST SP 800-38A em cora7z/app/hw/test/"
+Código C/C++,Firmware bare-metal Cortex-A9 (modelos de referência SW drivers BRAM benchmark 4 cenários) e injetor ESP32,.c / .h,Conforme,"Firmware PS Vitis 2026.1 em cora7z/app/sw/src/ e firmware ESP32 ESP-IDF v6.1 em esp32/main/"
+Diagrama de Blocos,Diagrama visual de blocos documentando a arquitetura do SoC interconexão BRAM dual-port e barramentos AXI,.png / .jpg,Conforme,Diagrama visual de alta resolução 3200x1800 gerado em docs/diagrams/cora7z_top.png e cora7z_soc_architecture.pdf
 Relatório Final,Documento técnico final em formato PDF contendo introdução arquitetura metodologia métricas e análise comparativa,.pdf,Pendente,Estruturado conforme normas do DELT UFMG para entrega da disciplina
 Repositório GitHub,Repositório público no GitHub com histórico de commits documentação e reprodutibilidade,URL,Conforme,Configurado e sincronizado em git@github.com:luishrmc/soc-proj.git (branch main)
