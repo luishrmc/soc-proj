@@ -93,30 +93,34 @@ begin
     variable v_idx_out : integer;
   begin
     if rising_edge(aclk) then
-      -- BRAM IN Port B
-      if bram_in_en = '1' then
-        v_idx_in := to_integer(unsigned(bram_in_addr(10 downto 2)));
-        if v_idx_in < 512 then
-          bram_in_dout <= ram_in_mem(v_idx_in);
+      if aresetn = '0' then
+        ram_out_mem <= (others => (others => '0'));
+      else
+        -- BRAM IN Port B
+        if bram_in_en = '1' then
+          v_idx_in := to_integer(unsigned(bram_in_addr(10 downto 2)));
+          if v_idx_in < 512 then
+            bram_in_dout <= ram_in_mem(v_idx_in);
+          end if;
         end if;
-      end if;
 
-      -- BRAM OUT Port B
-      if bram_out_en = '1' then
-        v_idx_out := to_integer(unsigned(bram_out_addr(10 downto 2)));
-        if v_idx_out < 512 then
-          bram_out_dout <= ram_out_mem(v_idx_out);
-          if bram_out_we(0) = '1' then
-            ram_out_mem(v_idx_out)(7 downto 0) <= bram_out_din(7 downto 0);
-          end if;
-          if bram_out_we(1) = '1' then
-            ram_out_mem(v_idx_out)(15 downto 8) <= bram_out_din(15 downto 8);
-          end if;
-          if bram_out_we(2) = '1' then
-            ram_out_mem(v_idx_out)(23 downto 16) <= bram_out_din(23 downto 16);
-          end if;
-          if bram_out_we(3) = '1' then
-            ram_out_mem(v_idx_out)(31 downto 24) <= bram_out_din(31 downto 24);
+        -- BRAM OUT Port B
+        if bram_out_en = '1' then
+          v_idx_out := to_integer(unsigned(bram_out_addr(10 downto 2)));
+          if v_idx_out < 512 then
+            bram_out_dout <= ram_out_mem(v_idx_out);
+            if bram_out_we(0) = '1' then
+              ram_out_mem(v_idx_out)(7 downto 0) <= bram_out_din(7 downto 0);
+            end if;
+            if bram_out_we(1) = '1' then
+              ram_out_mem(v_idx_out)(15 downto 8) <= bram_out_din(15 downto 8);
+            end if;
+            if bram_out_we(2) = '1' then
+              ram_out_mem(v_idx_out)(23 downto 16) <= bram_out_din(23 downto 16);
+            end if;
+            if bram_out_we(3) = '1' then
+              ram_out_mem(v_idx_out)(31 downto 24) <= bram_out_din(31 downto 24);
+            end if;
           end if;
         end if;
       end if;
@@ -272,6 +276,38 @@ begin
         -- Check uncompressed length header: 0x00, 0x18
         check_equal(ram_out_mem(0)(7 downto 0), std_logic_vector'(x"00"), "Header MSB mismatch");
         check_equal(ram_out_mem(0)(15 downto 8), std_logic_vector'(x"18"), "Header LSB mismatch");
+
+      elsif run("test_64b_pattern") then
+        info("Testing LZSS 64-byte test payload...");
+        -- Load 64 bytes matching test_sw_pipeline.c: (i * 3 + 0x20) & 0xFF
+        for w in 0 to 15 loop
+          ram_in_mem(w)(7 downto 0)   <= std_logic_vector(to_unsigned(((w * 4 + 0) * 3 + 16#20#) mod 256, 8));
+          ram_in_mem(w)(15 downto 8)  <= std_logic_vector(to_unsigned(((w * 4 + 1) * 3 + 16#20#) mod 256, 8));
+          ram_in_mem(w)(23 downto 16) <= std_logic_vector(to_unsigned(((w * 4 + 2) * 3 + 16#20#) mod 256, 8));
+          ram_in_mem(w)(31 downto 24) <= std_logic_vector(to_unsigned(((w * 4 + 3) * 3 + 16#20#) mod 256, 8));
+        end loop;
+
+        -- Length: 64 bytes
+        axi_write(16#08#, x"00000040");
+
+        -- Assert START
+        axi_write(16#00#, x"00000001");
+
+        -- Poll STATUS until DONE
+        loop
+          axi_read(16#04#, v_status);
+          exit when v_status(1) = '1';
+          wait for 10 ns;
+        end loop;
+
+        axi_read(16#0C#, v_data);
+        v_dst_len := to_integer(unsigned(v_data));
+        info("64B compressed size: " & integer'image(v_dst_len));
+
+        -- Print first 4 words of ram_out_mem
+        for w in 0 to 3 loop
+          info("ram_out_mem(" & integer'image(w) & ") = 0x" & to_hstring(ram_out_mem(w)));
+        end loop;
 
       elsif run("test_soft_reset") then
         info("Testing synchronous soft reset on LZSS...");

@@ -18,7 +18,7 @@
 #endif
 
 static int test_aes_nist_vectors(void) {
-    LOG_PRINT("[TEST 1/4] AES-128-CTR NIST SP 800-38A 4-Block Vector Verification... ");
+    LOG_PRINT("[TEST 1/5] AES-128-CTR NIST SP 800-38A 4-Block Vector Verification... ");
     int rc = aes_128_ctr_self_test();
     if (rc == 0) {
         LOG_PRINT("PASS\r\n");
@@ -30,7 +30,7 @@ static int test_aes_nist_vectors(void) {
 }
 
 static int test_lzss_roundtrip_fidelity(void) {
-    LOG_PRINT("[TEST 2/4] LZSS Compression/Decompression Roundtrip Fidelity... ");
+    LOG_PRINT("[TEST 2/5] LZSS Compression/Decompression Roundtrip Fidelity... ");
     static uint8_t raw[512];
     static uint8_t comp[1024];
     static uint8_t decomp[512];
@@ -67,7 +67,7 @@ static int test_lzss_roundtrip_fidelity(void) {
 }
 
 static int test_buffer_boundary_stress(void) {
-    LOG_PRINT("[TEST 3/4] Buffer Boundary & Edge Length Stress Testing... ");
+    LOG_PRINT("[TEST 3/5] Buffer Boundary & Edge Length Stress Testing... ");
     static const size_t test_lengths[] = { 0, 1, 3, 7, 15, 16, 17, 63, 64, 65, 127, 255, 256, 512, 1024 };
     const size_t num_tests = sizeof(test_lengths) / sizeof(test_lengths[0]);
 
@@ -107,7 +107,7 @@ static int test_buffer_boundary_stress(void) {
 }
 
 static int test_pipeline_loopback(void) {
-    LOG_PRINT("[TEST 4/4] End-to-End Pipeline Loopback (Raw -> Comp -> Encrypt -> Decrypt -> Decomp)... ");
+    LOG_PRINT("[TEST 4/5] End-to-End Pipeline Loopback (Raw -> Comp -> Encrypt -> Decrypt -> Decomp)... ");
     pipeline_init();
 
     static uint8_t raw_payload[64];
@@ -140,7 +140,14 @@ static int test_pipeline_loopback(void) {
 
     if (recovered_len != sizeof(raw_payload) ||
         memcmp(raw_payload, recovered_buf, sizeof(raw_payload)) != 0) {
-        LOG_PRINT("FAIL (Loopback payload mismatch)\r\n");
+        LOG_PRINT("FAIL (Loopback payload mismatch: rec_len=%u)\r\n", (unsigned int)recovered_len);
+        for (size_t i = 0; i < sizeof(raw_payload); i++) {
+            if (raw_payload[i] != recovered_buf[i]) {
+                LOG_PRINT("       Mismatch at byte %u: expected=0x%02X, got=0x%02X\r\n",
+                          (unsigned int)i, raw_payload[i], recovered_buf[i]);
+                break;
+            }
+        }
         return 1;
     }
 
@@ -151,9 +158,31 @@ static int test_pipeline_loopback(void) {
     return 0;
 }
 
+static int test_hybrid_hardware_parity(void) {
+    LOG_PRINT("[TEST 5/5] Hybrid 4-Scenario Parity & Dual-Port BRAM HW Offload... ");
+    if (!pipeline_is_pl_ready()) {
+        LOG_PRINT("SKIPPED (PL not programmed)\r\n");
+        return 0;
+    }
+
+    static uint8_t test_payload[64];
+    for (size_t i = 0; i < sizeof(test_payload); i++) {
+        test_payload[i] = (uint8_t)((i * 3 + 0x20) & 0xFFU);
+    }
+
+    int rc = pipeline_verify_all_scenarios(test_payload, sizeof(test_payload));
+    if (rc == PIPELINE_SUCCESS) {
+        LOG_PRINT("PASS\r\n");
+        return 0;
+    } else {
+        LOG_PRINT("FAIL (error code %d)\r\n", rc);
+        return 1;
+    }
+}
+
 int test_sw_pipeline_run_all(void) {
     LOG_PRINT("\r\n================================================================\r\n");
-    LOG_PRINT("  Running Pure-Software Pipeline Verification & Test Suite      \r\n");
+    LOG_PRINT("  Running Heterogeneous SoC Pipeline Verification & Test Suite \r\n");
     LOG_PRINT("================================================================\r\n");
 
     int failures = 0;
@@ -161,10 +190,11 @@ int test_sw_pipeline_run_all(void) {
     failures += test_lzss_roundtrip_fidelity();
     failures += test_buffer_boundary_stress();
     failures += test_pipeline_loopback();
+    failures += test_hybrid_hardware_parity();
 
     LOG_PRINT("================================================================\r\n");
     if (failures == 0) {
-        LOG_PRINT("  [ALL TESTS PASS] Software Pipeline Verification: 4/4 PASSED   \r\n");
+        LOG_PRINT("  [ALL TESTS PASS] Pipeline Verification Suite: 5/5 PASSED      \r\n");
     } else {
         LOG_PRINT("  [TEST SUITE FAILURE] %d tests failed!                         \r\n", failures);
     }

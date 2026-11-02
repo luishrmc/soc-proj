@@ -140,6 +140,7 @@ architecture rtl of lzss_accel is
   signal match_len_r     : integer range 0 to c_max_lookahead := 0;
   signal best_len_r      : integer range 0 to c_max_lookahead := 0;
   signal best_dist_r     : unsigned(15 downto 0) := (others => '0');
+  signal bram_wait_r     : std_logic := '0';
 
   -- Function to extract byte from 32-bit word at given byte address
   function extract_byte(word : std_logic_vector(31 downto 0); addr : unsigned(15 downto 0)) return std_logic_vector is
@@ -292,6 +293,7 @@ begin
         match_len_r       <= 0;
         best_len_r        <= 0;
         best_dist_r       <= (others => '0');
+        bram_wait_r       <= '0';
         bram_in_en        <= '0';
         bram_in_addr      <= (others => '0');
         bram_out_en       <= '0';
@@ -381,10 +383,15 @@ begin
             end if;
 
           when ST_INIT_LA_WAIT =>
-            v_read_byte := extract_byte(bram_in_dout, in_idx_r + to_unsigned(la_load_idx_r, 16));
-            lookahead_r(la_load_idx_r) <= v_read_byte;
-            la_load_idx_r <= la_load_idx_r + 1;
-            state_r       <= ST_INIT_LA_REQ;
+            if bram_wait_r = '0' then
+              bram_wait_r <= '1';
+            else
+              bram_wait_r <= '0';
+              v_read_byte := extract_byte(bram_in_dout, in_idx_r + to_unsigned(la_load_idx_r, 16));
+              lookahead_r(la_load_idx_r) <= v_read_byte;
+              la_load_idx_r <= la_load_idx_r + 1;
+              state_r       <= ST_INIT_LA_REQ;
+            end if;
 
           ----------------------------------------------------------------------
           -- ST_LOAD_LA_REQ / ST_LOAD_LA_WAIT: Reload Lookahead After Token
@@ -404,10 +411,15 @@ begin
           -- ST_LOAD_LA_WAIT: Sample Byte into Lookahead Buffer
           ----------------------------------------------------------------------
           when ST_LOAD_LA_WAIT =>
-            v_read_byte := extract_byte(bram_in_dout, in_idx_r + to_unsigned(la_load_idx_r, 16));
-            lookahead_r(la_load_idx_r) <= v_read_byte;
-            la_load_idx_r <= la_load_idx_r + 1;
-            state_r       <= ST_LOAD_LA_REQ;
+            if bram_wait_r = '0' then
+              bram_wait_r <= '1';
+            else
+              bram_wait_r <= '0';
+              v_read_byte := extract_byte(bram_in_dout, in_idx_r + to_unsigned(la_load_idx_r, 16));
+              lookahead_r(la_load_idx_r) <= v_read_byte;
+              la_load_idx_r <= la_load_idx_r + 1;
+              state_r       <= ST_LOAD_LA_REQ;
+            end if;
 
           ----------------------------------------------------------------------
           -- ST_START_CHUNK: Reserve 1 Byte for 8-Token Flag Bitmask
@@ -468,15 +480,20 @@ begin
           -- ST_SEARCH_WAIT: Compare Initial Byte of Candidate
           ----------------------------------------------------------------------
           when ST_SEARCH_WAIT =>
-            v_read_byte := extract_byte(bram_in_dout, cand_idx_r);
-            if v_read_byte = lookahead_r(0) then
-              -- Match candidate begins; compare remaining lookahead bytes
-              match_len_r <= 1;
-              state_r     <= ST_CMP_REQ;
+            if bram_wait_r = '0' then
+              bram_wait_r <= '1';
             else
-              -- Mismatch on first byte; advance to next candidate
-              cand_idx_r <= cand_idx_r + 1;
-              state_r    <= ST_SEARCH_REQ;
+              bram_wait_r <= '0';
+              v_read_byte := extract_byte(bram_in_dout, cand_idx_r);
+              if v_read_byte = lookahead_r(0) then
+                -- Match candidate begins; compare remaining lookahead bytes
+                match_len_r <= 1;
+                state_r     <= ST_CMP_REQ;
+              else
+                -- Mismatch on first byte; advance to next candidate
+                cand_idx_r <= cand_idx_r + 1;
+                state_r    <= ST_SEARCH_REQ;
+              end if;
             end if;
 
           ----------------------------------------------------------------------
@@ -491,28 +508,33 @@ begin
           -- ST_CMP_WAIT: Evaluate Match Extension
           ----------------------------------------------------------------------
           when ST_CMP_WAIT =>
-            v_read_byte := extract_byte(bram_in_dout, cand_idx_r + to_unsigned(match_len_r, 16));
-            if v_read_byte = lookahead_r(match_len_r) then
-              if match_len_r + 1 = la_valid_len_r then
-                -- Reached maximum possible lookahead match
-                if match_len_r + 1 > best_len_r then
-                  best_len_r  <= match_len_r + 1;
+            if bram_wait_r = '0' then
+              bram_wait_r <= '1';
+            else
+              bram_wait_r <= '0';
+              v_read_byte := extract_byte(bram_in_dout, cand_idx_r + to_unsigned(match_len_r, 16));
+              if v_read_byte = lookahead_r(match_len_r) then
+                if match_len_r + 1 = la_valid_len_r then
+                  -- Reached maximum possible lookahead match
+                  if match_len_r + 1 > best_len_r then
+                    best_len_r  <= match_len_r + 1;
+                    best_dist_r <= in_idx_r - cand_idx_r;
+                  end if;
+                  cand_idx_r <= cand_idx_r + 1;
+                  state_r    <= ST_SEARCH_REQ;
+                else
+                  match_len_r <= match_len_r + 1;
+                  state_r     <= ST_CMP_REQ;
+                end if;
+              else
+                -- Match ends
+                if match_len_r >= c_min_match and match_len_r > best_len_r then
+                  best_len_r  <= match_len_r;
                   best_dist_r <= in_idx_r - cand_idx_r;
                 end if;
                 cand_idx_r <= cand_idx_r + 1;
                 state_r    <= ST_SEARCH_REQ;
-              else
-                match_len_r <= match_len_r + 1;
-                state_r     <= ST_CMP_REQ;
               end if;
-            else
-              -- Match ends
-              if match_len_r >= c_min_match and match_len_r > best_len_r then
-                best_len_r  <= match_len_r;
-                best_dist_r <= in_idx_r - cand_idx_r;
-              end if;
-              cand_idx_r <= cand_idx_r + 1;
-              state_r    <= ST_SEARCH_REQ;
             end if;
 
           ----------------------------------------------------------------------

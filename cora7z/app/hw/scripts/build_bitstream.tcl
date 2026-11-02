@@ -42,6 +42,7 @@ open_bd_design $bd_file
 
 # Refresh module references if out of date
 puts "=== BITSTREAM BUILD === Updating module references..."
+catch { update_module_reference [get_ips *accel*] }
 catch { update_module_reference [get_ips *engine*] }
 catch { update_module_reference [get_ips *mux*] }
 

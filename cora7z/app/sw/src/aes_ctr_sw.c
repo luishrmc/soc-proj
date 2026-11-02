@@ -33,24 +33,7 @@ int aes_128_ctr_crypt(const uint8_t key[AES_CTR_KEY_SIZE],
 
     aes128_ctr_ctx_t ctx;
     aes128_ctr_init(&ctx, key, nonce_counter);
-
-    uint8_t current_ctr[AES_CTR_BLOCK_SIZE];
-    memcpy(current_ctr, nonce_counter, AES_CTR_BLOCK_SIZE);
-
-    uint8_t keystream[AES_CTR_BLOCK_SIZE];
-    size_t offset = 0U;
-
-    while (offset < len) {
-        /* Encrypt current 128-bit counter block to generate 16 bytes of keystream */
-        aes128_ctr_crypt(&ctx, current_ctr, keystream, AES_CTR_BLOCK_SIZE);
-        /* In aes_ctr.c, aes128_ctr_crypt already handles encryption and counter */
-        /* To ensure direct deterministic behavior: */
-        size_t block_bytes = (len - offset < AES_CTR_BLOCK_SIZE) ? (len - offset) : AES_CTR_BLOCK_SIZE;
-        for (size_t i = 0U; i < block_bytes; i++) {
-            dst[offset + i] = src[offset + i] ^ keystream[i];
-        }
-        offset += block_bytes;
-    }
+    aes128_ctr_crypt(&ctx, src, dst, len);
 
     return AES_CTR_SUCCESS;
 }

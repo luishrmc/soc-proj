@@ -269,6 +269,12 @@ int main(void) {
                            cr_pct,
                            tp_int,
                            tp_frac);
+                if (pm.comp_hw_cycles > 0 || pm.crypt_hw_cycles > 0) {
+                    xil_printf("           [PL Accel] HW Cycles: LZSS=%u cyc, AES=%u cyc (Scenario: Case %d)\r\n",
+                               (unsigned int)pm.comp_hw_cycles,
+                               (unsigned int)pm.crypt_hw_cycles,
+                               (int)pm.scenario + 1);
+                }
             } else {
                 xil_printf("[SPI_RX #%u] Seq: %u | Pipeline Processing Error: %d\r\n",
                            (unsigned int)metrics.valid_packets,
