@@ -1,0 +1,378 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1140 760" width="100%" height="100%">
+  <defs>
+    <!-- Gradients -->
+    <linearGradient id="bgGrad2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#090d16" />
+      <stop offset="100%" stop-color="#0f172a" />
+    </linearGradient>
+    <linearGradient id="psHeaderGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#0284c7" />
+      <stop offset="100%" stop-color="#0369a1" />
+    </linearGradient>
+    <linearGradient id="plHeaderGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#9333ea" />
+      <stop offset="100%" stop-color="#7e22ce" />
+    </linearGradient>
+    <linearGradient id="bramGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#854d0e" stop-opacity="0.9" />
+      <stop offset="100%" stop-color="#713f12" stop-opacity="0.9" />
+    </linearGradient>
+    <linearGradient id="lzssCoreGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1e1b4b" />
+      <stop offset="100%" stop-color="#31104b" />
+    </linearGradient>
+    <linearGradient id="aesCoreGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1e1b4b" />
+      <stop offset="100%" stop-color="#14213d" />
+    </linearGradient>
+    
+    <!-- Filter -->
+    <filter id="shadowBox" x="-4%" y="-4%" width="108%" height="110%">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#000000" flood-opacity="0.5"/>
+    </filter>
+
+    <!-- Markers -->
+    <marker id="arrBlue" markerWidth="7" markerHeight="7" refX="5" refY="3.5" orient="auto">
+      <path d="M1,1 L6,3.5 L1,6 Z" fill="#38bdf8" />
+    </marker>
+    <marker id="arrPurple" markerWidth="7" markerHeight="7" refX="5" refY="3.5" orient="auto">
+      <path d="M1,1 L6,3.5 L1,6 Z" fill="#c084fc" />
+    </marker>
+    <marker id="arrGold" markerWidth="7" markerHeight="7" refX="5" refY="3.5" orient="auto">
+      <path d="M1,1 L6,3.5 L1,6 Z" fill="#facc15" />
+    </marker>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1140" height="760" rx="16" fill="url(#bgGrad2)" stroke="#1e293b" stroke-width="2" />
+  
+  <!-- Subtle Grid -->
+  <g opacity="0.05" stroke="#94a3b8" stroke-width="1">
+    <path d="M 0,95 L 1140,95 M 0,190 L 1140,190 M 0,285 L 1140,285 M 0,380 L 1140,380 M 0,475 L 1140,475 M 0,570 L 1140,570 M 0,665 L 1140,665" />
+    <path d="M 95,0 L 95,760 M 190,0 L 190,760 M 285,0 L 285,760 M 380,0 L 380,760 M 475,0 L 475,760 M 570,0 L 570,760 M 665,0 L 665,760 M 760,0 L 760,760 M 855,0 L 855,760 M 950,0 L 950,760 M 1045,0 L 1045,760" />
+  </g>
+
+  <!-- Main Title -->
+  <text x="570" y="38" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="20" font-weight="700" fill="#f8fafc" letter-spacing="1">
+    DECOUPLED STORE-AND-FORWARD DUAL-PORT BRAM PIPELINE ARCHITECTURE
+  </text>
+  <text x="570" y="58" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="12" fill="#94a3b8">
+    Zero-DMA Interconnect ── PS Memory Staging via AXI BRAM Controllers ── Decoupled PL Accelerators @ 100 MHz
+  </text>
+
+  <!-- ========================================================================= -->
+  <!-- TOP REGION: PROCESSING SYSTEM (ARM CORTEX-A9)                             -->
+  <!-- ========================================================================= -->
+  <g transform="translate(40, 75)">
+    <rect width="1060" height="95" rx="10" fill="#082f49" stroke="#0284c7" stroke-width="1.5" filter="url(#shadowBox)" />
+    
+    <!-- Label -->
+    <rect x="15" y="10" width="280" height="24" rx="4" fill="url(#psHeaderGrad)" />
+    <text x="25" y="26" font-family="system-ui, sans-serif" font-size="11.5" font-weight="700" fill="#f0f9ff">
+      ARM Cortex-A9 Processing System (PS @ 667 MHz)
+    </text>
+
+    <!-- Sub components -->
+    <g transform="translate(15, 42)">
+      <!-- DDR Buffer -->
+      <rect width="230" height="42" rx="6" fill="#0c4a6e" stroke="#38bdf8" stroke-width="1" />
+      <text x="115" y="19" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11" font-weight="700" fill="#e0f2fe">
+        DDR3 Frame Staging Buffers
+      </text>
+      <text x="115" y="34" text-anchor="middle" font-family="monospace" font-size="9" fill="#7dd3fc">
+        rx_raw_buf [256B .. 1KB]
+      </text>
+
+      <!-- Fast Memory Copy -->
+      <rect x="255" width="260" height="42" rx="6" fill="#0c4a6e" stroke="#38bdf8" stroke-width="1" />
+      <text x="385" y="19" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11" font-weight="700" fill="#e0f2fe">
+        Cortex-A9 Burst memcpy Manager
+      </text>
+      <text x="385" y="34" text-anchor="middle" font-family="monospace" font-size="9" fill="#7dd3fc">
+        Deterministic Staging (Eliminates DMA)
+      </text>
+
+      <!-- PMU Profiler -->
+      <rect x="525" width="240" height="42" rx="6" fill="#0c4a6e" stroke="#38bdf8" stroke-width="1" />
+      <text x="645" y="19" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11" font-weight="700" fill="#e0f2fe">
+        ARM PMU Instrumentation
+      </text>
+      <text x="645" y="34" text-anchor="middle" font-family="monospace" font-size="9" fill="#7dd3fc">
+        CP15 PMCCNTR (Calibrated Overhead)
+      </text>
+
+      <!-- Control / Dispatch -->
+      <rect x="775" width="255" height="42" rx="6" fill="#0c4a6e" stroke="#38bdf8" stroke-width="1" />
+      <text x="902" y="19" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11" font-weight="700" fill="#e0f2fe">
+        AXI4-Lite Peripheral Dispatcher
+      </text>
+      <text x="902" y="34" text-anchor="middle" font-family="monospace" font-size="9" fill="#7dd3fc">
+        START Pulse / Polling DONE Status
+      </text>
+    </g>
+  </g>
+
+  <!-- ========================================================================= -->
+  <!-- AXI BUS INTERCONNECT STRIP                                                -->
+  <!-- ========================================================================= -->
+  <g transform="translate(40, 185)">
+    <rect width="1060" height="30" rx="6" fill="#1e293b" stroke="#475569" stroke-width="1.5" />
+    <text x="530" y="20" text-anchor="middle" font-family="system-ui, monospace" font-size="11.5" font-weight="700" fill="#f1f5f9" letter-spacing="0.5">
+      AXI4 INTERCONNECT (M_AXI_GP0 ── 32-bit Memory-Mapped Bus @ 100 MHz FCLK1)
+    </text>
+  </g>
+
+  <!-- Vertical AXI Downlinks -->
+  <!-- LZSS Bus Downlink -->
+  <path d="M 310,215 L 310,240" stroke="#38bdf8" stroke-width="2.5" marker-end="url(#arrBlue)" />
+  <!-- AES Bus Downlink -->
+  <path d="M 830,215 L 830,240" stroke="#38bdf8" stroke-width="2.5" marker-end="url(#arrBlue)" />
+
+  <!-- ========================================================================= -->
+  <!-- LEFT COPROCESSOR: LZSS COMPRESSION ENGINE                                 -->
+  <!-- ========================================================================= -->
+  <g transform="translate(40, 245)">
+    <!-- Container -->
+    <rect width="515" height="485" rx="12" fill="url(#lzssCoreGrad)" stroke="#a855f7" stroke-width="1.5" filter="url(#shadowBox)" />
+    
+    <!-- Title -->
+    <rect x="15" y="12" width="485" height="28" rx="6" fill="url(#plHeaderGrad)" />
+    <text x="257" y="31" text-anchor="middle" font-family="system-ui, sans-serif" font-size="12.5" font-weight="700" fill="#faf5ff">
+      COPROCESSOR 1: lzss_accel (Sliding-Window Dictionary Compression)
+    </text>
+
+    <!-- AXI BRAM Controllers Row -->
+    <g transform="translate(15, 52)">
+      <!-- Input AXI BRAM Ctrl -->
+      <rect width="235" height="38" rx="5" fill="#1e1b4b" stroke="#818cf8" stroke-width="1.2" />
+      <text x="117" y="17" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10.5" font-weight="700" fill="#c7d2fe">
+        AXI BRAM Ctrl (Input)
+      </text>
+      <text x="117" y="31" text-anchor="middle" font-family="monospace" font-size="9" fill="#a5b4fc">
+        Base: 0x4000_0000 (2 KB)
+      </text>
+
+      <!-- Output AXI BRAM Ctrl -->
+      <rect x="250" width="235" height="38" rx="5" fill="#1e1b4b" stroke="#818cf8" stroke-width="1.2" />
+      <text x="367" y="17" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10.5" font-weight="700" fill="#c7d2fe">
+        AXI BRAM Ctrl (Output)
+      </text>
+      <text x="367" y="31" text-anchor="middle" font-family="monospace" font-size="9" fill="#a5b4fc">
+        Base: 0x4000_2000 (2 KB)
+      </text>
+    </g>
+
+    <!-- Shared True Dual-Port Block RAMs -->
+    <g transform="translate(15, 102)">
+      <!-- Input BRAM -->
+      <rect width="235" height="75" rx="6" fill="url(#bramGrad)" stroke="#f59e0b" stroke-width="1.5" />
+      <text x="117" y="20" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11" font-weight="700" fill="#fef3c7">
+        Input True Dual-Port BRAM
+      </text>
+      <line x1="10" y1="28" x2="225" y2="28" stroke="#ca8a04" stroke-width="1" />
+      <text x="15" y="46" font-family="monospace" font-size="9.5" fill="#fde68a">• Capacity: 2 KB (36Kb BRAM)</text>
+      <text x="15" y="60" font-family="monospace" font-size="9.5" fill="#fde68a">• Port A: PS AXI Read/Write</text>
+      <text x="15" y="72" font-family="monospace" font-size="9.5" fill="#fde68a">• Port B: LZSS Engine Read</text>
+
+      <!-- Output BRAM -->
+      <rect x="250" width="235" height="75" rx="6" fill="url(#bramGrad)" stroke="#f59e0b" stroke-width="1.5" />
+      <text x="367" y="20" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11" font-weight="700" fill="#fef3c7">
+        Output True Dual-Port BRAM
+      </text>
+      <line x1="260" y1="28" x2="475" y2="28" stroke="#ca8a04" stroke-width="1" />
+      <text x="260" y="46" font-family="monospace" font-size="9.5" fill="#fde68a">• Capacity: 2 KB (36Kb BRAM)</text>
+      <text x="260" y="60" font-family="monospace" font-size="9.5" fill="#fde68a">• Port A: PS AXI Read/Drain</text>
+      <text x="260" y="72" font-family="monospace" font-size="9.5" fill="#fde68a">• Port B: LZSS Engine Write</text>
+    </g>
+
+    <!-- Connectors BRAM to Core -->
+    <path d="M 132,177 L 132,200" stroke="#facc15" stroke-width="2" marker-end="url(#arrGold)" />
+    <path d="M 382,200 L 382,177" stroke="#facc15" stroke-width="2" marker-end="url(#arrGold)" />
+
+    <!-- LZSS RTL Core Internal FSM -->
+    <g transform="translate(15, 202)">
+      <rect width="485" height="195" rx="8" fill="#180d2b" stroke="#c084fc" stroke-width="1.5" />
+      <text x="242" y="22" text-anchor="middle" font-family="system-ui, sans-serif" font-size="12" font-weight="700" fill="#f3e8ff">
+        lzss_accel Core Datapath (VHDL-2008 @ 100 MHz)
+      </text>
+      
+      <!-- Subblocks -->
+      <g transform="translate(15, 36)">
+        <rect width="220" height="72" rx="5" fill="#2e1065" stroke="#9333ea" stroke-width="1" />
+        <text x="110" y="18" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10.5" font-weight="700" fill="#e9d5ff">
+          Sliding Window Buffer
+        </text>
+        <text x="15" y="36" font-family="monospace" font-size="9" fill="#d8b4fe">• Window: 256 B (W=8)</text>
+        <text x="15" y="50" font-family="monospace" font-size="9" fill="#d8b4fe">• Circular BRAM Array</text>
+        <text x="15" y="64" font-family="monospace" font-size="9" fill="#d8b4fe">• Zero-Latch Invariants</text>
+
+        <rect x="235" width="220" height="72" rx="5" fill="#2e1065" stroke="#9333ea" stroke-width="1" />
+        <text x="345" y="18" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10.5" font-weight="700" fill="#e9d5ff">
+          Lookahead Match Finder
+        </text>
+        <text x="245" y="36" font-family="monospace" font-size="9" fill="#d8b4fe">• Lookahead: 16 B (L=4)</text>
+        <text x="245" y="50" font-family="monospace" font-size="9" fill="#d8b4fe">• Pipelined Comparator</text>
+        <text x="245" y="64" font-family="monospace" font-size="9" fill="#d8b4fe">• Longest Match Selector</text>
+      </g>
+
+      <!-- Token Packing & Bitstream Engine -->
+      <g transform="translate(15, 116)">
+        <rect width="455" height="68" rx="5" fill="#2e1065" stroke="#9333ea" stroke-width="1" />
+        <text x="227" y="19" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10.5" font-weight="700" fill="#e9d5ff">
+          Heatshrink-Compatible Bitstream Packer
+        </text>
+        <text x="20" y="38" font-family="monospace" font-size="9" fill="#d8b4fe">
+          • Tag Bit 1: Literal byte (8 bits) ── Tag Bit 0: Back-reference (offset + length)
+        </text>
+        <text x="20" y="54" font-family="monospace" font-size="9" fill="#d8b4fe">
+          • 32-bit Word Accumulator ── Byte-level BRAM Port B Write Interface
+        </text>
+      </g>
+    </g>
+
+    <!-- AXI4-Lite CSRs & HW Cycle Counter Block -->
+    <g transform="translate(15, 407)">
+      <rect width="485" height="65" rx="6" fill="#0f172a" stroke="#64748b" stroke-width="1" />
+      <text x="15" y="20" font-family="system-ui, sans-serif" font-size="10.5" font-weight="700" fill="#94a3b8">
+        AXI4-Lite Control &amp; Instrumentation Registers
+      </text>
+      
+      <rect x="15" y="28" width="105" height="26" rx="4" fill="#1e293b" />
+      <text x="67" y="45" text-anchor="middle" font-family="monospace" font-size="9" fill="#38bdf8">0x00 CONTROL</text>
+
+      <rect x="127" y="28" width="95" height="26" rx="4" fill="#1e293b" />
+      <text x="174" y="45" text-anchor="middle" font-family="monospace" font-size="9" fill="#38bdf8">0x04 STATUS</text>
+
+      <rect x="229" y="28" width="105" height="26" rx="4" fill="#1e293b" />
+      <text x="281" y="45" text-anchor="middle" font-family="monospace" font-size="9" fill="#38bdf8">0x08/0C LENGTH</text>
+
+      <!-- 32-bit HW Cycle Counter Highlight -->
+      <rect x="341" y="28" width="130" height="26" rx="4" fill="#3b0764" stroke="#facc15" stroke-width="1.2" />
+      <text x="406" y="45" text-anchor="middle" font-family="monospace" font-size="9" font-weight="700" fill="#facc15">0x10 CYCLES (32b)</text>
+    </g>
+  </g>
+
+  <!-- ========================================================================= -->
+  <!-- RIGHT COPROCESSOR: AES-128-CTR ENCRYPTION ENGINE                          -->
+  <!-- ========================================================================= -->
+  <g transform="translate(585, 245)">
+    <!-- Container -->
+    <rect width="515" height="485" rx="12" fill="url(#aesCoreGrad)" stroke="#38bdf8" stroke-width="1.5" filter="url(#shadowBox)" />
+    
+    <!-- Title -->
+    <rect x="15" y="12" width="485" height="28" rx="6" fill="url(#psHeaderGrad)" />
+    <text x="257" y="31" text-anchor="middle" font-family="system-ui, sans-serif" font-size="12.5" font-weight="700" fill="#f0f9ff">
+      COPROCESSOR 2: aes_accel (128-bit Iterative AES Counter Mode)
+    </text>
+
+    <!-- AXI BRAM Controllers Row -->
+    <g transform="translate(15, 52)">
+      <!-- Input AXI BRAM Ctrl -->
+      <rect width="235" height="38" rx="5" fill="#082f49" stroke="#38bdf8" stroke-width="1.2" />
+      <text x="117" y="17" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10.5" font-weight="700" fill="#bae6fd">
+        AXI BRAM Ctrl (Input)
+      </text>
+      <text x="117" y="31" text-anchor="middle" font-family="monospace" font-size="9" fill="#7dd3fc">
+        Base: 0x4000_4000 (2 KB)
+      </text>
+
+      <!-- Output AXI BRAM Ctrl -->
+      <rect x="250" width="235" height="38" rx="5" fill="#082f49" stroke="#38bdf8" stroke-width="1.2" />
+      <text x="367" y="17" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10.5" font-weight="700" fill="#bae6fd">
+        AXI BRAM Ctrl (Output)
+      </text>
+      <text x="367" y="31" text-anchor="middle" font-family="monospace" font-size="9" fill="#7dd3fc">
+        Base: 0x4000_6000 (2 KB)
+      </text>
+    </g>
+
+    <!-- Shared True Dual-Port Block RAMs -->
+    <g transform="translate(15, 102)">
+      <!-- Input BRAM -->
+      <rect width="235" height="75" rx="6" fill="url(#bramGrad)" stroke="#f59e0b" stroke-width="1.5" />
+      <text x="117" y="20" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11" font-weight="700" fill="#fef3c7">
+        Input True Dual-Port BRAM
+      </text>
+      <line x1="10" y1="28" x2="225" y2="28" stroke="#ca8a04" stroke-width="1" />
+      <text x="15" y="46" font-family="monospace" font-size="9.5" fill="#fde68a">• Capacity: 2 KB (36Kb BRAM)</text>
+      <text x="15" y="60" font-family="monospace" font-size="9.5" fill="#fde68a">• Port A: PS AXI Read/Write</text>
+      <text x="15" y="72" font-family="monospace" font-size="9.5" fill="#fde68a">• Port B: AES Plaintext Read</text>
+
+      <!-- Output BRAM -->
+      <rect x="250" width="235" height="75" rx="6" fill="url(#bramGrad)" stroke="#f59e0b" stroke-width="1.5" />
+      <text x="367" y="20" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11" font-weight="700" fill="#fef3c7">
+        Output True Dual-Port BRAM
+      </text>
+      <line x1="260" y1="28" x2="475" y2="28" stroke="#ca8a04" stroke-width="1" />
+      <text x="260" y="46" font-family="monospace" font-size="9.5" fill="#fde68a">• Capacity: 2 KB (36Kb BRAM)</text>
+      <text x="260" y="60" font-family="monospace" font-size="9.5" fill="#fde68a">• Port A: PS AXI Read/Drain</text>
+      <text x="260" y="72" font-family="monospace" font-size="9.5" fill="#fde68a">• Port B: AES Cipher Write</text>
+    </g>
+
+    <!-- Connectors BRAM to Core -->
+    <path d="M 132,177 L 132,200" stroke="#facc15" stroke-width="2" marker-end="url(#arrGold)" />
+    <path d="M 382,200 L 382,177" stroke="#facc15" stroke-width="2" marker-end="url(#arrGold)" />
+
+    <!-- AES RTL Core Internal FSM -->
+    <g transform="translate(15, 202)">
+      <rect width="485" height="195" rx="8" fill="#082032" stroke="#38bdf8" stroke-width="1.5" />
+      <text x="242" y="22" text-anchor="middle" font-family="system-ui, sans-serif" font-size="12" font-weight="700" fill="#e0f2fe">
+        aes_accel Core Datapath (VHDL-2008 @ 100 MHz)
+      </text>
+      
+      <!-- Subblocks -->
+      <g transform="translate(15, 36)">
+        <rect width="220" height="72" rx="5" fill="#0f172a" stroke="#0284c7" stroke-width="1" />
+        <text x="110" y="18" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10.5" font-weight="700" fill="#bae6fd">
+          10-Round Key Expander
+        </text>
+        <text x="15" y="36" font-family="monospace" font-size="9" fill="#7dd3fc">• Sequential 10-Cycle FSM</text>
+        <text x="15" y="50" font-family="monospace" font-size="9" fill="#7dd3fc">• Round Keys Array [0..10]</text>
+        <text x="15" y="64" font-family="monospace" font-size="9" fill="#7dd3fc">• Closes Timing (WNS &gt; 0)</text>
+
+        <rect x="235" width="220" height="72" rx="5" fill="#0f172a" stroke="#0284c7" stroke-width="1" />
+        <text x="345" y="18" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10.5" font-weight="700" fill="#bae6fd">
+          Transformation Pipeline
+        </text>
+        <text x="245" y="36" font-family="monospace" font-size="9" fill="#7dd3fc">• FIPS-197 S-Box ROM (256B)</text>
+        <text x="245" y="50" font-family="monospace" font-size="9" fill="#7dd3fc">• SubBytes &amp; ShiftRows</text>
+        <text x="245" y="64" font-family="monospace" font-size="9" fill="#7dd3fc">• MixColumns via xtime()</text>
+      </g>
+
+      <!-- Keystream & XOR Engine -->
+      <g transform="translate(15, 116)">
+        <rect width="455" height="68" rx="5" fill="#0f172a" stroke="#0284c7" stroke-width="1" />
+        <text x="227" y="19" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10.5" font-weight="700" fill="#bae6fd">
+          NIST SP 800-38A CTR Keystream Engine
+        </text>
+        <text x="20" y="38" font-family="monospace" font-size="9" fill="#7dd3fc">
+          • State: E_K(IV [95:0] || 32-bit Counter) ── Multi-word Keystream Buffer (128 bits)
+        </text>
+        <text x="20" y="54" font-family="monospace" font-size="9" fill="#7dd3fc">
+          • On-the-Fly XOR with Plaintext from BRAM Port B ── Output BRAM Write
+        </text>
+      </g>
+    </g>
+
+    <!-- AXI4-Lite CSRs & HW Cycle Counter Block -->
+    <g transform="translate(15, 407)">
+      <rect width="485" height="65" rx="6" fill="#0f172a" stroke="#64748b" stroke-width="1" />
+      <text x="15" y="20" font-family="system-ui, sans-serif" font-size="10.5" font-weight="700" fill="#94a3b8">
+        AXI4-Lite Control &amp; Key Registers
+      </text>
+      
+      <rect x="15" y="28" width="95" height="26" rx="4" fill="#1e293b" />
+      <text x="62" y="45" text-anchor="middle" font-family="monospace" font-size="9" fill="#38bdf8">0x00 CTRL/STAT</text>
+
+      <rect x="117" y="28" width="105" height="26" rx="4" fill="#1e293b" />
+      <text x="169" y="45" text-anchor="middle" font-family="monospace" font-size="9" fill="#38bdf8">0x14 KEY_0..3</text>
+
+      <rect x="229" y="28" width="105" height="26" rx="4" fill="#1e293b" />
+      <text x="281" y="45" text-anchor="middle" font-family="monospace" font-size="9" fill="#38bdf8">0x24 IV_0..2/CTR</text>
+
+      <!-- 32-bit HW Cycle Counter Highlight -->
+      <rect x="341" y="28" width="130" height="26" rx="4" fill="#0c4a6e" stroke="#facc15" stroke-width="1.2" />
+      <text x="406" y="45" text-anchor="middle" font-family="monospace" font-size="9" font-weight="700" fill="#facc15">0x10 CYCLES (32b)</text>
+    </g>
+  </g>
+</svg>

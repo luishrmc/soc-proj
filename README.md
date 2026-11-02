@@ -1,125 +1,316 @@
-# Acceleration of Compression and Encryption on Zynq-7010 (Digilent Cora Z7-10)
+# Heterogeneous SoC Telemetry Acceleration (Cora Z7 + ESP32)
 
-This repository contains the hardware (VHDL RTL on Artix-7 PL), firmware (bare-metal C/C++ on ARM Cortex-A9 PS), and verification infrastructure for evaluating hardware acceleration of data compression (RLE, LZ4) and encryption (AES-CTR, ChaCha20) on the Xilinx Zynq-7010 SoC.
-
----
-
-## 1. Project Overview
-
-Edge telemetry systems frequently ingest high-rate sensor streams that require compression and encryption before wireless transmission. Executing both routines sequentially in software introduces latency and saturates the CPU.
-
-This project implements, characterizes, and compares three operating scenarios on the Digilent Cora Z7-10:
-1. **Scenario 1: PS Pure (Software Only)**
-   The ARM Cortex-A9 receives SPI telemetry, buffers raw blocks in DDR3, compresses via software routines, encrypts the payload, and outputs ciphertext.
-2. **Scenario 2: PL Pure (Hardware Pipeline)**
-   A dedicated VHDL pipeline in the Artix-7 fabric ingests SPI data at up to 25 MHz, streams bytes through hardware compression (RLE/LZ4), pipes blocks into the hardware cryptographic engine (AES-CTR/ChaCha20), and buffers output without CPU involvement.
-3. **Scenario 3: Hybrid Co-Design (PS Control + PL Acceleration)**
-   The ARM Cortex-A9 manages transfer descriptors and memory buffers, dispatching raw blocks to FPGA hardware accelerators over an AXI4 interconnect.
-
-### Algorithms Evaluated
-- **Compression**: Run-Length Encoding (RLE) and simplified LZ4/LZSS with sliding window.
-- **Encryption**: AES-128 in Counter Mode (AES-CTR) and ChaCha20 stream cipher (ARX).
-- **Test Payloads**: Injected via SPI from an ESP32 micro-controller across 3 entropy profiles (High Redundancy, Pseudo-Random, Telemetry) in block sizes from 64 Bytes to 64 Kilobytes.
+[![Target: Zynq-7000](https://img.shields.io/badge/Target-Xilinx_Zynq--7000_(XC7Z010)-red.svg)](#)
+[![Toolchain: Vivado & Vitis 2026.1](https://img.shields.io/badge/Toolchain-Vivado_%26_Vitis_2026.1-blue.svg)](#)
+[![HDL: VHDL-2008](https://img.shields.io/badge/HDL-VHDL--2008-purple.svg)](#)
+[![Simulation: VUnit + GHDL](https://img.shields.io/badge/Simulation-VUnit_%2B_GHDL-darkgreen.svg)](#)
+[![License: Academic](https://img.shields.io/badge/License-Academic_(UFMG_DELT)-yellow.svg)](#)
 
 ---
 
-## 2. Repository Layout
+### Executive Summary & Problem Statement
+
+Distributed Internet of Things (IoT) edge nodes and industrial telemetry gateways continuously ingest dense telemetry streams (sensor readings, timestamps, environmental matrices, and diagnostics). Transmitting this raw telemetry directly over bandwidth-constrained or metered wireless networks (e.g., Cellular LTE-M/NB-IoT, Satellite, LoRaWAN, Wi-Fi) introduces severe performance and financial penalties:
+1. **Bandwidth Saturation & Uplink Costs:** High data volume increases radio transmission duty cycle, inflating operational power consumption and recurrent data fees.
+2. **Data Confidentiality & Spoofing Risks:** Telemetry traversing untrusted transit networks requires authenticated symmetric encryption to safeguard industrial assets.
+
+#### The Fundamental Pipeline Invariant: Compress-then-Encrypt
+
+Modern cryptographic block and stream ciphers (such as AES-CTR) produce ciphertext indistinguishable from a pseudorandom sequence, exhibiting near-maximal Shannon entropy ($H(X) \approx 8$ bits/byte). Standard dictionary compression algorithms rely on discovering recurrent byte patterns and statistical redundancy; therefore, **encrypted data cannot be compressed** (compression ratio drops to $0\%$, or inflates size due to metadata overhead).
+
+Consequently, the telemetry processing pipeline must strictly execute **Compress-then-Encrypt**:
+
+$$\text{Raw Telemetry Frame} \xrightarrow[\text{Redundancy Reduction}]{\text{LZSS / Heatshrink}} \text{Compressed Stream} \xrightarrow[\text{Confidentiality}]{\text{AES-128-CTR}} \text{Ciphertext Frame}$$
+
+#### Engineering Motivation & The Heterogeneous SoC Advantage
+
+Executing sequential dictionary compression followed by cryptographic encryption purely on embedded CPUs creates significant computational overhead, elevating latency and depleting CPU cycles needed for real-time control. This project investigates and characterizes hardware acceleration on a heterogeneous System-on-Chip (**AMD Xilinx Zynq-7010 on the Digilent Cora Z7**), offloading compute-intensive kernels to dedicated Artix-7 FPGA coprocessors while retaining flexible software supervision on the dual-core ARM Cortex-A9.
+
+---
+
+## 1. System Architecture & Topology
+
+The platform integrates two physical hardware subsystems: an external **ESP32-WROOM** test harness acting as an autonomous SPI master, and the **Digilent Cora Z7-10** development board housing the Zynq-7000 SoC.
+
+![System Topology](utils/imgs/system_topology.svg)
+
+### 1.1 Hardware Partitioning & Responsibilities
+
+The system is partitioned into three distinct execution domains:
+
+```
++─────────────────────────────────────────────────────────────────────────────+
+|                               SYSTEM DOMAINS                                |
+|                                                                             |
+|  +--------------------+                     +----------------------------+  |
+|  |    ESP32-WROOM     |                     |       CORA Z7 (ZYNQ-7000)  |  |
+|  |                    |                     |                            |  |
+|  | [Synthetic Telem]  |                     |  +----------------------+  |  |
+|  | [SPI Master Feed]  | ─── SPI (EMIO) ───> |  |  ARM Cortex-A9 PS    |  |  |
+|  | [Console Reporter] | <── Status/Data ─── |  |  (Bare-Metal Driver) |  |  |
+|  +--------------------+                     |  +----------┬-----------+  |  |
+|           ▲                                 |             │ AXI GP0 Bus  |  |
+|           │ Hardware Trigger Pulse          |  +----------▼-----------+  |  |
+|           └──────────────────────────────── |  |  Artix-7 FPGA PL     |  |  |
+|                  (PMOD JA1 -> GPIO 32)      |  |  [LZSS]     [AES-CTR]|  |  |
+|                                             |  +----------------------+  |  |
+|                                             +----------------------------+  |
++─────────────────────────────────────────────────────────────────────────────+
+```
+
+#### A. ESP32-WROOM (Autonomous Test Harness & Data Injector)
+* **Isolated Environment:** Operates independently of external cloud or Wi-Fi networks to ensure repeatable, deterministic benchmark timings.
+* **Telemetry Storage:** Holds pre-generated synthetic telemetry frames (fixed sizes: 256 B, 512 B, 1024 B) structured with realistic floating-point physical quantities, UNIX timestamps, station tags, and status words.
+* **SPI Master:** Feeds frames to the Cora Z7 over SPI Mode 0 (up to 25 MHz) upon receiving an autonomous trigger pulse from the Cora Z7 PS.
+* **Egress Verification:** Reads back ciphertext packets, compression ratios, and cycle counts, logging performance reports to a host terminal over UART.
+
+#### B. Processing System (PS: Dual ARM Cortex-A9 @ 667 MHz)
+* **SPI Ingress / Egress:** Receives external frames via the native Zynq `SPI1` controller routed through EMIO to dedicated physical board headers.
+* **Software Baseline Execution:** Runs standalone C11 reference implementations of LZSS/Heatshrink and AES-128-CTR to measure CPU-bound baseline performance.
+* **Memory Staging & Offload Supervisor:** Manages frame handoffs between DDR3 staging buffers and PL coprocessors via fast memory copies over the 32-bit `M_AXI_GP0` bus, completely bypassing brittle DMA scatter-gather engines.
+* **Cycle-Accurate Benchmarking:** Measures CPU cycles using the ARM Performance Monitor Unit (PMU / CP15 `PMCCNTR`) and polls PL hardware cycle registers.
+* **Hardware Trigger Output:** Generates an active-low pulse on PMOD JA Pin 1 (Package Pin `Y18`) to initiate bursts from the ESP32 without manual push-buttons.
+
+#### C. Programmable Logic (PL: Artix-7 FPGA Fabric @ 100 MHz)
+* **Decoupled Architecture:** Features two completely independent, non-multiplexed hardware accelerators:
+  1. `lzss_accel`: Sliding-window dictionary compressor.
+  2. `aes_accel`: Iterative 128-bit AES counter-mode encryptor.
+* **Shared BRAM Buffers:** Each core is encapsulated between dedicated True Dual-Port Block RAM buffers (Input BRAM and Output BRAM) driven by standard AXI BRAM Controllers.
+* **Dedicated Hardware Profiling:** Each core integrates a local 32-bit hardware cycle counter that increments strictly while its computing FSM is active and latches upon asserting `DONE`.
+
+---
+
+## 2. Decoupled Hardware Coprocessors (PL)
+
+Dynamic streaming multiplexers (`axis_accel_mux`) and AXI DMA engines have been retired in favor of **Shared Dual-Port Block RAM Coprocessors** ([ADR-017](file:///home/luis/ufmg/soc/proj/utils/memory/decisions.md)). Compression of non-stationary telemetry yields non-deterministic output lengths; streaming AXI DMA S2MM channels hang if the transferred byte count does not match programmed descriptors, leading to CPU bus lockups. Shared True Dual-Port BRAM buffers eliminate this vulnerability entirely.
+
+![BRAM Pipeline Architecture](utils/imgs/bram_pipeline_architecture.svg)
+
+### 2.1 Memory & Register Interface Layout
+
+Data and control movement across the PS-PL boundary follows a strict store-and-forward contract:
+
+```
+       PS Address Space (ARM CPU)                    PL Hardware Interface (FPGA Fabric)
+┌──────────────────────────────────────┐        ┌─────────────────────────────────────────┐
+│ AXI BRAM Controller 0 (Base In)      │ ──A──> │ 2 KB True Dual-Port Input BRAM          │
+└──────────────────────────────────────┘        └────────────────────┬────────────────────┘
+                                                                     │ Port B (100 MHz)
+                                                                     ▼
+                                                           [Core Processing FSM]
+                                                                     │
+                                                                     ▼ Port B (100 MHz)
+┌──────────────────────────────────────┐        ┌─────────────────────────────────────────┐
+│ AXI BRAM Controller 1 (Base Out)     │ ──A──> │ 2 KB True Dual-Port Output BRAM         │
+└──────────────────────────────────────┘        └─────────────────────────────────────────┘
+┌──────────────────────────────────────┐        ┌─────────────────────────────────────────┐
+│ AXI4-Lite CSR Slave Interface        │ ─────> │ [CONTROL / STATUS / CYCLES / LENGTHS]   │
+└──────────────────────────────────────┘        └─────────────────────────────────────────┘
+```
+
+1. **Port A (PS Access):** Memory-mapped into the ARM Cortex-A9 address space via standard Xilinx AXI BRAM Controllers. The CPU stages raw frames into Input BRAM and drains processed frames from Output BRAM using high-speed burst `memcpy`.
+2. **Port B (PL Core Access):** Directly wired to the accelerator core in the 100 MHz clock domain (`clk_accel`), providing single-cycle read and write access without bus arbitration contention.
+3. **AXI4-Lite Control:** Dedicated 32-bit memory-mapped registers expose `CONTROL`, `STATUS`, `SRC_LEN`, `DST_LEN`, and `CYCLE_COUNT`.
+
+### 2.2 Core Technical Breakdown
+
+#### Core 1: `lzss_accel` (Sliding-Window Dictionary Compression)
+* **Algorithm:** LZSS compression compatible with the embedded Heatshrink bitstream format.
+* **Sliding Window:** Implements a circular history buffer ($2^W = 256$ bytes, $W=8$) in internal synchronous block RAM.
+* **Match Finder:** 16-byte lookahead buffer ($2^L = 16$ bytes, $L=4$) with a pipelined search FSM. It determines the longest back-reference within the window; matches equal to or exceeding 2 bytes are encoded as back-references `(offset, length)`, while non-matching bytes are emitted as literal tags.
+* **Bitstream Output:** Formats a variable-length bitstream packed into bytes: tag bit `'1'` prefixes an 8-bit literal, while tag bit `'0'` prefixes back-reference tokens.
+* **Hardware Instrumentation:** An internal 32-bit hardware cycle counter increments only while the search/packing FSM is running. Upon reaching the end of the input buffer, `DONE` asserts and the final compressed length is latched into `DST_LEN`.
+
+#### Core 2: `aes_accel` (128-bit Symmetric Cryptographic Coprocessor)
+* **Algorithm:** Advanced Encryption Standard (AES-128) in Counter Mode (CTR) per NIST FIPS-197 and NIST SP 800-38A.
+* **Iterative Datapath:** Features an unrolled round datapath performing SubBytes (via synthesizable FIPS-197 S-Box ROM tables), ShiftRows, MixColumns (using Galois field $\text{GF}(2^8)$ multiplication `xtime`), and AddRoundKey.
+* **Sequential Key Expansion:** To guarantee timing closure at 100 MHz without multi-cycle setup violations, key expansion computes the 10 round keys sequentially over 10 clock cycles upon initialization.
+* **CTR Keystream Generation:** For each 128-bit block, the core encrypts the counter block $T_j = IV \parallel \text{Counter}_j$, producing keystream $O_j = E_K(T_j)$. The keystream is XORed on-the-fly with plaintext bytes fetched from Input BRAM Port B and written directly to Output BRAM Port B.
+* **Hardware Instrumentation:** Cycle counter runs from the moment `START` is pulsed until the final block is encrypted and written to BRAM.
+
+---
+
+## 3. Benchmarking & Evaluation Methodology
+
+To rigorously answer how hardware offloading compares with pure CPU execution, the system implements a **$2 \times 2$ factorial evaluation matrix**:
+
+![Benchmark Matrix Flow](utils/imgs/benchmark_matrix_flow.svg)
+
+### 3.1 The 4 Benchmark Configurations
+
+Every incoming telemetry frame is processed through four distinct operational scenarios:
+
+| Case | Name | Compression Stage | Encryption Stage | Data Movement |
+| :---: | :--- | :--- | :--- | :--- |
+| **Case 1** | **Pure Software Baseline** | Cortex-A9 SW Heatshrink | Cortex-A9 SW AES-CTR | Pure DDR3 memory buffers |
+| **Case 2** | **Compression Offload** | PL `lzss_accel` (100 MHz) | Cortex-A9 SW AES-CTR | DDR $\to$ LZSS In BRAM $\to$ Out BRAM $\to$ DDR |
+| **Case 3** | **Encryption Offload** | Cortex-A9 SW Heatshrink | PL `aes_accel` (100 MHz) | DDR $\to$ AES In BRAM $\to$ Out BRAM $\to$ DDR |
+| **Case 4** | **Full Hardware Offload** | PL `lzss_accel` (100 MHz) | PL `aes_accel` (100 MHz) | DDR $\to$ LZSS BRAM $\to$ AES BRAM $\to$ DDR |
+
+### 3.2 Evaluation Metrics & Instrumentation Rigor
+
+* **ARM PMU Cycles (`PMCCNTR`):** Reads the Cortex-A9 Performance Monitor Unit cycle counter via CP15 register `c9` with calibrated execution overhead subtracted.
+* **Hardware Compute Cycles (`CYCLE_COUNT`):** Dedicated 32-bit hardware registers in PL cores measure exact algorithmic computation latency isolated from AXI bus contention and software interrupt jitter.
+* **Effective Throughput:** Calculated over frame payload length:
+  $$\text{Throughput (MB/s)} = \frac{\text{Payload Size (Bytes)}}{\text{Total Execution Latency } (\mu s)}$$
+* **Compression Ratio:** Quantifies redundancy reduction:
+  $$\text{CR} = \left( 1 - \frac{\text{Compressed Size}}{\text{Raw Size}} \right) \times 100\%$$
+* **Resource Utilization:** FPGA slice logic (LUTs, FFs), DSP48 slices, and 36 Kb Block RAMs extracted directly from post-implementation Vivado reports.
+
+---
+
+## 4. Repository Structure & Hardware Pin Mapping
+
+The repository adheres to a clean, decoupled layout separating synthesizable RTL, bare-metal firmware, verification harnesses, and project governance:
 
 ```
 .
-├── .agents/                    # Autonomous agent framework (skills, hooks, manifest)
 ├── cora7z/
 │   └── app/
-│       ├── hw/                 # Hardware RTL, testbenches, Vivado scripts
+│       ├── hw/                 # Hardware RTL & Vivado flow
 │       │   ├── src/            # Synthesizable VHDL-2008 sources & INTERFACES.md
-│       │   ├── test/           # VUnit self-checking testbenches (tb_*.vhdl)
-│       │   ├── scripts/        # Non-interactive Vivado Tcl automation scripts
-│       │   ├── utils/          # Cora Z7-10 XDC physical pin constraints
-│       │   ├── waves/          # GTKWave visualization configurations
-│       │   ├── Makefile        # Simulation harness (make test, make view)
-│       │   └── run.py          # VUnit entry point
-│       ├── sw/                 # Software & firmware (Vitis 2026.1 unified flow)
-│       │   ├── src/            # Bare-metal C sources (RLE, LZ4, AES, ChaCha, PMU)
-│       │   └── scripts/        # Python automation scripts for Vitis CLI
-│       └── test_results/       # Experimental measurement summaries & plots
-├── docs/                       # Datasheets, schematics, diagrams, final report
-│   ├── cora7z/                 # Cora Z7 Reference Manual, UG585, Schematic
-│   ├── diagrams/               # System architecture block diagrams (.png/.jpg)
-│   └── report/                 # Course final technical report (.pdf)
-├── esp32/                      # ESP32 synthetic data injector firmware
-├── utils/
-│   ├── memory/                 # Technical memory between task iterations
-│   │   ├── INDEX.md            # Entry point for active modules and handoffs
-│   │   ├── modules/            # Per-core digests and source SHA-256 hashes
-│   │   ├── handoff/            # Inter-iteration task status
-│   │   ├── decisions.md        # Architecture Decision Records (ADR)
-│   │   └── lessons.md          # Tool quirks and solutions
-│   ├── plan/                   # Course deliverable project management
-│   │   ├── Cronograma_e_Tarefas.csv # Schedule and task status
-│   │   ├── Matriz_de_Testes_e_Métricas.csv # 12-row benchmark test matrix
-│   │   ├── Checklist_de_Entregaveis.csv # Deliverable compliance checklist
-│   │   ├── Riscos_e_Bloqueios.csv # Risk management log
-│   │   └── STATUS.md           # Generated status report
-│   └── TEMA.md                 # Detailed project requirements and specification
-├── GEMINI.md                   # Workspace operating rules and invariants
-├── Makefile                    # Top-level entry points
-└── requirements.txt            # Python dependencies (vunit-hdl)
+│       │   │   ├── aes_ctr_engine.vhdl
+│       │   │   └── INTERFACES.md
+│       │   ├── test/           # Self-checking VUnit testbenches (tb_*.vhdl)
+│       │   ├── scripts/        # Non-interactive Vivado Tcl automation
+│       │   │   ├── build_bitstream.tcl
+│       │   │   ├── configure_block_design.tcl
+│       │   │   └── run_vivado.sh
+│       │   ├── utils/          # Pin and timing constraints (DO NOT HARDCODE)
+│       │   │   ├── cora_z7_pins.json   # Machine-readable pin definitions
+│       │   │   └── cora_z7_io.xdc     # Physical XDC constraints
+│       │   ├── Makefile        # VUnit simulation harness entry point
+│       │   └── run.py          # VUnit Python test runner
+│       └── sw/                 # Software & bare-metal firmware (Vitis unified flow)
+│           ├── src/            # C11 bare-metal source files
+│           │   ├── main.c              # Baseline boot, PMU calibration & SPI loop
+│           │   ├── aes_ctr.c/.h        # NIST SP 800-38A reference model
+│           │   ├── axi_spi_receiver.c  # SPI slave driver & CRC-16 parser
+│           │   └── axi_io.h            # Low-level MMIO access macros
+│           └── scripts/        # Vitis 2026.1 Unified Python CLI scripts
+│               ├── build_sw.py         # Automated platform, BSP, and ELF compilation
+│               └── launch_app.py       # Automated XSDB bitstream programming & run
+├── esp32/                      # ESP32 SPI test harness (ESP-IDF v6.1)
+│   ├── main/main.c             # SPI master payload sender & reporter
+│   └── CMakeLists.txt
+├── docs/                       # Architectural documentation & academic report
+│   ├── AES_CTR_ALGORITHM.md
+│   └── SYSTEM_ARCHITECTURE.md
+└── utils/                      # Governance, project plan, and vector assets
+    ├── imgs/                   # Responsive SVG system architecture diagrams
+    │   ├── system_topology.svg
+    │   ├── bram_pipeline_architecture.svg
+    │   └── benchmark_matrix_flow.svg
+    ├── memory/                 # Technical memory, ADR log, and lessons learned
+    │   ├── INDEX.md
+    │   ├── decisions.md        # Append-only Architectural Decision Records
+    │   └── lessons.md          # Toolchain quirks and operational rules
+    └── plan/                   # DELT UFMG project management CSVs
+        ├── Cronograma_e_Tarefas.csv
+        ├── Matriz_de_Testes_e_Métricas.csv
+        ├── Checklist_de_Entregaveis.csv
+        ├── Riscos_e_Bloqueios.csv
+        └── STATUS.md           # Automated progress summary
 ```
 
----
+### 4.1 Dynamic Pin Mapping Policy
 
-## 3. Toolchain & Setup Requirements
+To maintain portability and avoid board routing faults, **pin numbers, base addresses, and clock frequencies are never hardcoded in documentation or source files**. All hardware connections are dynamically verified against:
+* [`cora7z/app/hw/utils/cora_z7_pins.json`](file:///home/luis/ufmg/soc/proj/cora7z/app/hw/utils/cora_z7_pins.json)
+* [`cora7z/app/hw/utils/cora_z7_io.xdc`](file:///home/luis/ufmg/soc/proj/cora7z/app/hw/utils/cora_z7_io.xdc)
 
-The project uses Ubuntu Linux with:
-- **Xilinx Vivado & Vitis 2026.1**: Installed at `$HOME/Xilinx/2026.1` (loaded via `.agents/env.sh`).
-- **GHDL 7.0.0-dev**: Open-source VHDL simulator for unit tests.
-- **Python 3**: With `vunit-hdl` installed in a local `.venv`.
-- **GTKWave**: Waveform viewer.
-
-### Quick Start: Simulation Flow
-
-1. Set up the Python virtual environment:
-   ```bash
-   make -C cora7z/app/hw venv
-   ```
-
-2. Run the unit test suite:
-   ```bash
-   make -C cora7z/app/hw test
-   ```
-
-3. Run filtered simulation (e.g. for `smoke_counter`):
-   ```bash
-   make -C cora7z/app/hw test TB=smoke_counter
-   ```
-
-4. Open simulation waveforms in GTKWave:
-   ```bash
-   make -C cora7z/app/hw view TB=smoke_counter
-   ```
+| Signal Name | Cora Z7 FPGA Pin | Header / Pin | Standard | Direction | Description |
+| :--- | :---: | :---: | :---: | :---: | :--- |
+| `spi_sck_i`  | `H15` | Header J7 Pin 3 | LVCMOS33 | Input  | SPI serial clock from ESP32 (up to 25 MHz) |
+| `spi_mosi_i` | `T12` | Header J7 Pin 4 | LVCMOS33 | Input  | Master-Out Slave-In serial telemetry |
+| `spi_miso_o` | `W15` | Header J7 Pin 1 | LVCMOS33 | Output | Master-In Slave-Out ciphertext and metrics |
+| `spi_ss_i`   | `F16` | Header J7 Pin 5 | LVCMOS33 | Input  | Active-low chip select with internal pull-up |
+| `esp32_trigger_o` | `Y18` | PMOD JA Pin 1 | LVCMOS33 | Output | Autonomous active-low burst trigger from PS EMIO GPIO |
+| `GND`        | `GND` | Header J7 Pin 6 | -        | Ground | Common ground reference |
 
 ---
 
-## 4. Hardware Verification & Build Flow
+## 5. Build & Quick Start Guide
 
-To run the static linting and simulation verification gates:
+### 5.1 Toolchain Prerequisites
+
+Ensure the following development environments are installed and configured:
+* **Host OS:** Ubuntu Linux 22.04 LTS / 24.04 LTS
+* **FPGA & Embedded Tools:** AMD Xilinx Vivado & Vitis 2026.1 (loaded via `.agents/env.sh`)
+* **Simulation Tools:** GHDL 4.1+ and Python 3.10+ (VUnit framework)
+* **Microcontroller Toolchain:** Espressif ESP-IDF v6.1+
+
+Load the environment variables before invoking any build tools:
 ```bash
 source .agents/env.sh
-TASK_ID=2.1 bash .agents/hooks/vhdl-lint.sh
-TASK_ID=2.1 bash .agents/hooks/vhdl-sim-gate.sh
-```
-
-To run Vivado implementation and hardware export in batch mode:
-```bash
-TASK_ID=3.5 bash .agents/hooks/vivado-gate.sh
 ```
 
 ---
 
-## 5. Course Deliverables Compliance
+### 5.2 Verification & Simulation (VUnit + GHDL)
 
-This repository conforms to the requirements defined in `utils/Projeto Final.pdf` and tracked in `utils/plan/Checklist_de_Entregaveis.csv`:
-- Synthesizable VHDL-2008 sources (`.vhdl`) with VUnit testbenches.
-- Bare-metal C/C++ firmware with ARM PMU cycle instrumentation.
-- System block diagrams and technical documentation.
-- Measured experimental metrics across all 12 combinations of the evaluation matrix.
+The repository provides a fast, self-checking VUnit test harness for hardware RTL verification:
+
+```bash
+# 1. Create Python virtual environment and install VUnit
+make -C cora7z/app/hw venv
+
+# 2. Run all active testbenches (AES-128-CTR golden vectors)
+make -C cora7z/app/hw test
+
+# 3. View simulation waveforms in GTKWave
+make -C cora7z/app/hw view TB=aes
+```
+
+---
+
+### 5.3 Hardware Synthesis & Bitstream Generation (Vivado Batch)
+
+Synthesize the design, implement logic, close timing at 100 MHz, and generate the hardware container `.xsa`:
+
+```bash
+# Non-interactive bitstream build and platform export
+bash cora7z/app/hw/scripts/run_vivado.sh cora7z/app/hw/scripts/build_bitstream.tcl
+```
+*Output container generated:* `cora7z/app/hw/vivado/cora7z_top.xsa` (bundled with `cora7z_top.bit`).
+
+---
+
+### 5.4 Bare-Metal Firmware Compilation (Vitis Unified CLI)
+
+Compile the standalone Board Support Package (BSP) and ARM Cortex-A9 firmware using the Vitis Python API:
+
+```bash
+# Build platform component, generate xparameters.h, and compile cora7z_firmware.elf
+vitis -s cora7z/app/sw/scripts/build_sw.py
+```
+*Output binary generated:* `cora7z/app/sw/vitis/cora7z_firmware/build/cora7z_firmware.elf`.
+
+---
+
+### 5.5 Target Execution on Cora Z7 Hardware
+
+Connect the Digilent Cora Z7 board via Micro-USB and program both the bitstream and application binary over JTAG via XSDB:
+
+```bash
+# Programs bitstream, executes FSBL to initialize DDR/clocks, and launches firmware
+vitis -s cora7z/app/sw/scripts/launch_app.py
+```
+
+Open a serial terminal to observe the Cortex-A9 UART output:
+```bash
+picocom -b 115200 /dev/ttyUSB1
+```
+
+---
+
+### 5.6 ESP32 Test Harness Setup
+
+Connect the ESP32 board to the Cora Z7 board according to the pinout table in Section 4.1. Flash and run the injector:
+
+```bash
+cd esp32
+idf.py set-target esp32
+idf.py build
+idf.py -p /dev/ttyUSB0 flash monitor
+```

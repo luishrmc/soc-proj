@@ -1,13 +1,13 @@
-Cenário,Algoritmo / Cifra,Tamanho do Bloco,Perfil de Dados,Latência (ms),Ciclos ARM PMU,Vazão (MB/s),Recursos FPGA (LUTs/FFs/BRAMs)
-PS puro,RLE,64 B,Alta redundância,,,,N/A
-PS puro,LZ4,1 KB,Pseudoaleatório,,,,N/A
-PS puro,AES-CTR,64 KB,Telemetria,,,,N/A
-PL pura,RLE,64 B,Alta redundância,,,,
-PL pura,LZ4,1 KB,Pseudoaleatório,,,,
-PL pura,AES-CTR,64 KB,Telemetria,,,,
-Híbrido,RLE,64 B,Alta redundância,,,,
-Híbrido,LZ4,1 KB,Pseudoaleatório,,,,
-Híbrido,AES-CTR,64 KB,Telemetria,,,,
-Híbrido,ChaCha20,64 KB,Telemetria,,,,
-PL pura,ChaCha20,1 KB,Pseudoaleatório,,,,
-PS puro,ChaCha20,64 B,Alta redundância,,,,N/A
+Cenário,Configuração do Pipeline,Tamanho do Bloco,Perfil de Dados,Latência (ms),Ciclos ARM PMU,Ciclos PL HW,Razão de Compressão (%),Vazão (MB/s),Recursos FPGA (LUTs/FFs/BRAMs)
+Cenário 1: SW Puro,SW LZSS + SW AES-CTR,256 B,Telemetria IoT,,,,,,N/A
+Cenário 1: SW Puro,SW LZSS + SW AES-CTR,512 B,Telemetria IoT,,,,,,N/A
+Cenário 1: SW Puro,SW LZSS + SW AES-CTR,1024 B,Telemetria IoT,,,,,,N/A
+Cenário 2: Offload Compressão,PL LZSS + SW AES-CTR,256 B,Telemetria IoT,,,,,,
+Cenário 2: Offload Compressão,PL LZSS + SW AES-CTR,512 B,Telemetria IoT,,,,,,
+Cenário 2: Offload Compressão,PL LZSS + SW AES-CTR,1024 B,Telemetria IoT,,,,,,
+Cenário 3: Offload Cifragem,SW LZSS + PL AES-CTR,256 B,Telemetria IoT,,,,,,
+Cenário 3: Offload Cifragem,SW LZSS + PL AES-CTR,512 B,Telemetria IoT,,,,,,
+Cenário 3: Offload Cifragem,SW LZSS + PL AES-CTR,1024 B,Telemetria IoT,,,,,,
+Cenário 4: Aceleração HW Total,PL LZSS + PL AES-CTR,256 B,Telemetria IoT,,,,,,
+Cenário 4: Aceleração HW Total,PL LZSS + PL AES-CTR,512 B,Telemetria IoT,,,,,,
+Cenário 4: Aceleração HW Total,PL LZSS + PL AES-CTR,1024 B,Telemetria IoT,,,,,,

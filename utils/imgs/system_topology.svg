@@ -1,0 +1,290 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1050 560" width="100%" height="100%">
+  <defs>
+    <!-- Gradients -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0b0f19" />
+      <stop offset="100%" stop-color="#111827" />
+    </linearGradient>
+    <linearGradient id="espGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#064e3b" stop-opacity="0.9" />
+      <stop offset="100%" stop-color="#022c22" stop-opacity="0.95" />
+    </linearGradient>
+    <linearGradient id="coraGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1e1b4b" stop-opacity="0.9" />
+      <stop offset="100%" stop-color="#0f172a" stop-opacity="0.95" />
+    </linearGradient>
+    <linearGradient id="psGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0369a1" stop-opacity="0.8" />
+      <stop offset="100%" stop-color="#0c4a6e" stop-opacity="0.9" />
+    </linearGradient>
+    <linearGradient id="plGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#6b21a8" stop-opacity="0.8" />
+      <stop offset="100%" stop-color="#4c1d95" stop-opacity="0.9" />
+    </linearGradient>
+    <linearGradient id="coreGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3b0764" />
+      <stop offset="100%" stop-color="#1e1b4b" />
+    </linearGradient>
+
+    <!-- Filters for Glow & Shadow -->
+    <filter id="cardShadow" x="-5%" y="-5%" width="110%" height="115%">
+      <feDropShadow dx="0" dy="6" stdDeviation="8" flood-color="#000000" flood-opacity="0.6"/>
+    </filter>
+    <filter id="neonGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="3" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+
+    <!-- Marker Arrowheads -->
+    <marker id="arrCyan" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+      <path d="M1,1 L7,4 L1,7 Z" fill="#38bdf8" />
+    </marker>
+    <marker id="arrAmber" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+      <path d="M1,1 L7,4 L1,7 Z" fill="#fbbf24" />
+    </marker>
+    <marker id="arrGreen" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+      <path d="M1,1 L7,4 L1,7 Z" fill="#34d399" />
+    </marker>
+  </defs>
+
+  <!-- Background Canvas -->
+  <rect width="1050" height="560" rx="16" fill="url(#bgGrad)" stroke="#1e293b" stroke-width="2" />
+  
+  <!-- Subtle Grid Pattern -->
+  <g opacity="0.06" stroke="#94a3b8" stroke-width="1">
+    <path d="M 0,70 L 1050,70 M 0,140 L 1050,140 M 0,210 L 1050,210 M 0,280 L 1050,280 M 0,350 L 1050,350 M 0,420 L 1050,420 M 0,490 L 1050,490" />
+    <path d="M 70,0 L 70,560 M 140,0 L 140,560 M 210,0 L 210,560 M 280,0 L 280,560 M 350,0 L 350,560 M 420,0 L 420,560 M 490,0 L 490,560 M 560,0 L 560,560 M 630,0 L 630,560 M 700,0 L 700,560 M 770,0 L 770,560 M 840,0 L 840,560 M 910,0 L 910,560 M 980,0 L 980,560" />
+  </g>
+
+  <!-- Title Header -->
+  <text x="525" y="38" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="20" font-weight="700" fill="#f8fafc" letter-spacing="1">
+    HETEROGENEOUS TELEMETRY ACCELERATION SYSTEM TOPOLOGY
+  </text>
+  <text x="525" y="58" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="12" fill="#94a3b8">
+    ESP32-WROOM Injection Harness ── Physical SPI (Mode 0, 25 MHz) ── Digilent Cora Z7 (Zynq-7000 SoC)
+  </text>
+
+  <!-- ========================================================================= -->
+  <!-- LEFT: ESP32-WROOM BOARD                                                   -->
+  <!-- ========================================================================= -->
+  <g transform="translate(40, 80)">
+    <!-- Main Board Box -->
+    <rect width="250" height="430" rx="12" fill="url(#espGrad)" stroke="#10b981" stroke-width="2" filter="url(#cardShadow)" />
+    
+    <!-- Badge -->
+    <rect x="20" y="20" width="210" height="32" rx="6" fill="#065f46" stroke="#34d399" stroke-width="1"/>
+    <text x="125" y="41" text-anchor="middle" font-family="system-ui, sans-serif" font-size="13" font-weight="700" fill="#ecfdf5">
+      ESP32-WROOM (Master)
+    </text>
+
+    <!-- Sub-blocks inside ESP32 -->
+    <!-- Flash Storage -->
+    <rect x="20" y="70" width="210" height="75" rx="8" fill="#022c22" stroke="#059669" stroke-width="1.5" />
+    <text x="35" y="94" font-family="system-ui, sans-serif" font-size="12" font-weight="700" fill="#6ee7b7">
+      Synthetic Telemetry Payloads
+    </text>
+    <text x="35" y="114" font-family="monospace" font-size="10.5" fill="#a7f3d0">
+      • Profile: Industrial Sensors
+    </text>
+    <text x="35" y="130" font-family="monospace" font-size="10.5" fill="#a7f3d0">
+      • Frames: 256 B, 512 B, 1 KB
+    </text>
+
+    <!-- SPI Master Module -->
+    <rect x="20" y="160" width="210" height="85" rx="8" fill="#022c22" stroke="#059669" stroke-width="1.5" />
+    <text x="35" y="184" font-family="system-ui, sans-serif" font-size="12" font-weight="700" fill="#6ee7b7">
+      Hardware SPI Master
+    </text>
+    <text x="35" y="204" font-family="monospace" font-size="10.5" fill="#a7f3d0">
+      • SPI Mode 0 (CPOL=0, CPHA=0)
+    </text>
+    <text x="35" y="220" font-family="monospace" font-size="10.5" fill="#a7f3d0">
+      • SCK Freq: Up to 25 MHz
+    </text>
+    <text x="35" y="235" font-family="monospace" font-size="10.5" fill="#a7f3d0">
+      • Protocol: Pre (2B) + CRC-16
+    </text>
+
+    <!-- Autonomous Trigger Receiver -->
+    <rect x="20" y="260" width="210" height="65" rx="8" fill="#022c22" stroke="#059669" stroke-width="1.5" />
+    <text x="35" y="284" font-family="system-ui, sans-serif" font-size="12" font-weight="700" fill="#6ee7b7">
+      Hardware Trigger Input
+    </text>
+    <text x="35" y="304" font-family="monospace" font-size="10.5" fill="#a7f3d0">
+      • GPIO 32 (Active-Low Interrupt)
+    </text>
+    <text x="35" y="318" font-family="monospace" font-size="10.5" fill="#a7f3d0">
+      • Autonomous Burst Trigger
+    </text>
+
+    <!-- Console Logging -->
+    <rect x="20" y="340" width="210" height="60" rx="8" fill="#022c22" stroke="#059669" stroke-width="1.5" />
+    <text x="35" y="364" font-family="system-ui, sans-serif" font-size="12" font-weight="700" fill="#6ee7b7">
+      UART Console Logger
+    </text>
+    <text x="35" y="384" font-family="monospace" font-size="10.5" fill="#a7f3d0">
+      • 115200 bps to Host PC
+    </text>
+  </g>
+
+  <!-- ========================================================================= -->
+  <!-- CENTER: PHYSICAL INTERCONNECT BUS (PMOD JA & HEADER J7)                   -->
+  <!-- ========================================================================= -->
+  <g transform="translate(305, 110)">
+    <!-- Outer Shield Box -->
+    <rect width="190" height="370" rx="10" fill="#0f172a" stroke="#334155" stroke-dasharray="4,4" stroke-width="1.5" />
+    <text x="95" y="26" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11" font-weight="700" fill="#94a3b8" letter-spacing="0.5">
+      PHYSICAL HEADER LINK
+    </text>
+    <text x="95" y="42" text-anchor="middle" font-family="system-ui, sans-serif" font-size="9.5" fill="#64748b">
+      (Direct 3.3V LVCMOS Wires)
+    </text>
+
+    <!-- Wires / Buses -->
+    <!-- MOSI -->
+    <g transform="translate(0, 70)">
+      <line x1="-15" y1="0" x2="205" y2="0" stroke="#38bdf8" stroke-width="2" marker-end="url(#arrCyan)" />
+      <rect x="35" y="-12" width="120" height="24" rx="4" fill="#0b0f19" stroke="#0284c7" stroke-width="1" />
+      <text x="95" y="4" text-anchor="middle" font-family="monospace" font-size="10" font-weight="700" fill="#38bdf8">MOSI (J7.4 / T12)</text>
+    </g>
+
+    <!-- MISO -->
+    <g transform="translate(0, 120)">
+      <line x1="205" y1="0" x2="-15" y2="0" stroke="#34d399" stroke-width="2" marker-end="url(#arrGreen)" />
+      <rect x="35" y="-12" width="120" height="24" rx="4" fill="#0b0f19" stroke="#059669" stroke-width="1" />
+      <text x="95" y="4" text-anchor="middle" font-family="monospace" font-size="10" font-weight="700" fill="#34d399">MISO (J7.1 / W15)</text>
+    </g>
+
+    <!-- SCK -->
+    <g transform="translate(0, 170)">
+      <line x1="-15" y1="0" x2="205" y2="0" stroke="#38bdf8" stroke-width="2" marker-end="url(#arrCyan)" />
+      <rect x="35" y="-12" width="120" height="24" rx="4" fill="#0b0f19" stroke="#0284c7" stroke-width="1" />
+      <text x="95" y="4" text-anchor="middle" font-family="monospace" font-size="10" font-weight="700" fill="#38bdf8">SCK (J7.3 / H15)</text>
+    </g>
+
+    <!-- SS / CS_n -->
+    <g transform="translate(0, 220)">
+      <line x1="-15" y1="0" x2="205" y2="0" stroke="#38bdf8" stroke-width="2" marker-end="url(#arrCyan)" />
+      <rect x="35" y="-12" width="120" height="24" rx="4" fill="#0b0f19" stroke="#0284c7" stroke-width="1" />
+      <text x="95" y="4" text-anchor="middle" font-family="monospace" font-size="10" font-weight="700" fill="#38bdf8">SS_n (J7.5 / F16)</text>
+    </g>
+
+    <!-- Autonomous Trigger -->
+    <g transform="translate(0, 280)">
+      <line x1="205" y1="0" x2="-15" y2="0" stroke="#fbbf24" stroke-width="2.5" marker-end="url(#arrAmber)" />
+      <rect x="25" y="-14" width="140" height="28" rx="4" fill="#0b0f19" stroke="#d97706" stroke-width="1.5" />
+      <text x="95" y="4" text-anchor="middle" font-family="monospace" font-size="9.5" font-weight="700" fill="#fbbf24">TRIGGER (JA1 / Y18)</text>
+    </g>
+
+    <!-- Ground Reference -->
+    <g transform="translate(0, 335)">
+      <line x1="-15" y1="0" x2="205" y2="0" stroke="#64748b" stroke-width="1.5" stroke-dasharray="3,3" />
+      <rect x="45" y="-10" width="100" height="20" rx="4" fill="#0b0f19" stroke="#475569" stroke-width="1" />
+      <text x="95" y="4" text-anchor="middle" font-family="monospace" font-size="9.5" fill="#94a3b8">GND (Common)</text>
+    </g>
+  </g>
+
+  <!-- ========================================================================= -->
+  <!-- RIGHT: DIGILENT CORA Z7-10 (ZYNQ-7000 SOC)                                -->
+  <!-- ========================================================================= -->
+  <g transform="translate(510, 80)">
+    <!-- Outer Cora Z7 Board Box -->
+    <rect width="500" height="430" rx="12" fill="url(#coraGrad)" stroke="#6366f1" stroke-width="2" filter="url(#cardShadow)" />
+    
+    <!-- Board Title Badge -->
+    <rect x="20" y="15" width="460" height="30" rx="6" fill="#312e81" stroke="#818cf8" stroke-width="1" />
+    <text x="250" y="35" text-anchor="middle" font-family="system-ui, sans-serif" font-size="13" font-weight="700" fill="#e0e7ff">
+      DIGILENT CORA Z7-10 (XILINX ZYNQ-7010 SoC)
+    </text>
+
+    <!-- PS Sub-System (ARM Cortex-A9) -->
+    <g transform="translate(20, 55)">
+      <rect width="460" height="150" rx="10" fill="url(#psGrad)" stroke="#0284c7" stroke-width="1.5" />
+      <rect x="15" y="10" width="220" height="24" rx="4" fill="#0369a1" />
+      <text x="25" y="26" font-family="system-ui, sans-serif" font-size="11.5" font-weight="700" fill="#f0f9ff">
+        Processing System (PS) @ 667 MHz
+      </text>
+
+      <!-- PS Details Grid -->
+      <g transform="translate(15, 45)">
+        <!-- Cortex-A9 Core -->
+        <rect width="135" height="42" rx="6" fill="#082f49" stroke="#0ea5e9" stroke-width="1" />
+        <text x="67" y="20" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10.5" font-weight="700" fill="#bae6fd">ARM Cortex-A9</text>
+        <text x="67" y="34" text-anchor="middle" font-family="monospace" font-size="9" fill="#7dd3fc">Core 0 (Standalone)</text>
+
+        <!-- ARM PMU -->
+        <rect x="145" width="135" height="42" rx="6" fill="#082f49" stroke="#0ea5e9" stroke-width="1" />
+        <text x="212" y="20" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10.5" font-weight="700" fill="#bae6fd">ARM PMU (CP15)</text>
+        <text x="212" y="34" text-anchor="middle" font-family="monospace" font-size="9" fill="#7dd3fc">PMCCNTR Cycles</text>
+
+        <!-- DDR3 -->
+        <rect x="290" width="140" height="42" rx="6" fill="#082f49" stroke="#0ea5e9" stroke-width="1" />
+        <text x="360" y="20" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10.5" font-weight="700" fill="#bae6fd">512 MB DDR3</text>
+        <text x="360" y="34" text-anchor="middle" font-family="monospace" font-size="9" fill="#7dd3fc">Telemetry Staging</text>
+      </g>
+
+      <!-- Native Peripherals -->
+      <g transform="translate(15, 95)">
+        <rect width="210" height="42" rx="6" fill="#082f49" stroke="#0ea5e9" stroke-width="1" />
+        <text x="105" y="20" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10.5" font-weight="700" fill="#bae6fd">EMIO SPI1 Slave (XSpiPs)</text>
+        <text x="105" y="34" text-anchor="middle" font-family="monospace" font-size="9" fill="#7dd3fc">Dedicated Pmod J7 Ingress</text>
+
+        <rect x="230" width="200" height="42" rx="6" fill="#082f49" stroke="#0ea5e9" stroke-width="1" />
+        <text x="330" y="20" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10.5" font-weight="700" fill="#bae6fd">PS EMIO GPIO Trigger</text>
+        <text x="330" y="34" text-anchor="middle" font-family="monospace" font-size="9" fill="#7dd3fc">PMOD JA1 Pulse Generator</text>
+      </g>
+    </g>
+
+    <!-- AXI Interconnect Bus Bridge -->
+    <g transform="translate(20, 212)">
+      <rect width="460" height="26" rx="4" fill="#1e293b" stroke="#64748b" stroke-width="1" />
+      <text x="230" y="17" text-anchor="middle" font-family="monospace" font-size="10.5" font-weight="700" fill="#cbd5e1">
+        AXI4-Lite &amp; AXI BRAM Interconnect (M_AXI_GP0 @ 100 MHz)
+      </text>
+    </g>
+
+    <!-- PL Sub-System (Artix-7 FPGA Fabric) -->
+    <g transform="translate(20, 245)">
+      <rect width="460" height="170" rx="10" fill="url(#plGrad)" stroke="#9333ea" stroke-width="1.5" />
+      <rect x="15" y="10" width="240" height="24" rx="4" fill="#581c87" />
+      <text x="25" y="26" font-family="system-ui, sans-serif" font-size="11.5" font-weight="700" fill="#faf5ff">
+        Programmable Logic (PL) @ 100 MHz
+      </text>
+
+      <!-- Decoupled Core 1: LZSS -->
+      <g transform="translate(15, 42)">
+        <rect width="205" height="115" rx="8" fill="url(#coreGrad)" stroke="#c084fc" stroke-width="1.5" />
+        <text x="102" y="22" text-anchor="middle" font-family="system-ui, sans-serif" font-size="12" font-weight="700" fill="#f3e8ff">
+          lzss_accel (Core 1)
+        </text>
+        <line x1="15" y1="30" x2="190" y2="30" stroke="#9333ea" stroke-width="1" />
+        <text x="20" y="48" font-family="monospace" font-size="9.5" fill="#e9d5ff">• 2KB In / 2KB Out BRAM</text>
+        <text x="20" y="66" font-family="monospace" font-size="9.5" fill="#e9d5ff">• Sliding Window Match FSM</text>
+        <text x="20" y="84" font-family="monospace" font-size="9.5" fill="#e9d5ff">• Heatshrink-Compat Stream</text>
+        <rect x="15" y="93" width="175" height="16" rx="3" fill="#3b0764" stroke="#a855f7" stroke-width="1" />
+        <text x="102" y="105" text-anchor="middle" font-family="monospace" font-size="8.5" font-weight="700" fill="#facc15">
+          [32-bit HW Cycle Counter]
+        </text>
+      </g>
+
+      <!-- Decoupled Core 2: AES-CTR -->
+      <g transform="translate(240, 42)">
+        <rect width="205" height="115" rx="8" fill="url(#coreGrad)" stroke="#c084fc" stroke-width="1.5" />
+        <text x="102" y="22" text-anchor="middle" font-family="system-ui, sans-serif" font-size="12" font-weight="700" fill="#f3e8ff">
+          aes_accel (Core 2)
+        </text>
+        <line x1="15" y1="30" x2="190" y2="30" stroke="#9333ea" stroke-width="1" />
+        <text x="20" y="48" font-family="monospace" font-size="9.5" fill="#e9d5ff">• 2KB In / 2KB Out BRAM</text>
+        <text x="20" y="66" font-family="monospace" font-size="9.5" fill="#e9d5ff">• 10-Round Iterative AES</text>
+        <text x="20" y="84" font-family="monospace" font-size="9.5" fill="#e9d5ff">• NIST SP 800-38A CTR Core</text>
+        <rect x="15" y="93" width="175" height="16" rx="3" fill="#3b0764" stroke="#a855f7" stroke-width="1" />
+        <text x="102" y="105" text-anchor="middle" font-family="monospace" font-size="8.5" font-weight="700" fill="#facc15">
+          [32-bit HW Cycle Counter]
+        </text>
+      </g>
+    </g>
+  </g>
+</svg>

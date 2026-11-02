@@ -6,20 +6,20 @@
 * Tool Version:  Vitis 2026.1 Unified / ARM GCC 13.x
 * File:          main.c
 * Description:   Bare-metal baseline verification firmware for Cortex-A9.
-*                Performs MMIO sanity checks on memory-mapped AXI peripherals
-*                (DMA, Quad SPI, RLE Engine, LZ4 Engine) and validates cycle-
-*                accurate hardware profiling via the ARM PMU (CP15).
+*                Performs PMU calibration, self-checks reference AES-CTR software
+*                model against NIST SP 800-38A golden vectors, manages autonomous
+*                ESP32 hardware triggering via PMOD JA1, and ingests SPI telemetry.
 ******************************************************************************/
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <string.h>
 #include "xil_printf.h"
 #include "xil_io.h"
 #include "xparameters.h"
 #include "sleep.h"
-#include "benchmark_ps.h"
-#include "pipeline_mgr.h"
 #include "axi_spi_receiver.h"
+#include "aes_ctr.h"
 
 /* ========================================================================= */
 /* PS EMIO GPIO Hardware Trigger for ESP32 Data Injector                     */
@@ -119,79 +119,41 @@ static inline bool is_pl_programmed(void) {
 }
 
 /* ========================================================================= */
-/* Peripheral MMIO Sanity Checks                                             */
+/* Cryptographic Software Baseline Self-Test                                 */
 /* ========================================================================= */
 
-static bool check_peripherals(void) {
-    bool all_ok = true;
-    uint32_t val;
+static bool test_software_aes_ctr(void) {
+    /* NIST SP 800-38A Section F.5.1 Golden Vector (128-bit key) */
+    static const uint8_t key[16] = {
+        0x2b, 0x7e, 0x15, 0x16, 0x28, 0xae, 0xd2, 0xa6,
+        0xab, 0xf7, 0x15, 0x88, 0x09, 0xcf, 0x4f, 0x3c
+    };
+    static const uint8_t iv[16] = {
+        0xf0, 0xf1, 0xf2, 0xf3, 0xf4, 0xf5, 0xf6, 0xf7,
+        0xf8, 0xf9, 0xfa, 0xfb, 0xfc, 0xfd, 0xfe, 0xff
+    };
+    static const uint8_t plaintext[16] = {
+        0x6b, 0xc1, 0xbe, 0xe2, 0x2e, 0x40, 0x9f, 0x96,
+        0xe9, 0x3d, 0x7e, 0x11, 0x73, 0x93, 0x17, 0x2a
+    };
+    static const uint8_t expected_cipher[16] = {
+        0x87, 0x4d, 0x61, 0x91, 0xb6, 0x20, 0xe3, 0x26,
+        0x1b, 0xef, 0x68, 0x64, 0x99, 0xfb, 0x67, 0xc1
+    };
 
-    xil_printf("--- 1. Checking Memory-Mapped Peripheral Registers ---\r\n");
+    uint8_t ciphertext[16];
+    aes128_ctr_ctx_t ctx;
 
-    /* Safety Check: Guard against accessing PL when FPGA is unprogrammed */
-    if (!is_pl_programmed()) {
-        xil_printf("[CRITICAL] FPGA fabric (PL) is NOT programmed (PCFG_DONE = 0)!\r\n");
-        xil_printf("[CRITICAL] Accessing M_AXI_GP0 without a loaded bitstream freezes the ARM bus.\r\n");
-        xil_printf("[ACTION]   Load the bitstream into the FPGA before running the application.\r\n");
+    aes128_ctr_init(&ctx, key, iv);
+    aes128_ctr_crypt(&ctx, plaintext, ciphertext, 16);
+
+    if (memcmp(ciphertext, expected_cipher, 16) == 0) {
+        xil_printf("[TEST] SW AES-128-CTR NIST SP 800-38A Golden Vector: PASS\r\n");
+        return true;
+    } else {
+        xil_printf("[TEST] SW AES-128-CTR NIST SP 800-38A Golden Vector: FAIL\r\n");
         return false;
     }
-
-    /* 1. RLE Compression Engine */
-    val = Xil_In32(ACCEL_BASE_RLE + ACCEL_REG_STATUS);
-    xil_printf("[CHECK] RLE Engine @ 0x%08X -> STATUS = 0x%08X ... ", ACCEL_BASE_RLE, val);
-    if ((val & ACCEL_STAT_BUSY_MASK) == 0U) { /* BUSY should be 0 at idle */
-        xil_printf("PASS (IDLE)\r\n");
-    } else {
-        xil_printf("FAIL (Unexpected BUSY state)\r\n");
-        all_ok = false;
-    }
-
-    /* 2. LZ4 Compression Engine */
-    val = Xil_In32(ACCEL_BASE_LZ4 + ACCEL_REG_STATUS);
-    xil_printf("[CHECK] LZ4 Engine @ 0x%08X -> STATUS = 0x%08X ... ", ACCEL_BASE_LZ4, val);
-    if ((val & ACCEL_STAT_BUSY_MASK) == 0U) { /* BUSY should be 0 at idle */
-        xil_printf("PASS (IDLE)\r\n");
-    } else {
-        xil_printf("FAIL (Unexpected BUSY state)\r\n");
-        all_ok = false;
-    }
-
-    /* 3. AES-CTR Coprocessor */
-    val = Xil_In32(ACCEL_BASE_AES_CTR + ACCEL_REG_STATUS);
-    xil_printf("[CHECK] AES Engine @ 0x%08X -> STATUS = 0x%08X ... ", ACCEL_BASE_AES_CTR, val);
-    if ((val & ACCEL_STAT_BUSY_MASK) == 0U) { /* BUSY should be 0 at idle */
-        xil_printf("PASS (IDLE)\r\n");
-    } else {
-        xil_printf("FAIL (Unexpected BUSY state)\r\n");
-        all_ok = false;
-    }
-
-    /* 4. ChaCha20 Stream Cipher Coprocessor */
-    val = Xil_In32(ACCEL_BASE_CHACHA20 + ACCEL_REG_STATUS);
-    xil_printf("[CHECK] ChaCha Engine @ 0x%08X -> STATUS = 0x%08X ... ", ACCEL_BASE_CHACHA20, val);
-    if ((val & ACCEL_STAT_BUSY_MASK) == 0U) { /* BUSY should be 0 at idle */
-        xil_printf("PASS (IDLE)\r\n");
-    } else {
-        xil_printf("FAIL (Unexpected BUSY state)\r\n");
-        all_ok = false;
-    }
-
-    /* 5. AXI Direct Memory Access (AXI DMA) */
-    val = Xil_In32(AXI_DMA_DEFAULT_BASEADDR + DMA_REG_MM2S_DMACR);
-    xil_printf("[CHECK] AXI DMA    @ 0x%08X -> MM2S_DMACR = 0x%08X ... ", AXI_DMA_DEFAULT_BASEADDR, val);
-    /* In reset state, DMACR bit 0 (RS) is 0 */
-    if ((val & DMA_CR_RS_MASK) == 0U) {
-        xil_printf("PASS (HALTED/READY)\r\n");
-    } else {
-        xil_printf("PASS (RUNNING)\r\n");
-    }
-
-    /* 6. AXI Quad SPI Slave */
-    val = Xil_In32(AXI_SPI_DEFAULT_BASEADDR + SPI_REG_SPISR);
-    xil_printf("[CHECK] AXI SPI    @ 0x%08X -> STATUS     = 0x%08X ... ", AXI_SPI_DEFAULT_BASEADDR, val);
-    xil_printf("PASS (ACCESSIBLE)\r\n");
-
-    return all_ok;
 }
 
 /* ========================================================================= */
@@ -202,7 +164,7 @@ int main(void) {
     xil_printf("\r\n");
     xil_printf("================================================================\r\n");
     xil_printf("  Digilent Cora Z7-10: SoC PS/PL Baseline Firmware Initialized  \r\n");
-    xil_printf("  ARM Cortex-A9 Core 0 @ 650 MHz (Bare-Metal Standalone BSP)    \r\n");
+    xil_printf("  ARM Cortex-A9 Core 0 @ 667 MHz (Bare-Metal Standalone BSP)    \r\n");
     xil_printf("================================================================\r\n\r\n");
 
     /* Initialize and calibrate ARM PMU */
@@ -211,53 +173,25 @@ int main(void) {
     xil_printf("[PMU] Performance Monitor Unit initialized.\r\n");
     xil_printf("[PMU] Average PMCCNTR read overhead: %d CPU cycles\r\n\r\n", (int)pmu_overhead);
 
-    /* Run MMIO peripheral checks */
-    bool status = check_peripherals();
-
-    xil_printf("\r\n================================================================\r\n");
-    if (status) {
-        xil_printf("[RESULT] ALL MAPPED AXI PERIPHERALS RESPONDED CORRECTLY (PASS)\r\n");
+    /* Check FPGA fabric state */
+    if (is_pl_programmed()) {
+        xil_printf("[DEVCFG] FPGA fabric (PL) is programmed (PCFG_DONE = 1).\r\n");
     } else {
-        xil_printf("[RESULT] ONE OR MORE PERIPHERALS FAILED SANITY CHECKS (FAIL)\r\n");
-    }
-    xil_printf("================================================================\r\n\r\n");
-
-    /* Run Scenario 1: Pure Software (PS) Reference Algorithms Benchmark */
-    xil_printf("--- 2. Running Scenario 1 (PS Pure) Software Benchmarks ---\r\n");
-#ifdef XPAR_CPU_CORE_CLOCK_FREQ_HZ
-    benchmark_ps_run_all(XPAR_CPU_CORE_CLOCK_FREQ_HZ);
-#else
-    benchmark_ps_run_all(650000000U);
-#endif
-
-    /* Run AXI Communication Drivers Self-Test and Arming */
-    xil_printf("--- 3. Testing and Initializing AXI Communication Drivers ---\r\n");
-    int pipe_test_rc = pipeline_mgr_self_test();
-    if (pipe_test_rc == 0) {
-        xil_printf("[DRV_TEST] AXI Drivers and Frame Parser Self-Test: PASS\r\n");
-    } else {
-        xil_printf("[DRV_TEST] AXI Drivers Self-Test: FAIL (code %d)\r\n", pipe_test_rc);
+        xil_printf("[DEVCFG] Note: FPGA fabric (PL) is not yet programmed.\r\n");
     }
 
-    if (status) {
-        int pipe_init_rc = pipeline_mgr_init();
-        if (pipe_init_rc == 0) {
-            xil_printf("[DRV_INIT] AXI DMA, Quad SPI, and Accelerators Initialized & Armed: PASS\r\n");
-        } else {
-            xil_printf("[DRV_INIT] Pipeline Manager Init: FAIL (code %d)\r\n", pipe_init_rc);
-        }
-    }
+    /* Run baseline cryptographic software test */
+    test_software_aes_ctr();
 
     /* Initialize Autonomous ESP32 Trigger Line (PMOD JA Pin 1 -> ESP32 GPIO 32) */
     esp32_trigger_init();
     xil_printf("[TRIGGER] PS EMIO GPIO Initialized on PMOD JA Pin 1 (Package Pin Y18).\r\n");
-    xil_printf("[TRIGGER] Connect PMOD JA Pin 1 to ESP32 GPIO 32 for automatic burst control!\r\n\r\n");
+    xil_printf("[TRIGGER] Connected to ESP32 GPIO 32 for automatic burst control.\r\n\r\n");
 
     /* Active SPI Ingestion and Benchmark Loop */
     xil_printf("================================================================\r\n");
     xil_printf("  [SPI_RX] Listening for incoming packets from ESP32 on J7...\r\n");
     xil_printf("  Pinout: SCLK=H15 (J7.3), MOSI=T12 (J7.4), MISO=W15 (J7.1), SS=F16 (J7.5)\r\n");
-    xil_printf("  Autonomous Trigger: PMOD JA Pin 1 (Y18) -> ESP32 GPIO 32\r\n");
     xil_printf("================================================================\r\n\r\n");
 
     /* Trigger initial burst automatically */

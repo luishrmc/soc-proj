@@ -1,10 +1,7 @@
 ---
 module: chacha20_engine
-status: verified
-sources:
-  - cora7z/app/hw/src/chacha20_engine.vhdl sha256=e581f16b9a252ca90d8bb41d432543923420a34578a745626972150ed8581838
-  - cora7z/app/hw/test/tb_chacha20_engine.vhdl sha256=251300ade853fe8522b3e70f9d6d38d6ab66b7d087fa6220b05ce11f8d3b19ac
-  - docs/CHACHA20_ALGORITHM.md sha256=743d46a665adaf53b8ad121036164e2c5a4914497b71e8b88a4b85429dd23e8d
+status: retired
+sources: []
 gates_passed: [vhdl-lint, vhdl-sim]
 ---
 

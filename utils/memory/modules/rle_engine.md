@@ -1,10 +1,7 @@
 ---
 module: rle_engine
-status: verified
-sources:
-  - cora7z/app/hw/src/rle_engine.vhdl sha256=079cbaf29ae4aa40a8e22a0b7f8d885799402e77d891c2d7d87a64a0d65e7753
-  - cora7z/app/hw/test/tb_rle_engine.vhdl sha256=897e96b212063c59180e94e3f60f42ba105ec2212d03225d3ce9751ccdfbd047
-  - docs/RLE_ALGORITHM.md sha256=4ca4d59ebf5c4a2e06505e5e93be84509c8b5dadce4c6663d0ee5c740a24c423
+status: retired
+sources: []
 gates_passed: [vhdl-lint, vhdl-sim, vivado-bd]
 ---
 

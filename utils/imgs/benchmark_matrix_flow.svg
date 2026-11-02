@@ -1,0 +1,414 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 700" width="100%" height="100%">
+  <defs>
+    <!-- Background Gradient -->
+    <linearGradient id="bgGrad3" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0b0f19" />
+      <stop offset="100%" stop-color="#111827" />
+    </linearGradient>
+
+    <!-- Card Backgrounds -->
+    <linearGradient id="case1Grad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#082f49" stop-opacity="0.9" />
+      <stop offset="100%" stop-color="#0f172a" stop-opacity="0.9" />
+    </linearGradient>
+    <linearGradient id="case2Grad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#2e1065" stop-opacity="0.9" />
+      <stop offset="100%" stop-color="#082f49" stop-opacity="0.9" />
+    </linearGradient>
+    <linearGradient id="case3Grad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#082f49" stop-opacity="0.9" />
+      <stop offset="100%" stop-color="#2e1065" stop-opacity="0.9" />
+    </linearGradient>
+    <linearGradient id="case4Grad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#3b0764" stop-opacity="0.9" />
+      <stop offset="100%" stop-color="#1e1b4b" stop-opacity="0.9" />
+    </linearGradient>
+
+    <!-- Block Gradients -->
+    <linearGradient id="swBlockGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0284c7" />
+      <stop offset="100%" stop-color="#0369a1" />
+    </linearGradient>
+    <linearGradient id="hwBlockGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#9333ea" />
+      <stop offset="100%" stop-color="#7e22ce" />
+    </linearGradient>
+    <linearGradient id="bramBlockGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#d97706" />
+      <stop offset="100%" stop-color="#b45309" />
+    </linearGradient>
+
+    <!-- Shadows -->
+    <filter id="boxShadow" x="-3%" y="-4%" width="106%" height="110%">
+      <feDropShadow dx="0" dy="4" stdDeviation="5" flood-color="#000000" flood-opacity="0.5"/>
+    </filter>
+
+    <!-- Markers -->
+    <marker id="arr" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+      <path d="M1,1 L5,3 L1,5 Z" fill="#94a3b8" />
+    </marker>
+    <marker id="arrCyan3" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+      <path d="M1,1 L5,3 L1,5 Z" fill="#38bdf8" />
+    </marker>
+    <marker id="arrPurple3" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+      <path d="M1,1 L5,3 L1,5 Z" fill="#c084fc" />
+    </marker>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1080" height="700" rx="16" fill="url(#bgGrad3)" stroke="#1e293b" stroke-width="2" />
+  
+  <!-- Subtle Grid -->
+  <g opacity="0.05" stroke="#94a3b8" stroke-width="1">
+    <path d="M 0,100 L 1080,100 M 0,200 L 1080,200 M 0,300 L 1080,300 M 0,400 L 1080,400 M 0,500 L 1080,500 M 0,600 L 1080,600" />
+    <path d="M 108,0 L 108,700 M 216,0 L 216,700 M 324,0 L 324,700 M 432,0 L 432,700 M 540,0 L 540,700 M 648,0 L 648,700 M 756,0 L 756,700 M 864,0 L 864,700 M 972,0 L 972,700" />
+  </g>
+
+  <!-- Header -->
+  <text x="540" y="38" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="20" font-weight="700" fill="#f8fafc" letter-spacing="1">
+    2 × 2 FACTORIAL BENCHMARK EVALUATION MATRIX
+  </text>
+  <text x="540" y="58" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="12" fill="#94a3b8">
+    Comparative Pipeline Analysis: Pure Software ── Partial Offload ── Full Hardware Acceleration
+  </text>
+
+  <!-- Legend Bar -->
+  <g transform="translate(190, 75)">
+    <rect width="700" height="30" rx="6" fill="#0f172a" stroke="#334155" stroke-width="1" />
+    <!-- Legend Item 1 -->
+    <rect x="25" y="8" width="14" height="14" rx="3" fill="#0284c7" />
+    <text x="46" y="19" font-family="system-ui, sans-serif" font-size="11" font-weight="600" fill="#e0f2fe">
+      Cortex-A9 Software Execution
+    </text>
+    <!-- Legend Item 2 -->
+    <rect x="250" y="8" width="14" height="14" rx="3" fill="#9333ea" />
+    <text x="271" y="19" font-family="system-ui, sans-serif" font-size="11" font-weight="600" fill="#f3e8ff">
+      FPGA Hardware Offload (100 MHz)
+    </text>
+    <!-- Legend Item 3 -->
+    <rect x="495" y="8" width="14" height="14" rx="3" fill="#d97706" />
+    <text x="516" y="19" font-family="system-ui, sans-serif" font-size="11" font-weight="600" fill="#fef3c7">
+      BRAM memcpy Staging
+    </text>
+  </g>
+
+  <!-- ========================================================================= -->
+  <!-- CASE 1: PURE SOFTWARE BASELINE                                            -->
+  <!-- ========================================================================= -->
+  <g transform="translate(40, 125)">
+    <rect width="1000" height="120" rx="10" fill="url(#case1Grad)" stroke="#0284c7" stroke-width="1.5" filter="url(#boxShadow)" />
+    
+    <!-- Title Badge -->
+    <rect x="15" y="12" width="220" height="24" rx="4" fill="#0369a1" />
+    <text x="25" y="28" font-family="system-ui, sans-serif" font-size="11.5" font-weight="700" fill="#f0f9ff">
+      CASE 1: Pure Software Baseline
+    </text>
+    <text x="245" y="28" font-family="monospace" font-size="10" fill="#7dd3fc">
+      (SW LZSS ──▶ SW AES-128-CTR on ARM Cortex-A9 @ 667 MHz)
+    </text>
+
+    <!-- Pipeline Stages -->
+    <g transform="translate(15, 45)">
+      <!-- Stage 0: Raw Ingress -->
+      <rect width="115" height="52" rx="6" fill="#0f172a" stroke="#475569" stroke-width="1" />
+      <text x="57" y="24" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10.5" font-weight="700" fill="#cbd5e1">Raw Frame</text>
+      <text x="57" y="40" text-anchor="middle" font-family="monospace" font-size="9" fill="#94a3b8">DDR3 Buffer</text>
+
+      <path d="M 115,26 L 140,26" stroke="#94a3b8" stroke-width="2" marker-end="url(#arr)" />
+
+      <!-- Stage 1: SW LZSS -->
+      <g transform="translate(145, 0)">
+        <rect width="195" height="52" rx="6" fill="url(#swBlockGrad)" stroke="#38bdf8" stroke-width="1.2" />
+        <text x="97" y="22" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11" font-weight="700" fill="#ffffff">
+          SW Heatshrink / LZSS
+        </text>
+        <text x="97" y="38" text-anchor="middle" font-family="monospace" font-size="9.5" fill="#bae6fd">
+          Timer: T_SW_COMP (PMCCNTR)
+        </text>
+      </g>
+
+      <path d="M 340,26 L 365,26" stroke="#94a3b8" stroke-width="2" marker-end="url(#arr)" />
+
+      <!-- Stage 2: Intermediate Comp Buffer -->
+      <g transform="translate(370, 0)">
+        <rect width="125" height="52" rx="6" fill="#0f172a" stroke="#475569" stroke-width="1" />
+        <text x="62" y="24" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10" font-weight="700" fill="#cbd5e1">Comp Buffer</text>
+        <text x="62" y="40" text-anchor="middle" font-family="monospace" font-size="9" fill="#94a3b8">DDR3 Staging</text>
+      </g>
+
+      <path d="M 495,26 L 520,26" stroke="#94a3b8" stroke-width="2" marker-end="url(#arr)" />
+
+      <!-- Stage 3: SW AES -->
+      <g transform="translate(525, 0)">
+        <rect width="195" height="52" rx="6" fill="url(#swBlockGrad)" stroke="#38bdf8" stroke-width="1.2" />
+        <text x="97" y="22" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11" font-weight="700" fill="#ffffff">
+          SW AES-128-CTR
+        </text>
+        <text x="97" y="38" text-anchor="middle" font-family="monospace" font-size="9.5" fill="#bae6fd">
+          Timer: T_SW_CRYPT (PMCCNTR)
+        </text>
+      </g>
+
+      <path d="M 720,26 L 745,26" stroke="#94a3b8" stroke-width="2" marker-end="url(#arr)" />
+
+      <!-- Stage 4: Output Ciphertext -->
+      <g transform="translate(750, 0)">
+        <rect width="215" height="52" rx="6" fill="#022c22" stroke="#10b981" stroke-width="1.2" />
+        <text x="107" y="22" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11" font-weight="700" fill="#a7f3d0">
+          Final Ciphertext Output
+        </text>
+        <text x="107" y="38" text-anchor="middle" font-family="monospace" font-size="9.5" fill="#6ee7b7">
+          Total Cycles = SW_C + SW_E
+        </text>
+      </g>
+    </g>
+  </g>
+
+  <!-- ========================================================================= -->
+  <!-- CASE 2: COMPRESSION OFFLOAD ONLY                                          -->
+  <!-- ========================================================================= -->
+  <g transform="translate(40, 265)">
+    <rect width="1000" height="120" rx="10" fill="url(#case2Grad)" stroke="#818cf8" stroke-width="1.5" filter="url(#boxShadow)" />
+    
+    <!-- Title Badge -->
+    <rect x="15" y="12" width="240" height="24" rx="4" fill="#4338ca" />
+    <text x="25" y="28" font-family="system-ui, sans-serif" font-size="11.5" font-weight="700" fill="#e0e7ff">
+      CASE 2: Compression Offload Only
+    </text>
+    <text x="265" y="28" font-family="monospace" font-size="10" fill="#c7d2fe">
+      (PL lzss_accel @ 100 MHz ──▶ SW AES-128-CTR on Cortex-A9)
+    </text>
+
+    <!-- Pipeline Stages -->
+    <g transform="translate(15, 45)">
+      <!-- Stage 0: Staging copy -->
+      <rect width="125" height="52" rx="6" fill="url(#bramBlockGrad)" stroke="#facc15" stroke-width="1.2" />
+      <text x="62" y="22" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10.5" font-weight="700" fill="#ffffff">
+        PS memcpy
+      </text>
+      <text x="62" y="38" text-anchor="middle" font-family="monospace" font-size="9" fill="#fef3c7">
+        DDR ──▶ LZSS In
+      </text>
+
+      <path d="M 125,26 L 145,26" stroke="#94a3b8" stroke-width="2" marker-end="url(#arr)" />
+
+      <!-- Stage 1: HW LZSS Engine -->
+      <g transform="translate(150, 0)">
+        <rect width="215" height="52" rx="6" fill="url(#hwBlockGrad)" stroke="#c084fc" stroke-width="1.5" />
+        <text x="107" y="22" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11.5" font-weight="700" fill="#ffffff">
+          PL lzss_accel Engine
+        </text>
+        <text x="107" y="38" text-anchor="middle" font-family="monospace" font-size="9.5" fill="#facc15">
+          [HW Cycle Counter 0x10]
+        </text>
+      </g>
+
+      <path d="M 365,26 L 385,26" stroke="#94a3b8" stroke-width="2" marker-end="url(#arr)" />
+
+      <!-- Stage 2: BRAM Drain copy -->
+      <g transform="translate(390, 0)">
+        <rect width="125" height="52" rx="6" fill="url(#bramBlockGrad)" stroke="#facc15" stroke-width="1.2" />
+        <text x="62" y="22" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10.5" font-weight="700" fill="#ffffff">
+          PS memcpy
+        </text>
+        <text x="62" y="38" text-anchor="middle" font-family="monospace" font-size="9" fill="#fef3c7">
+          LZSS Out ──▶ DDR
+        </text>
+      </g>
+
+      <path d="M 515,26 L 535,26" stroke="#94a3b8" stroke-width="2" marker-end="url(#arr)" />
+
+      <!-- Stage 3: SW AES -->
+      <g transform="translate(540, 0)">
+        <rect width="185" height="52" rx="6" fill="url(#swBlockGrad)" stroke="#38bdf8" stroke-width="1.2" />
+        <text x="92" y="22" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11" font-weight="700" fill="#ffffff">
+          SW AES-128-CTR
+        </text>
+        <text x="92" y="38" text-anchor="middle" font-family="monospace" font-size="9.5" fill="#bae6fd">
+          Timer: T_SW_CRYPT
+        </text>
+      </g>
+
+      <path d="M 725,26 L 745,26" stroke="#94a3b8" stroke-width="2" marker-end="url(#arr)" />
+
+      <!-- Stage 4: Output Ciphertext -->
+      <g transform="translate(750, 0)">
+        <rect width="215" height="52" rx="6" fill="#022c22" stroke="#10b981" stroke-width="1.2" />
+        <text x="107" y="22" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11" font-weight="700" fill="#a7f3d0">
+          Ciphertext &amp; Metrics
+        </text>
+        <text x="107" y="38" text-anchor="middle" font-family="monospace" font-size="9" fill="#6ee7b7">
+          HW_LZSS + BRAM_T + SW_AES
+        </text>
+      </g>
+    </g>
+  </g>
+
+  <!-- ========================================================================= -->
+  <!-- CASE 3: ENCRYPTION OFFLOAD ONLY                                           -->
+  <!-- ========================================================================= -->
+  <g transform="translate(40, 405)">
+    <rect width="1000" height="120" rx="10" fill="url(#case3Grad)" stroke="#818cf8" stroke-width="1.5" filter="url(#boxShadow)" />
+    
+    <!-- Title Badge -->
+    <rect x="15" y="12" width="230" height="24" rx="4" fill="#0369a1" />
+    <text x="25" y="28" font-family="system-ui, sans-serif" font-size="11.5" font-weight="700" fill="#f0f9ff">
+      CASE 3: Encryption Offload Only
+    </text>
+    <text x="255" y="28" font-family="monospace" font-size="10" fill="#bae6fd">
+      (SW Heatshrink / LZSS ──▶ PL aes_accel @ 100 MHz)
+    </text>
+
+    <!-- Pipeline Stages -->
+    <g transform="translate(15, 45)">
+      <!-- Stage 1: SW LZSS -->
+      <g transform="translate(0, 0)">
+        <rect width="185" height="52" rx="6" fill="url(#swBlockGrad)" stroke="#38bdf8" stroke-width="1.2" />
+        <text x="92" y="22" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11" font-weight="700" fill="#ffffff">
+          SW Heatshrink / LZSS
+        </text>
+        <text x="92" y="38" text-anchor="middle" font-family="monospace" font-size="9.5" fill="#bae6fd">
+          Timer: T_SW_COMP
+        </text>
+      </g>
+
+      <path d="M 185,26 L 205,26" stroke="#94a3b8" stroke-width="2" marker-end="url(#arr)" />
+
+      <!-- Stage 2: Staging copy -->
+      <g transform="translate(210, 0)">
+        <rect width="125" height="52" rx="6" fill="url(#bramBlockGrad)" stroke="#facc15" stroke-width="1.2" />
+        <text x="62" y="22" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10.5" font-weight="700" fill="#ffffff">
+          PS memcpy
+        </text>
+        <text x="62" y="38" text-anchor="middle" font-family="monospace" font-size="9" fill="#fef3c7">
+          DDR ──▶ AES In
+        </text>
+      </g>
+
+      <path d="M 335,26 L 355,26" stroke="#94a3b8" stroke-width="2" marker-end="url(#arr)" />
+
+      <!-- Stage 3: HW AES Engine -->
+      <g transform="translate(360, 0)">
+        <rect width="215" height="52" rx="6" fill="url(#hwBlockGrad)" stroke="#c084fc" stroke-width="1.5" />
+        <text x="107" y="22" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11.5" font-weight="700" fill="#ffffff">
+          PL aes_accel Engine
+        </text>
+        <text x="107" y="38" text-anchor="middle" font-family="monospace" font-size="9.5" fill="#facc15">
+          [HW Cycle Counter 0x10]
+        </text>
+      </g>
+
+      <path d="M 575,26 L 595,26" stroke="#94a3b8" stroke-width="2" marker-end="url(#arr)" />
+
+      <!-- Stage 4: BRAM Drain copy -->
+      <g transform="translate(600, 0)">
+        <rect width="125" height="52" rx="6" fill="url(#bramBlockGrad)" stroke="#facc15" stroke-width="1.2" />
+        <text x="62" y="22" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10.5" font-weight="700" fill="#ffffff">
+          PS memcpy
+        </text>
+        <text x="62" y="38" text-anchor="middle" font-family="monospace" font-size="9" fill="#fef3c7">
+          AES Out ──▶ DDR
+        </text>
+      </g>
+
+      <path d="M 725,26 L 745,26" stroke="#94a3b8" stroke-width="2" marker-end="url(#arr)" />
+
+      <!-- Stage 5: Output Ciphertext -->
+      <g transform="translate(750, 0)">
+        <rect width="215" height="52" rx="6" fill="#022c22" stroke="#10b981" stroke-width="1.2" />
+        <text x="107" y="22" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11" font-weight="700" fill="#a7f3d0">
+          Ciphertext &amp; Metrics
+        </text>
+        <text x="107" y="38" text-anchor="middle" font-family="monospace" font-size="9" fill="#6ee7b7">
+          SW_LZSS + BRAM_T + HW_AES
+        </text>
+      </g>
+    </g>
+  </g>
+
+  <!-- ========================================================================= -->
+  <!-- CASE 4: FULL HARDWARE PIPELINE                                            -->
+  <!-- ========================================================================= -->
+  <g transform="translate(40, 545)">
+    <rect width="1000" height="125" rx="10" fill="url(#case4Grad)" stroke="#c084fc" stroke-width="2" filter="url(#boxShadow)" />
+    
+    <!-- Title Badge -->
+    <rect x="15" y="12" width="250" height="24" rx="4" fill="#6b21a8" />
+    <text x="25" y="28" font-family="system-ui, sans-serif" font-size="11.5" font-weight="700" fill="#faf5ff">
+      CASE 4: Full Hardware Acceleration
+    </text>
+    <text x="275" y="28" font-family="monospace" font-size="10" fill="#e9d5ff">
+      (PL lzss_accel ──▶ BRAM Staging ──▶ PL aes_accel @ 100 MHz)
+    </text>
+
+    <!-- Pipeline Stages -->
+    <g transform="translate(15, 45)">
+      <!-- Stage 0: Staging copy -->
+      <rect width="115" height="55" rx="6" fill="url(#bramBlockGrad)" stroke="#facc15" stroke-width="1.2" />
+      <text x="57" y="24" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10" font-weight="700" fill="#ffffff">
+        PS memcpy
+      </text>
+      <text x="57" y="40" text-anchor="middle" font-family="monospace" font-size="8.5" fill="#fef3c7">
+        DDR ──▶ LZSS In
+      </text>
+
+      <path d="M 115,28 L 135,28" stroke="#94a3b8" stroke-width="2" marker-end="url(#arr)" />
+
+      <!-- Stage 1: HW LZSS Engine -->
+      <g transform="translate(140, 0)">
+        <rect width="195" height="55" rx="6" fill="url(#hwBlockGrad)" stroke="#c084fc" stroke-width="1.5" />
+        <text x="97" y="23" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11" font-weight="700" fill="#ffffff">
+          PL lzss_accel Engine
+        </text>
+        <text x="97" y="41" text-anchor="middle" font-family="monospace" font-size="9" font-weight="700" fill="#facc15">
+          [LZSS Cycles: Reg 0x10]
+        </text>
+      </g>
+
+      <path d="M 335,28 L 355,28" stroke="#94a3b8" stroke-width="2" marker-end="url(#arr)" />
+
+      <!-- Stage 2: Fast Inter-BRAM Handoff -->
+      <g transform="translate(360, 0)">
+        <rect width="145" height="55" rx="6" fill="url(#bramBlockGrad)" stroke="#facc15" stroke-width="1.5" />
+        <text x="72" y="22" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10.5" font-weight="700" fill="#ffffff">
+          PS Burst Transfer
+        </text>
+        <text x="72" y="37" text-anchor="middle" font-family="monospace" font-size="8.5" fill="#fef3c7">
+          LZSS Out ──▶ AES In
+        </text>
+        <text x="72" y="49" text-anchor="middle" font-family="monospace" font-size="8" fill="#fde68a">
+          (Length from Status)
+        </text>
+      </g>
+
+      <path d="M 505,28 L 525,28" stroke="#94a3b8" stroke-width="2" marker-end="url(#arr)" />
+
+      <!-- Stage 3: HW AES Engine -->
+      <g transform="translate(530, 0)">
+        <rect width="195" height="55" rx="6" fill="url(#hwBlockGrad)" stroke="#c084fc" stroke-width="1.5" />
+        <text x="97" y="23" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11" font-weight="700" fill="#ffffff">
+          PL aes_accel Engine
+        </text>
+        <text x="97" y="41" text-anchor="middle" font-family="monospace" font-size="9" font-weight="700" fill="#facc15">
+          [AES Cycles: Reg 0x10]
+        </text>
+      </g>
+
+      <path d="M 725,28 L 745,28" stroke="#94a3b8" stroke-width="2" marker-end="url(#arr)" />
+
+      <!-- Stage 4: Output Ciphertext & Full Metric Suite -->
+      <g transform="translate(750, 0)">
+        <rect width="215" height="55" rx="6" fill="#022c22" stroke="#10b981" stroke-width="1.5" />
+        <text x="107" y="22" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11" font-weight="700" fill="#a7f3d0">
+          Full HW Ciphertext
+        </text>
+        <text x="107" y="38" text-anchor="middle" font-family="monospace" font-size="8.5" fill="#6ee7b7">
+          Pure Compute: HW_C + HW_E
+        </text>
+        <text x="107" y="49" text-anchor="middle" font-family="monospace" font-size="8" fill="#86efac">
+          Isolated from Bus Overheads
+        </text>
+      </g>
+    </g>
+  </g>
+</svg>
