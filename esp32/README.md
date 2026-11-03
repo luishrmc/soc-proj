@@ -1,99 +1,88 @@
-# ESP32 High-Speed SPI Master Synthetic Data Injector
+# Autonomous SPI Telemetry Injector Harness
+## ESP32-WROOM (ESP-IDF v6.1 @ 240 MHz)
 
-Firmware for the ESP32 (ESP32-WROOM-32 / ESP32-DevKitC) acting as a high-speed SPI Master data injector into the Digilent Cora Z7-10 (Xilinx Zynq-7010) platform. Transmits structured synthetic benchmark blocks across SPI at up to 25 MHz to validate hardware coprocessors and hybrid co-design pipelines.
-
----
-
-## 1. Physical Hardware Interconnect (Pinout)
-
-Connect the ESP32 GPIOs directly to the Cora Z7-10 **Dedicated SPI Header J7** (2x3 pin header, 3.3V LVCMOS):
-
-| Signal Name | ESP32 GPIO | Cora Z7 FPGA Pin | Cora Z7 Connector J7 | Description |
-|---|:---:|:---:|:---:|---|
-| **MISO** | `GPIO 19` | `W15` | **J7 Pin 1** (`MISO`) | Master-In Slave-Out serial data (via 200Ω R108, CK_MISO) |
-| **SCLK** | `GPIO 18` | `H15` | **J7 Pin 3** (`SCK`) | SPI Bus Clock (Mode 0, up to 25 MHz, via 200Ω R109, CK_SCK) |
-| **MOSI** | `GPIO 23` | `T12` | **J7 Pin 4** (`MOSI`) | Master-Out Slave-In serial data (via 200Ω R110, CK_MOSI) |
-| **CS / SS** | `GPIO 5` | `F16` | **J7 Pin 5** (`SS`) | Active-Low Chip Select framing (via 200Ω R111, CK_SS) |
-| **GND** | `GND` | `GND` | **J7 Pin 6** (`GND`) | Common Ground Reference |
-| *(5.0V)* | *N/A* | *N/A* | **J7 Pin 2** (`5V0`) | **DO NOT CONNECT** (Power rail) |
-| **BTN_TRIGGER** | `GPIO 32` | `Y18` | **PMOD JA Pin 1** (or BTN) | Trigger Full Suite (Active-Low pulse from Cora Z7 PS EMIO or Pushbutton) |
-| **LED_GREEN** | `GPIO 21` | N/A | RGB LED Green Channel | Heartbeat (1 Hz) / Busy (Solid ON) / Success (3 Rapid Blinks) |
-| **LED_RED** | `GPIO 22` | N/A | RGB LED Red Channel | Alert / Critical Error (5 Hz Rapid Blink) |
-| **LED_READY** | `GPIO 2` | N/A | Blue Onboard | Onboard Ready Heartbeat mirror |
-
-> [!IMPORTANT]
-> Both the ESP32 and the Cora Z7-10 operate on 3.3V logic levels. On the Cora Z7, all four SPI lines on J7 pass through 200Ω series protection resistors ($R108 \dots R111$) directly into FPGA Banks 34 and 35. Ensure a solid, low-impedance common ground connection (J7 Pin 6 to ESP32 GND) to minimize transmission ringing at 25 MHz. **Do not connect J7 Pin 2 (5V)**.
+This directory contains the firmware for the external **ESP32-WROOM** microcontroller test harness, acting as an autonomous SPI master streaming synthetic telemetry frames into the Cora Z7-10.
 
 ---
 
-## 2. Autonomous UI & Single-Cable Bench Workflow
+## 1. Module Overview & Operational Role
 
-Because the test setup utilizes **a single micro-USB cable** and limited breadboard area, the hardware UI is streamlined:
-1. **Flashing & Diagnostics**: USB cable connected to ESP32 (`/dev/ttyACM0`).
-2. **End-to-End Benchmarks**: USB cable connected to Cora Z7 (capturing Cortex-A9 PMU / UART). The ESP32 is powered independently via external 5V/VIN or 3.3V rail.
-
-### Pushbutton & Autonomous Software Trigger
-- **BTN_TRIGGER (GPIO 32)**: Active-Low trigger line connected to Cora Z7 PMOD JA Pin 1 (`Y18`) or a momentary button to GND. The Cora Z7 firmware automatically pulses this pin low for 30 ms to trigger bursts sequentially, or the user can manually push the button.
-  1. 64 B High-Redundancy block (RLE pipeline)
-  2. 1 KB Pseudo-Random block (LZ4 pipeline)
-  3. 64 KB Synthetic Telemetry block (AES-128-CTR pipeline)
-  4. 64 KB Synthetic Telemetry block (ChaCha20 pipeline)
-
-### Driver & Timing Architecture (ESP-IDF v6.1)
-- **Host**: `SPI3_HOST` (VSPI) on native IOMUX pins (`GPIO 18`, `23`, `19`, `5`).
-- **Timing & Framing**: Operates in `SPI_DEVICE_HALFDUPLEX` with `.cs_ena_pretrans = 2` and `.cs_ena_posttrans = 2`. This guarantees that `CS` is held low 2 clock cycles before `SCLK` begins toggling, satisfying the AXI Quad SPI 2-stage synchronizer on `ext_spi_clk`.
-- **Zero Allocation**: Uses static `DMA_ATTR` buffers for zero-heap-allocation transmission.
-
-### Visual LED Telemetry (RGB LED on GPIO 21 & 22)
-- **IDLE / Ready**: Green LED (GPIO 21) pulses with a 1 Hz heartbeat; Red LED is OFF.
-- **BUSY (Transmitting)**: Green LED (GPIO 21) remains Solid ON during SPI packet injection.
-- **SUCCESS**: Green LED (GPIO 21) emits 3 rapid blinks upon completing all 4 benchmark patterns with valid handshake, then returns to IDLE heartbeat.
-- **ERROR / Alert**: Red LED (GPIO 22) flashes rapidly at 5 Hz if a timeout, CRC mismatch, or framing error occurs.
+The ESP32 simulates an industrial sensor cluster or avionics telemetry unit operating in a decoupled environment:
+* **Clock & Protocol:** Hardware SPI Master in **Mode 0** (CPOL=0, CPHA=0, MSB-First) operating at up to **25 MHz**.
+* **Dynamic Payload Cycling:** Transmits realistic telemetry frames across standardized lengths: **64 B, 256 B, 512 B, and 1024 B**.
+* **Integrity Guard:** Formats frames with synchronization preambles, monotonic sequence counters, CRC-16 CCITT checksums, and EOF delimiters.
+* **Autonomous Handshake:** Listens on **GPIO 32** for active-low burst trigger pulses emitted by the Cora Z7 Processing System on **PMOD JA1** (Pin Y18), eliminating manual push-button triggers.
 
 ---
 
-## 3. SPI Frame Protocol Format
+## 2. Telemetry Frame Wire Specification
 
-Each frame strictly adheres to the protocol specified in `cora7z/app/hw/src/INTERFACES.md` (Section 1.3):
+Every frame transmitted over the physical SPI bus adheres to the following byte layout:
 
 ```text
-+---------------+-------------------+---------------+---------------+-------------------------+---------------+
-| Preamble (2B) | Payload Type (1B) | Flags (1B)    | Length (4B)   | Payload Data (N Bytes)  | CRC-16 (2B)   |
-| 0xAA, 0x55    | TYPE              | FLAGS         | Big-Endian    | [0 ... N-1]             | Big-Endian    |
-+---------------+-------------------+---------------+---------------+-------------------------+---------------+
+ 0                   1                   2                   3
+ 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+|       Preamble (0xA55A)       |          Sequence ID (31:16)  |
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+|      Sequence ID (15:0)       |   Payload Length (Little-End) |
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+|    Reserved Padding (0x0000)  |  Payload Byte 0 | Payload 1   |
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+|                 ... Dynamic Payload Bytes ...                 |
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+|      CRC-16 CCITT Checksum    | EOF Delim (0x5A)|
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 ```
 
-- **Preamble**: `0xAA, 0x55` (Fixed synchronization marker).
-- **Payload Types**:
-  - `0x01` (`TYPE_REDUNDANT`): 64 B repeated pattern (for RLE benchmarking).
-  - `0x02` (`TYPE_RANDOM`): 1 KB pseudo-random data (for LZ4 benchmarking).
-  - `0x03` (`TYPE_TELEMETRY`): 64 KB structured sensor records (for AES-CTR / ChaCha20).
-- **Flags**:
-  - `Bit 0`: `COMPRESS_EN`
-  - `Bit 1`: `ENCRYPT_EN`
-  - `Bit 2`: `COMP_ALGO` (`0` = RLE, `1` = LZ4)
-  - `Bit 3`: `CRYPTO_ALGO` (`0` = AES-128-CTR, `1` = ChaCha20)
-- **Length**: 32-bit unsigned integer (Big-Endian).
-- **CRC-16**: CRC-16-CCITT (polynomial `0x1021`, initial `0xFFFF`) over Header + Payload.
+| Field Name | Offset | Size | Description |
+| :--- | :---: | :---: | :--- |
+| `preamble` | 0 | 2 bytes | Synchronization marker (`0xA55A`) |
+| `seq_id` | 2 | 4 bytes | Monotonic packet counter [31:0] (prevents replay attacks) |
+| `payload_len` | 6 | 2 bytes | Unsigned payload byte count (64, 256, 512, 1024) |
+| `reserved_align`| 8 | 2 bytes | Padding to guarantee 32-bit word alignment on `payload` (offset 10) |
+| `payload` | 10 | $N$ bytes | Synthetic floating-point sensor telemetry |
+| `crc16` | $10 + N$ | 2 bytes | CRC-16 CCITT (Polynom 0x1021, Init 0xFFFF) |
+| `eof_delim` | $12 + N$ | 1 byte | End-of-frame framing delimiter (`0x5A`) |
 
 ---
 
-## 4. Toolchain & Development Workflow
+## 3. Physical Hardware Pinout Mapping
 
-The project is structured according to the clean ESP-IDF model from [`luishrmc/weather_system_esp`](https://github.com/luishrmc/weather_system_esp).
+Connect the ESP32 development board to the Digilent Cora Z7 board according to the pinout below:
 
-### 4.1 Command Line Interface (CLI)
+| Signal Function | ESP32 GPIO | Cora Z7 Header / Pin | Standard | Description |
+| :--- | :---: | :---: | :---: | :--- |
+| **SPI SCLK** | **GPIO 18** | **Header J7 Pin 3 (Pin H15)** | LVCMOS33 | SPI Master Clock (up to 25 MHz) |
+| **SPI MOSI** | **GPIO 23** | **Header J7 Pin 4 (Pin T12)** | LVCMOS33 | Master-Out Slave-In Telemetry Stream |
+| **SPI MISO** | **GPIO 19** | **Header J7 Pin 1 (Pin W15)** | LVCMOS33 | Master-In Slave-Out Ciphertext ACK |
+| **SPI SS_N** | **GPIO 5** | **Header J7 Pin 5 (Pin F16)** | LVCMOS33 | Active-Low Slave Select |
+| **BURST TRIG** | **GPIO 32** | **PMOD JA Pin 1 (Pin Y18)** | LVCMOS33 | Active-low 30 ms pulse from Cora Z7 PS |
+| **GROUND** | **GND** | **Header J7 Pin 6 (GND)** | --- | Common Ground Reference |
+
+---
+
+## 4. Build, Flash & Monitor Instructions
 
 ```bash
-# 1. Load the ESP-IDF v6.1 environment
-source $HOME/.espressif/tools/activate_idf_v6.1.sh
-
-# 2. Navigate to the ESP32 project directory
+# Navigate to ESP32 project directory
 cd esp32
 
-# 3. Compile the firmware
+# Set ESP-IDF target
+idf.py set-target esp32
+
+# Clean and compile firmware
 idf.py build
 
-# 4. Flash and open serial monitor via native USB-Serial (/dev/ttyACM0)
+# Flash to device on /dev/ttyACM0 and open serial monitor
 idf.py -p /dev/ttyACM0 flash monitor
+```
+
+### Expected Serial Monitor Telemetry Output
+```text
+[ESP32_INJECTOR] SPI Master initialized. Ready to transmit frames.
+[ESP32_INJECTOR] TX #0 | Seq: 0 | Len: 64 B (Wire: 75 B) | CRC: 0x93FC
+[ESP32_INJECTOR] TX #1 | Seq: 1 | Len: 256 B (Wire: 267 B) | CRC: 0xC321
+[ESP32_INJECTOR] TX #2 | Seq: 2 | Len: 512 B (Wire: 523 B) | CRC: 0x1A8E
+[ESP32_INJECTOR] TX #3 | Seq: 3 | Len: 1024 B (Wire: 1035 B) | CRC: 0x5D43
 ```
