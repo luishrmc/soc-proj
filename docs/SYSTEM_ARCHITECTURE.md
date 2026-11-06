@@ -6,6 +6,10 @@ This document establishes the authoritative system-level architectural specifica
 
 ## 1. System Overview and Objectives
 
+> [!NOTE]
+> **Engineering Status — Work-in-Progress (WIP: Testbench & Synthetic Data Pipeline):**  
+> This specification defines the hardware/software co-design architecture and comparative benchmarking framework on the Zynq-7010. Active development centers on a **Python-based synthetic telemetry generator** that produces realistic, time-series sensor streams (temperature, 3-axis vibration, supply voltage, status bitmasks, and monotonic timestamps) with variable entropy and repetition profiles. These streams drive the ESP32 SPI master injector and Cora Z7 processing pipeline. All quantitative benchmark results across the scenarios remain **Pending Measurement / WIP**.
+
 The platform evaluates and compares hardware/software co-design tradeoffs across two computational stages:
 1. **Lossless Data Compression**: Run-Length Encoding (RLE) and a streamlined variant of LZ4 (LZSS-style byte sliding window).
 2. **Symmetric Cryptography**: Advanced Encryption Standard in Counter Mode (AES-128-CTR) and the ChaCha20 stream cipher (RFC 8439).
@@ -373,16 +377,17 @@ Vitis 2026.1 replaces the legacy XSCT tool with a modern, unified Python client 
   vitis -s cora7z/app/sw/scripts/build_sw.py
   ```
 
-### 6.3 ESP-IDF External Ingestion Setup (ESP32)
-The external data injector runs on an ESP32 microcontroller configured as an SPI master:
-- **Toolchain**: ESP-IDF v5.x with VS Code extension integration under `esp32/`.
-- **SPI Driver Configuration**:
-  - Uses `SPI2_HOST` (HSPI) with hardware DMA enabled (`SPI_DMA_CH_AUTO`).
-  - Transmission clock configured up to 25 MHz (Mode 0: CPOL=0, CPHA=0).
-- **Payload Synthesis Modes**:
-  1. *Repetitive Pattern*: Highly compressible test vectors (e.g., continuous strings of identical bytes) to stress RLE and LZ4 compression.
-  2. *Pseudo-Random Pattern*: Linear Feedback Shift Register (LFSR) data with high Shannon entropy ($H(X) \approx 8$ bits/byte) to verify compression rejection and crypto throughput.
-  3. *Telemetry Frames*: Structured sensor-like frames mixing ASCII headers, timestamps, and floating-point readings.
+### 6.3 Synthetic Telemetry Generation & ESP-IDF Ingestion Setup (ESP32)
+The data generation and ingestion pipeline combines a host-side Python generator with an ESP32 hardware bridge:
+- **Python Synthetic Telemetry Generator (Active WIP):**
+  - Synthesizes realistic, time-series telemetry streams modeling physical sensor records (simulated temperature, 3-axis vibration, supply voltage, status bitmasks, and monotonic timestamps).
+  - Configures data entropy and repetition profiles to systematically challenge both compression (high-redundancy runs for RLE/LZ4) and encryption (uniform entropy for AES-CTR/ChaCha20).
+  - Emits binary frames formatted per `spi_frame.h` (64 B, 256 B, 512 B, 1024 B payloads with 32-bit alignment padding, CRC-16 CCITT, and EOF delimiter `0x5A`).
+- **ESP-IDF Hardware Injector (`esp32/`):**
+  - Toolchain: ESP-IDF v6.1 targeting ESP32-WROOM.
+  - SPI Driver: `SPI3_HOST` (VSPI) with hardware DMA enabled (`SPI_DMA_CH_AUTO`).
+  - Transmission clock configured at 2.0 MHz bring-up, scalable up to 25.0 MHz (Mode 0: CPOL=0, CPHA=0).
+  - Streams preloaded or generated synthetic frames across physical flying leads to the Cora Z7 Header J7.
 
 ---
 

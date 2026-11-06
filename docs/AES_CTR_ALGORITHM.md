@@ -1,144 +1,131 @@
-# Arquitetura e Implementação do Coprocessador Criptográfico AES-128-CTR em VHDL
+# Architecture & VHDL Implementation of AES-128-CTR Cryptographic Accelerator
 
-**Projeto:** Aceleração Heterogênea de Compressão e Criptografia em SoC Zynq-7010 (Digilent Cora Z7-10)  
-**Módulo:** `aes_ctr_engine.vhdl`  
-**Autor:** Luis H. R. M. C. / Antigravity AI  
-**Data:** 18 de Outubro de 2026  
-**Padrão:** VHDL-2008 (IEEE 1076-2008)  
-**Especificações:** NIST FIPS-197 / NIST SP 800-38A  
+**Project:** Heterogeneous SoC Compression & Cryptography on Zynq-7010 (Digilent Cora Z7-10)  
+**Hardware Module:** `aes_ctr_engine.vhdl` / `aes_accel.vhdl`  
+**HDL Standard:** VHDL-2008 (IEEE 1076-2008)  
+**Target Device:** AMD Xilinx Zynq XC7Z010-1CLG400C  
+**Cryptographic Standards:** NIST FIPS-197 / NIST SP 800-38A  
+
+> [!NOTE]
+> **Engineering Status — Work-in-Progress (WIP: Testbench & Synthetic Data Pipeline):**  
+> The hardware cryptographic engine architecture conforms to NIST FIPS-197 and NIST SP 800-38A standards, verified against canonical golden test vectors in VUnit simulation. Integration with the **Python synthetic telemetry generator** will drive comprehensive performance evaluation across structured time-series sensor streams. Quantitative execution latency and throughput benchmarks are **Pending Measurement / WIP**.
 
 ---
 
-## 1. Fundamentos Teóricos do Algoritmo AES (FIPS-197)
+## 1. Theoretical Foundations of AES (FIPS-197)
 
-O **Advanced Encryption Standard (AES)** é uma cifra de bloco simétrica adotada pelo National Institute of Standards and Technology (NIST) em 2001. A versão implementada opera com blocos de dados de **128 bits** e chave simétrica de **128 bits**, exigindo **10 rodadas ($N_r = 10$)** de transformações matemáticas sucessivas sobre uma matriz de estado de $4 \times 4$ bytes.
+The **Advanced Encryption Standard (AES)** is a symmetric block cipher standardized by the National Institute of Standards and Technology (NIST) in 2001. The implemented core operates on **128-bit data blocks** with a **128-bit symmetric key**, executing **10 iterative rounds ($N_r = 10$)** over a $4 \times 4$ byte state matrix.
 
-### 1.1 Representação da Matriz de Estado
+### 1.1 State Matrix Representation
 
-O bloco de 128 bits (16 bytes) é mapeado em uma matriz bidimensional em ordem *column-major*:
+The 128-bit block (16 bytes) is mapped onto a two-dimensional matrix in column-major order:
 
 $$\text{State} = \begin{bmatrix} s_{0,0} & s_{0,1} & s_{0,2} & s_{0,3} \\ s_{1,0} & s_{1,1} & s_{1,2} & s_{1,3} \\ s_{2,0} & s_{2,1} & s_{2,2} & s_{2,3} \\ s_{3,0} & s_{3,1} & s_{3,2} & s_{3,3} \end{bmatrix} = \begin{bmatrix} b_0 & b_4 & b_8 & b_{12} \\ b_1 & b_5 & b_9 & b_{13} \\ b_2 & b_6 & b_{10} & b_{14} \\ b_3 & b_7 & b_{11} & b_{15} \end{bmatrix}$$
 
-### 1.2 Transformações Fundamentais de Cada Rodada
+### 1.2 Fundamental Round Transformations
 
-A cada rodada do algoritmo, quatro transformações são aplicadas:
+Each round applies four deterministic operations:
 
-1. **`SubBytes` (Substituição Não-Linear de Bytes)**:
-   - Cada byte do estado $s_{r,c}$ é substituído de forma independente pelo valor correspondente em uma tabela de busca de 256 bytes denominada **S-Box**.
-   - A S-Box é construída calculando o inverso multiplicativo no corpo finito de Galois $GF(2^8)$ com polinômio irredutível $m(x) = x^8 + x^4 + x^3 + x + 1$ (`0x11B`), seguido de uma transformação afim invertível sobre $GF(2)$.
-   - Em hardware, 16 S-Boxes combinacionais operam em paralelo para transformar o bloco completo em um único ciclo.
+1. **`SubBytes` (Non-linear Byte Substitution)**:
+   - Each state byte $s_{r,c}$ is independently mapped through a 256-byte substitution table (**S-Box**).
+   - The S-Box computes the multiplicative inverse in Galois Field $GF(2^8)$ with irreducible polynomial $m(x) = x^8 + x^4 + x^3 + x + 1$ (`0x11B`), followed by an affine transformation over $GF(2)$.
+   - In hardware, 16 combinational S-Box lookup units operate in parallel to transform the entire 128-bit state in a single clock cycle.
 
-2. **`ShiftRows` (Permutação Cíclica de Linhas)**:
-   - Linha 0: sem deslocamento.
-   - Linha 1: deslocamento circular à esquerda de 1 byte ($s_{1,c} \leftarrow s_{1,(c+1)\bmod 4}$).
-   - Linha 2: deslocamento circular à esquerda de 2 bytes ($s_{2,c} \leftarrow s_{2,(c+2)\bmod 4}$).
-   - Linha 3: deslocamento circular à esquerda de 3 bytes ($s_{3,c} \leftarrow s_{3,(c+3)\bmod 4}$).
-   - Em hardware FPGA, essa operação não consome lógica (apenas fiação direta entre registradores).
+2. **`ShiftRows` (Cyclic Row Permutation)**:
+   - Row 0: No shift.
+   - Row 1: 1-byte left cyclic shift ($s_{1,c} \leftarrow s_{1,(c+1)\bmod 4}$).
+   - Row 2: 2-byte left cyclic shift ($s_{2,c} \leftarrow s_{2,(c+2)\bmod 4}$).
+   - Row 3: 3-byte left cyclic shift ($s_{3,c} \leftarrow s_{3,(c+3)\bmod 4}$).
+   - On FPGA architectures, this requires zero logic cells (direct register-to-register wire permutations).
 
-3. **`MixColumns` (Difusão Linear nas Colunas)**:
-   - Cada coluna da matriz de estado é multiplicada por uma matriz circulant fixa de Maximum Distance Separable (MDS) no corpo $GF(2^8)$:
+3. **`MixColumns` (Linear Column Diffusion)**:
+   - Each state column is multiplied by a fixed Maximum Distance Separable (MDS) circulant matrix over $GF(2^8)$:
      $$\begin{bmatrix} s'_{0,c} \\ s'_{1,c} \\ s'_{2,c} \\ s'_{3,c} \end{bmatrix} = \begin{bmatrix} 02 & 03 & 01 & 01 \\ 01 & 02 & 03 & 01 \\ 01 & 01 & 02 & 03 \\ 03 & 01 & 01 & 02 \end{bmatrix} \begin{bmatrix} s_{0,c} \\ s_{1,c} \\ s_{2,c} \\ s_{3,c} \end{bmatrix}$$
-   - A multiplicação por 02 é realizada pela função $xtime(b)$:
-     $$xtime(b) = (b \ll 1) \oplus (0x1B \text{ se } b_7 = 1 \text{ senão } 0x00)$$
-   - A multiplicação por 03 é calculada como $xtime(b) \oplus b$.
-   - **Nota**: A transformação `MixColumns` é omitida na última rodada (Rodada 10).
+   - Multiplication by 02 is implemented via $xtime(b) = (b \ll 1) \oplus (0x1B \text{ if } b_7 = 1 \text{ else } 0x00)$.
+   - Multiplication by 03 is computed as $xtime(b) \oplus b$.
+   - **Note**: `MixColumns` is omitted in Round 10 per FIPS-197.
 
-4. **`AddRoundKey` (Injeção da Chave da Rodada)**:
-   - Os 128 bits do estado são combinados por operação XOR bit-a-bit com os 128 bits da subchave correspondente à rodada:
+4. **`AddRoundKey` (Round Key Injection)**:
+   - Bitwise XOR between the 128-bit state and the 128-bit round subkey:
      $$\text{State}' = \text{State} \oplus K_r$$
 
-### 1.3 Expansão de Chave (*Key Schedule*)
+### 1.3 Key Expansion (*Key Schedule*)
 
-A chave do usuário de 128 bits ($K$) é expandida em um array linear de 44 palavras de 32 bits ($W_0, W_1, \dots, W_{43}$), fornecendo 11 subchaves de 128 bits:
-- $W_0, W_1, W_2, W_3$: Chave original.
-- Para $i = 4$ até 43:
-  $$W_i = \begin{cases} W_{i-4} \oplus \text{SubWord}(\text{RotWord}(W_{i-1})) \oplus \text{Rcon}[i/4], & \text{se } i \equiv 0 \pmod 4 \\ W_{i-4} \oplus W_{i-1}, & \text{caso contrário} \end{cases}$$
-Onde $\text{Rcon}[j]$ é a constante de rodada $x^{j-1}$ em $GF(2^8)$.
+The 128-bit key ($K$) expands into a linear array of 44 32-bit words ($W_0, W_1, \dots, W_{43}$), providing 11 round subkeys of 128 bits:
+- $W_0, W_1, W_2, W_3$: Original cipher key.
+- For $i = 4$ to 43:
+  $$W_i = \begin{cases} W_{i-4} \oplus \text{SubWord}(\text{RotWord}(W_{i-1})) \oplus \text{Rcon}[i/4], & \text{if } i \equiv 0 \pmod 4 \\ W_{i-4} \oplus W_{i-1}, & \text{otherwise} \end{cases}$$
+Where $\text{Rcon}[j]$ is the round constant $x^{j-1}$ in $GF(2^8)$.
 
 ---
 
-## 2. Princípio do Modo Contador (AES-CTR - NIST SP 800-38A)
+## 2. Counter Mode Operation (AES-CTR - NIST SP 800-38A)
 
-O **Counter Mode (CTR)** converte uma cifra de bloco em uma cifra de fluxo (*stream cipher*), gerando uma sequência pseudoaleatória de bytes (*keystream*) independente do texto plano:
+**Counter Mode (CTR)** turns a block cipher into a stream cipher by encrypting sequential counter blocks ($T_j$) to generate a pseudo-random keystream ($O_j$):
 
 ```mermaid
 flowchart TD
-    subgraph KeystreamGen ["Geração de Keystream (AES-128 Direto)"]
-        IV["Nonce / IV (96 bits)<br/>reg_iv_0..2"] --> Concat["Bloco Contador (128 bits)<br/>T_j = IV || Counter_j"]
-        CTR["Contador (32 bits)<br/>reg_counter_r"] --> Concat
-        Concat --> AES["Cifra de Bloco AES-128<br/>E_K(T_j) [10 Rodadas]"]
-        Key["Chave de 128 bits<br/>reg_key_0..3"] --> AES
-        AES --> KS["Keystream O_j<br/>(128 bits / 4x 32-bit words)"]
+    subgraph KeystreamGen ["Keystream Generation (Forward AES-128)"]
+        IV["Nonce / IV (96 bits)\nreg_iv_0..2"] --> Concat["Counter Block (128 bits)\nT_j = IV || Counter_j"]
+        CTR["Counter (32 bits)\nreg_counter_r"] --> Concat
+        Concat --> AES["AES-128 Core\nE_K(T_j) [10 Rounds]"]
+        Key["128-bit Key\nreg_key_0..3"] --> AES
+        AES --> KS["Keystream O_j\n(128 bits / 4x 32-bit words)"]
     end
 
-    subgraph Datapath ["Fluxo de Dados AXI4-Stream"]
-        Plain["Entrada de Dados (S_AXIS)<br/>Plaintext / Ciphertext"] --> XOR{"XOR"}
+    subgraph Datapath ["Data Stream Processing"]
+        Plain["Plaintext Input (BRAM / Stream)"] --> XOR{"XOR"}
         KS --> XOR
-        XOR --> Cipher["Saída de Dados (M_AXIS)<br/>Ciphertext / Plaintext"]
+        XOR --> Cipher["Ciphertext Output (BRAM / Stream)"]
     end
 ```
 
-### 2.1 Propriedades Notáveis do Modo CTR
+### 2.1 Properties of CTR Mode
 
-1. **Simetria Operacional**: A cifragem e a decifragem executam exatamente a mesma operação:
+1. **Symmetric Execution**: Encryption and decryption execute the identical forward cipher function:
    $$C_j = P_j \oplus E_K(T_j) \iff P_j = C_j \oplus E_K(T_j)$$
-   Como a operação de decifração nunca invoca a decifração da cifra de bloco ($D_K$), **não há necessidade de implementar a S-Box inversa nem o MixColumns inverso em silício**, economizando mais de 50% dos recursos de hardware na FPGA.
-2. **Sem Propagação de Erros**: A corrupção de 1 bit no texto cifrado corrompe exatamente 1 bit no texto plano decifrado, sem corromper os blocos adjacentes.
-3. **Alto Throughput**: O keystream pode ser pré-computado em paralelo com a chegada dos dados.
+   Because the inverse block cipher ($D_K$) is never evaluated, **inverse S-Boxes and inverse MixColumns are not synthesized**, reducing FPGA logic utilization by over 50%.
+2. **Error Isolation**: A 1-bit transmission error in ciphertext affects only the corresponding bit in plaintext, preventing error propagation across adjacent blocks.
+3. **Pipeline Efficiency**: Keystream generation can proceed synchronously with data ingestion.
 
 ---
 
-## 3. Arquitetura do Coprocessador e Integração de Memória no Block Design (ADR-012)
+## 3. Hardware Architecture & Memory Decoupling (ADR-012)
 
-Em conformidade com a diretriz arquitetural **ADR-012**, o módulo `aes_ctr_engine` não aloca arrays gigantescos de memória interna. A entidade é puramente computacional e modular:
+In accordance with architectural invariant **ADR-012**, large memory buffers and FIFOs are not inferred inside the VHDL RTL core. Instead, data movement uses decoupled True Dual-Port Block RAMs:
 
-- **Controle e Configuração**: Barramento escravo **AXI4-Lite** em `0x43C20000` (`s_axi_lite_awaddr`, `s_axi_lite_wdata`, etc.).
-- **Fluxo de Dados**: Interfaces padronizadas **AXI4-Stream** de 32 bits:
-  - Ingress: `s_axis_tdata(31:0)`, `s_axis_tvalid`, `s_axis_tready`, `s_axis_tlast`, `s_axis_tkeep(3:0)`.
-  - Egress: `m_axis_tdata(31:0)`, `m_axis_tvalid`, `m_axis_tready`, `m_axis_tlast`, `m_axis_tkeep(3:0)`.
-- **Memória Desacoplada no Block Design**:
-  - Na tela do Vivado Block Design (`soc_final_bd_1.bd`), os blocos **`axis_data_fifo`** da Xilinx são conectados na entrada e na saída do coprocessador, absorvendo as latências de transferência e fornecendo buffer visual para o AXI DMA.
-
-```
-+-----------------------------------------------------------------------------------------+
-|                                  VIVADO BLOCK DESIGN                                    |
-|                                                                                         |
-|  [AXI DMA MM2S] ===> [axis_data_fifo_in] ===> [aes_ctr_engine] ===> [axis_data_fifo_out] ===> [AXI DMA S2MM]
-|                                                     ^                                   |
-|  [PS7 M_AXI_GP0] ===================================+ (AXI4-Lite @ 0x43C20000)          |
-+-----------------------------------------------------------------------------------------+
-```
+- **Control & Configuration**: Memory-mapped AXI4-Lite slave interface at `0x43C20000` (or `0x43C10000` depending on Block Design instance).
+- **Data Buffering**:
+  - **Input Memory**: Dedicated 8 KB Dual-Port BRAM (`0x40010000`, Port A PS, Port B Accel).
+  - **Output Memory**: Dedicated 8 KB Dual-Port BRAM (`0x40012000`, Port A PS, Port B Accel).
+- **Throughput**: Processes each 16-byte block in **11 clock cycles** at 100 MHz (1 cycle initialization + 10 rounds).
 
 ---
 
-## 4. Máquina de Estados Finita (FSM) do Coprocessador
+## 4. Finite State Machine (FSM)
 
-A máquina de estados implementada em [`aes_ctr_engine.vhdl`](../cora7z/app/hw/src/aes_ctr_engine.vhdl) opera nos seguintes estados:
+The hardware FSM transitions through the following states:
 
-1. **`ST_IDLE`**: Repouso com `s_axis_tready = '0'` e `m_axis_tvalid = '0'`. Aguarda pulso no bit 0 do registrador `CONTROL` (`START`).
-2. **`ST_EXPAND_KEYS`**: Expande a chave de 128 bits (`KEY_0..3`) em 11 subchaves de 128 bits ($W_0..W_{43}$) armazenadas em registradores internos dedicados.
-3. **`ST_LOAD_CTR`**: Monta o bloco contador inicial $T_j = [\text{IV\_0}, \text{IV\_1}, \text{IV\_2}, \text{cur\_counter\_r}]$ e aplica o `AddRoundKey` inicial (Rodada 0).
-4. **`ST_ROUND_OP`**: Itera sequencialmente pelas rodadas 1 a 10 (1 ciclo por rodada). Ao atingir a rodada 10, o keystream de 128 bits está pronto e é armazenado em `keystream_r`.
-5. **`ST_STREAM_XOR`**: Transfere 4 palavras de 32 bits via AXI4-Stream. A cada batida com handshake (`tvalid and tready`), realiza a operação XOR entre a palavra de dados e a palavra de keystream correspondente.
-6. **`ST_NEXT_BLOCK`**: Incrementa o contador de 32 bits ($\text{cur\_counter\_r} \leftarrow \text{cur\_counter\_r} + 1$) e retorna a `ST_LOAD_CTR` caso ainda existam dados a processar.
-7. **`ST_DONE`**: Finaliza o processamento, asserta o bit 1 em `STATUS` (`DONE`), grava `DST_LEN` e dispara pulso na linha de interrupção `irq_o`.
+1. **`ST_IDLE`**: Awaiting assertion of Bit 0 (`START`) in the `CONTROL` register.
+2. **`ST_EXPAND_KEYS`**: Expands the 128-bit key into 11 subkeys stored in internal registers.
+3. **`ST_LOAD_CTR`**: Assembles the initial counter block $T_j = [\text{IV\_0}, \text{IV\_1}, \text{IV\_2}, \text{cur\_counter\_r}]$ and applies Round 0 `AddRoundKey`.
+4. **`ST_ROUND_OP`**: Steps iteratively through Rounds 1 to 10 (1 round per clock cycle). Upon completion of Round 10, the 128-bit keystream is registered.
+5. **`ST_STREAM_XOR`**: Performs 32-bit word-level XOR operations with incoming data and writes results to the output BRAM.
+6. **`ST_NEXT_BLOCK`**: Increments the 32-bit counter ($\text{cur\_counter\_r} \leftarrow \text{cur\_counter\_r} + 1$) and returns to `ST_LOAD_CTR` until the full payload length is processed.
+7. **`ST_DONE`**: Asserts Bit 1 (`DONE`) in the `STATUS` register, records the execution cycle count in `CYCLE_COUNT`, and issues an interrupt pulse.
 
 ---
 
-## 5. Validação contra Vetores Oficiais NIST SP 800-38A
+## 5. Verification Against NIST SP 800-38A Vectors
 
-O banco de testes em VUnit ([`tb_aes_ctr_engine.vhdl`](../cora7z/app/hw/test/tb_aes_ctr_engine.vhdl)) valida o núcleo com os vetores oficiais publicados pelo NIST:
+The self-checking VUnit testbench (`tb_aes_accel.vhdl` / `tb_aes_ctr_engine.vhdl`) validates the core against official NIST test vectors:
 
-- **Chave de Cifragem ($K$)**:  
-  `2b7e1516 28aed2a6 abf71588 09cf4f3c`
-- **Vetor de Inicialização / Nonce ($IV$)**:  
-  `f0f1f2f3 f4f5f6f7 f8f9fa`
-- **Texto Plano ($P_1$)**:  
-  `6bc1bee2 2e409f96 e93d7e11 7393172a`
-- **Texto Cifrado Esperado ($C_1$)**:  
-  `874d6191 b620e326 1bef6864 990db6ce`
+- **Cipher Key ($K$)**: `2b7e1516 28aed2a6 abf71588 09cf4f3c`
+- **Initialization Vector / Nonce ($IV$)**: `f0f1f2f3 f4f5f6f7 f8f9fa`
+- **Plaintext ($P_1$)**: `6bc1bee2 2e409f96 e93d7e11 7393172a`
+- **Expected Ciphertext ($C_1$)**: `874d6191 b620e326 1bef6864 990db6ce`
 
-### Resumo dos Resultados do Testbench VUnit
+### VUnit Testbench Execution Output
 ```text
 pass lib.tb_aes_ctr_engine.test_csr_access                 (0.3 seconds)
 pass lib.tb_aes_ctr_engine.test_nist_sp800_38a_vector      (0.3 seconds)
@@ -151,7 +138,7 @@ pass 4 of 4
 
 ---
 
-## 6. Referências
+## 6. References
 
 1. National Institute of Standards and Technology (NIST), *FIPS PUB 197: Advanced Encryption Standard (AES)*, 2001.
 2. National Institute of Standards and Technology (NIST), *SP 800-38A: Recommendation for Block Cipher Modes of Operation: Methods and Techniques*, 2001.
