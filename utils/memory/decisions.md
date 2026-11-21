@@ -69,6 +69,10 @@ Resolution:
 2. Updated VUnit self-checking testbench `cora7z/app/hw/test/tb_lzss_accel.vhdl` with a 64-byte payload pattern; verified 11/11 tests pass in GHDL simulation.
 3. Closed timing ($WNS = +0.551$ ns) and verified hardware execution on Cora Z7 target across all 5 verification suites, achieving 100% bit-exact parity across the 4 co-design scenarios (SW/SW, HW/SW, SW/HW, HW/HW) and zero CRC frame errors under continuous ESP32 SPI streaming.
 
+## ADR-020 | 2026-11-11 | architecture | Standardized 1024-Byte Payload Sizing for HIL Benchmarking
+Reason: To eliminate variable-length buffer fragmentation, align to 1024-byte True Dual-Port Block RAM coprocessor boundaries, and streamline the evaluation matrix, physical HIL benchmarking drops intermediate payload lengths (64 B, 256 B, 512 B) and standardizes exclusively on a fixed 1024-byte payload size (exactly 64 packed 16-byte Telemetry Records). Algorithmic behavior and throughput variations are measured across three distinct Entropy Profiles (Quiescent, Dynamic, Chaotic).
+
+
 
 
 
