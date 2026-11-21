@@ -13,7 +13,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-INTERFACES = ROOT / "cora7z" / "app" / "hw" / "src" / "INTERFACES.md"
+INTERFACES = ROOT / "docs" / "hw" / "INTERFACES.md"
 TASK = os.environ.get("TASK_ID", "adhoc")
 
 

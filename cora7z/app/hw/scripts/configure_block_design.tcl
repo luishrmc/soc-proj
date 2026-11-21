@@ -32,10 +32,10 @@ set repo_root [file normalize "[file dirname [info script]]/../../../.."]
 # ------------------------------------------------------------------------------
 # 1. Add Accelerator RTL Sources to Project and Update Compile Order
 # ------------------------------------------------------------------------------
-puts "--- Adding Accelerator RTL Sources (lzss_accel.vhdl, aes_accel.vhdl) ---"
+puts "--- Adding Accelerator RTL Sources (compression/lzss_accel.vhdl, crypto/aes_accel.vhdl) ---"
 set rtl_files [list \
-    "$repo_root/cora7z/app/hw/src/lzss_accel.vhdl" \
-    "$repo_root/cora7z/app/hw/src/aes_accel.vhdl" \
+    "$repo_root/cora7z/app/hw/src/compression/lzss_accel.vhdl" \
+    "$repo_root/cora7z/app/hw/src/crypto/aes_accel.vhdl" \
 ]
 add_files -norecurse $rtl_files
 set_property file_type {VHDL 2008} [get_files [list lzss_accel.vhdl aes_accel.vhdl]]

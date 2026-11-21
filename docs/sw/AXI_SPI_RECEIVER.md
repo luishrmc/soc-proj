@@ -1,7 +1,7 @@
 # Módulo de Software: axi_spi_receiver (Driver de Recepção SPI)
 ## Ingestão de Quadros de Telemetria sobre AXI Quad SPI (Bare-Metal C11)
 
-Os arquivos [`axi_spi_receiver.c`](axi_spi_receiver.c) e [`axi_spi_receiver.h`](axi_spi_receiver.h) implementam o driver responsável pela recepção, alinhamento de memória e validação criptográfica/estrutural dos pacotes enviados pelo ESP32 via barramento SPI.
+Os arquivos [`axi_spi_receiver.c`](../../cora7z/app/sw/src/comms/axi_spi_receiver.c) e [`axi_spi_receiver.h`](../../cora7z/app/sw/src/comms/axi_spi_receiver.h) implementam o driver responsável pela recepção, alinhamento de memória e validação criptográfica/estrutural dos pacotes enviados pelo ESP32 via barramento SPI.
 
 ---
 

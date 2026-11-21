@@ -2,8 +2,8 @@
 module: pipeline_mgr
 status: verified
 sources:
-  - cora7z/app/sw/src/pipeline_mgr.c sha256=e86285545f0be533b84cc41b4ac1015469dfd4ebe4389b5c138c46749bd894af
-  - cora7z/app/sw/src/pipeline_mgr.h sha256=18e7b38360cb9048ddeb3a0d284ebe29684444cdb0ab164c326ed4dae832a691
+  - cora7z/app/sw/src/pipeline/pipeline_mgr.c sha256=8feb3b676761cf71cc5e03ad9f8e00ba3947a65c2d6aff1fd84af08327f49ccd
+  - cora7z/app/sw/src/pipeline/pipeline_mgr.h sha256=18e7b38360cb9048ddeb3a0d284ebe29684444cdb0ab164c326ed4dae832a691
 gates_passed: [c-lint, vitis-build, elf-link]
 ---
 

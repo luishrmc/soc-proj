@@ -51,13 +51,13 @@ The parameters below define the physical hardware testbed on the Digilent Cora Z
 | Subsystem / Module | Source Files | Linked Specification | Architectural Role | Deliverable & Verification Status |
 |---|---|:---:|---|---|
 | **1. Telemetry Generator (Host)** | `utils/` (Python WIP) | [Architecture §6.3](docs/SYSTEM_ARCHITECTURE.md#63-synthetic-telemetry-generation--esp-idf-ingestion-setup-esp32) | Time-series sensor stream synthesis (temperature, vibration, voltage) | Active WIP; generates test vectors for HIL sweeps |
-| **2. SPI Injector (ESP32)** | [`spi_injector_master.c`](esp32/main/spi_injector_master.c) | [SPI_INJECTOR.md](esp32/SPI_INJECTOR.md) | Physical SPI Master bridge for synthetic test vector frames | Mode 0 driver verified; physical HIL sweeps WIP |
-| **3. SPI Receiver (PS/PL)** | [`axi_spi_receiver.c`](cora7z/app/sw/src/axi_spi_receiver.c) | [AXI_SPI_RECEIVER.md](cora7z/app/sw/src/AXI_SPI_RECEIVER.md) | 256 B FIFO drainage and 32-bit word alignment | Preamble validation (`0xA5`), CRC check, echo/ACK response |
-| **4. Compression Accel (PL)** | [`lzss_accel.vhdl`](cora7z/app/hw/src/lzss_accel.vhdl) | [LZSS_ACCEL.md](cora7z/app/hw/src/LZSS_ACCEL.md) | Sliding window hardware compressor (256 B / 16 B) | RTL verified in VUnit; physical benchmark pending |
-| **5. Compression Baseline (PS)** | [`lzss_sw.c`](cora7z/app/sw/src/lzss_sw.c) | [LZSS_SW.md](cora7z/app/sw/src/LZSS_SW.md) | Heatshrink-compatible C11 reference for Cortex-A9 | L1/L2 cache execution, bit-exact parity with HW model |
-| **6. Crypto Accel (PL)** | [`aes_accel.vhdl`](cora7z/app/hw/src/aes_accel.vhdl) | [AES_ACCEL.md](cora7z/app/hw/src/AES_ACCEL.md) | Iterative 10-round AES-128-CTR hardware engine | VUnit verified with NIST vectors; benchmark pending |
-| **7. Crypto Baseline (PS)** | [`aes_ctr_sw.c`](cora7z/app/sw/src/aes_ctr_sw.c) | [AES_CTR_SW.md](cora7z/app/sw/src/AES_CTR_SW.md) | NIST SP 800-38A reference model in C11 | Golden vector validated; baseline CPU profiling target |
-| **8. Pipeline Manager** | [`pipeline_mgr.c`](cora7z/app/sw/src/pipeline_mgr.c) | [PIPELINE_MGR.md](cora7z/app/sw/src/PIPELINE_MGR.md) | Orchestration of 4 scenarios and DEVCFG bus safety | Interlock implemented (`PCFG_DONE`); scenario dispatcher ready |
+| **2. SPI Injector (ESP32)** | [`spi_injector_master.c`](esp32/main/spi_injector_master.c) | [SPI_INJECTOR.md](docs/esp32/SPI_INJECTOR.md) | Physical SPI Master bridge for `Embedded Dataset` frames | Mode 0 + `GPIO 32` trigger verified; HIL sweeps WIP |
+| **3. SPI Receiver (PS/PL)** | [`axi_spi_receiver.c`](cora7z/app/sw/src/comms/axi_spi_receiver.c) | [AXI_SPI_RECEIVER.md](docs/sw/AXI_SPI_RECEIVER.md) | 256 B FIFO drainage and 32-bit word alignment | Preamble validation (`0xA5`), CRC check, echo/ACK response |
+| **4. Compression Accel (PL)** | [`lzss_accel.vhdl`](cora7z/app/hw/src/compression/lzss_accel.vhdl) | [LZSS_ACCEL.md](docs/hw/LZSS_ACCEL.md) | Sliding window hardware compressor (256 B / 16 B) | RTL verified in VUnit; physical benchmark pending |
+| **5. Compression Baseline (PS)** | [`lzss_sw.c`](cora7z/app/sw/src/compression/lzss_sw.c) | [LZSS_SW.md](docs/sw/LZSS_SW.md) | Heatshrink-compatible C11 reference for Cortex-A9 | L1/L2 cache execution, bit-exact parity with HW model |
+| **6. Crypto Accel (PL)** | [`aes_accel.vhdl`](cora7z/app/hw/src/crypto/aes_accel.vhdl) | [AES_ACCEL.md](docs/hw/AES_ACCEL.md) | Iterative 10-round AES-128-CTR hardware engine | VUnit verified with NIST vectors; benchmark pending |
+| **7. Crypto Baseline (PS)** | [`aes_ctr_sw.c`](cora7z/app/sw/src/crypto/aes_ctr_sw.c) | [AES_CTR_SW.md](docs/sw/AES_CTR_SW.md) | NIST SP 800-38A reference model in C11 | Golden vector validated; baseline CPU profiling target |
+| **8. Pipeline Manager** | [`pipeline_mgr.c`](cora7z/app/sw/src/pipeline/pipeline_mgr.c) | [PIPELINE_MGR.md](docs/sw/PIPELINE_MGR.md) | Orchestration of 4 scenarios and DEVCFG bus safety | Interlock implemented (`PCFG_DONE`); scenario dispatcher ready |
 | **9. Architectural Diagrams** | [`cora7z_top.png`](docs/diagrams/cora7z_top.png) | [Diagrams README](docs/diagrams/README.md) | High-resolution 3200 $\times$ 1800 block diagram | Memory map, bus interconnects, pin allocation |
 
 ---
@@ -95,7 +95,7 @@ On the Cora Z7, the physical lines connect to the Xilinx LogiCORE **`axi_quad_sp
 * **Handshake Sequence:**
   1. The Cora Z7 issues an active-low trigger pulse on **PMOD JA1** (`Y18`) connected to ESP32 **GPIO 32** (or the ESP32 transmits autonomously via FreeRTOS timer pacing).
   2. The ESP32 formats the binary frame with CRC-16 CCITT and initiates the SPI transaction.
-  3. The PS driver [`axi_spi_receiver.c`](cora7z/app/sw/src/axi_spi_receiver.c) drains the FIFO into DDR3 and validates frame integrity.
+  3. The PS driver [`axi_spi_receiver.c`](cora7z/app/sw/src/comms/axi_spi_receiver.c) drains the FIFO into DDR3 and validates frame integrity.
 
 ---
 
@@ -254,17 +254,28 @@ ufmg/soc/proj/
 ├── cora7z/
 │   └── app/
 │       ├── hw/                 # VHDL-2008 RTL, constraints, synthesis scripts
-│       │   ├── src/            # LZSS_ACCEL.md, AES_ACCEL.md, INTERFACES.md
+│       │   ├── src/
+│       │   │   ├── compression/ # lzss_accel.vhdl
+│       │   │   └── crypto/      # aes_accel.vhdl
 │       │   ├── test/           # tb_lzss_accel.vhdl, tb_aes_accel.vhdl (VUnit)
 │       │   ├── scripts/        # configure_block_design.tcl, build_bitstream.tcl, run_vivado.sh
 │       │   └── utils/          # cora_z7_io.xdc, cora_z7_pins.json
 │       └── sw/                 # C11 Bare-metal firmware (ARM Cortex-A9)
-│           ├── src/            # LZSS_SW.md, AES_CTR_SW.md, PIPELINE_MGR.md, AXI_SPI_RECEIVER.md
+│           ├── src/
+│           │   ├── compression/ # lzss_sw.{c,h}
+│           │   ├── crypto/      # aes_ctr.{c,h}, aes_ctr_sw.{c,h}
+│           │   ├── comms/       # axi_spi_receiver.{c,h}, spi_frame.h
+│           │   ├── pipeline/    # main.c, pipeline_mgr.{c,h}
+│           │   └── utils/       # axi_io.h, test_sw_pipeline.{c,h}
 │           └── scripts/        # build_sw.py, launch_app.py
 ├── esp32/                      # Autonomous SPI synthetic injector (ESP-IDF v6.1)
-│   ├── main/                   # main.c, spi_injector_master.c, spi_frame.h
-│   └── components/ui_controller
-├── docs/                       # Architectural specifications and diagrams
+│   ├── main/                   # main.c, spi_injector_master.{c,h}, trigger_gpio.{c,h}, spi_frame.h
+│   └── scripts/                # generate_telemetry.py, telemetry_profiles.py, test_generate_telemetry.py
+├── docs/                       # Architectural, module, and hardware documentation
+│   ├── hw/                     # INTERFACES.md, LZSS_ACCEL.md, AES_ACCEL.md, README.md
+│   ├── sw/                     # LZSS_SW.md, AES_CTR_SW.md, PIPELINE_MGR.md, AXI_SPI_RECEIVER.md, README.md
+│   ├── esp32/                  # SPI_INJECTOR.md, ESP32 datasheets & pinout
+│   ├── adr/                    # Architecture Decision Records
 │   ├── SYSTEM_ARCHITECTURE.md
 │   ├── AES_CTR_ALGORITHM.md
 │   └── diagrams/               # cora7z_top.png (3200x1800), generate_soc_diagram.py

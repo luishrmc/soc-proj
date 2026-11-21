@@ -10,7 +10,7 @@ permissions:
   write:
     - cora7z/app/hw/scripts/**
     - cora7z/app/hw/utils/*.xdc
-    - cora7z/app/hw/src/INTERFACES.md
+    - docs/hw/INTERFACES.md
     - utils/memory/modules/*
     - utils/memory/handoff/*
 ---

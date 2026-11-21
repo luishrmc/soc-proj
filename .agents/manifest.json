@@ -21,7 +21,7 @@
   },
   "protected": [
     "cora7z/app/hw/utils/*.xdc",
-    "cora7z/app/hw/src/INTERFACES.md",
+    "docs/hw/INTERFACES.md",
     "requirements.txt",
     ".agents/manifest.json"
   ],
@@ -101,7 +101,7 @@
       "write": [
         "cora7z/app/hw/scripts/**",
         "cora7z/app/hw/utils/*.xdc",
-        "cora7z/app/hw/src/INTERFACES.md",
+        "docs/hw/INTERFACES.md",
         "utils/memory/modules/*",
         "utils/memory/handoff/*"
       ],

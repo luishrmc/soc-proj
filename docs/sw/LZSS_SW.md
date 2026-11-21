@@ -1,7 +1,7 @@
 # Módulo de Software: lzss_sw (Compressão LZSS / Heatshrink em C11)
 ## Referência em Software e Descompressor para ARM Cortex-A9 @ 667 MHz
 
-Os arquivos [`lzss_sw.c`](lzss_sw.c) e [`lzss_sw.h`](lzss_sw.h) implementam o algoritmo de compressão e descompressão LZSS (Lempel-Ziv-Storer-Szymanski) em linguagem C11 bare-metal, servindo como modelo de ouro funcional (*golden model*) e mecanismo de descompressão para validação *round-trip*.
+Os arquivos [`lzss_sw.c`](../../cora7z/app/sw/src/compression/lzss_sw.c) e [`lzss_sw.h`](../../cora7z/app/sw/src/compression/lzss_sw.h) implementam o algoritmo de compressão e descompressão LZSS (Lempel-Ziv-Storer-Szymanski) em linguagem C11 bare-metal, servindo como modelo de ouro funcional (*golden model*) e mecanismo de descompressão para validação *round-trip*.
 
 ---
 

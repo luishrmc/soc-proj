@@ -1,16 +1,16 @@
 # SPI Telemetry Injector & Dataset Pipeline (`spi_injector_master` / `trigger_gpio`)
 ## Autonomous Transmission Firmware for ESP32-WROOM (ESP-IDF v6.1 @ 240 MHz)
 
-The modules in [`esp32/main/`](main/) and [`esp32/scripts/`](scripts/) implement the build-time synthetic telemetry dataset pipeline, `GPIO 32` hardware trigger listener, and VSPI master injector targeting the Digilent Cora Z7-10.
+The modules in [`esp32/main/`](../../esp32/main/) and [`esp32/scripts/`](../../esp32/scripts/) implement the build-time synthetic telemetry dataset pipeline, `GPIO 32` hardware trigger listener, and VSPI master injector targeting the Digilent Cora Z7-10.
 
 ---
 
 ## 1. Operational Overview
 
-* **Build-Time `Embedded Dataset` ([`scripts/generate_telemetry.py`](scripts/generate_telemetry.py)):** CMake (`main/CMakeLists.txt`) runs the Python generator during `idf.py build` to emit `telemetry_dataset.{h,c}` in flash `.rodata`. Each entry stores a `1024`-byte payload (`64` packed `16`-byte `Telemetry Record`s) tagged with its `Entropy Profile` (`Quiescent`, `Dynamic`, `Chaotic`).
-* **SPI Master Link ([`main/spi_injector_master.c`](main/spi_injector_master.c)):** Uses `SPI3_HOST` (VSPI) in Mode 0 with DMA buffers at `CONFIG_ESP32_SPI_CLOCK_HZ` (`2 MHz` default, up to `25 MHz`).
-* **Hardware Trigger ([`main/trigger_gpio.c`](main/trigger_gpio.c)):** `GPIO 32` (`GPIO_INTR_NEGEDGE`, internal pull-up) uses an `IRAM_ATTR` ISR with `esp_timer_get_time()` lockout (`CONFIG_ESP32_TRIGGER_LOCKOUT_MS`, default `50 ms`) and `xTaskNotifyFromISR()` to launch one complete burst per Cora Z7 pulse (`30 ms` active-low on PMOD JA1 `Y18`).
-* **Paced Burst Loop ([`main/main.c`](main/main.c)):** Iterates over `g_telemetry_dataset[0..TELEMETRY_DATASET_FRAME_COUNT-1]`, calls `spi_injector_build_frame()` with `SPI_PKT_TYPE_TELEMETRY` (`0x02`) and monotonic `seq_id`, validates ACKs via `spi_injector_validate_ack()`, and delays `CONFIG_ESP32_INTER_FRAME_GAP_MS` (`30 ms` default) between frames.
+* **Build-Time `Embedded Dataset` ([`scripts/generate_telemetry.py`](../../esp32/scripts/generate_telemetry.py)):** CMake (`main/CMakeLists.txt`) runs the Python generator during `idf.py build` to emit `telemetry_dataset.{h,c}` in flash `.rodata`. Each entry stores a `1024`-byte payload (`64` packed `16`-byte `Telemetry Record`s) tagged with its `Entropy Profile` (`Quiescent`, `Dynamic`, `Chaotic`).
+* **SPI Master Link ([`main/spi_injector_master.c`](../../esp32/main/spi_injector_master.c)):** Uses `SPI3_HOST` (VSPI) in Mode 0 with DMA buffers at `CONFIG_ESP32_SPI_CLOCK_HZ` (`2 MHz` default, up to `25 MHz`).
+* **Hardware Trigger ([`main/trigger_gpio.c`](../../esp32/main/trigger_gpio.c)):** `GPIO 32` (`GPIO_INTR_NEGEDGE`, internal pull-up) uses an `IRAM_ATTR` ISR with `esp_timer_get_time()` lockout (`CONFIG_ESP32_TRIGGER_LOCKOUT_MS`, default `50 ms`) and `xTaskNotifyFromISR()` to launch one complete burst per Cora Z7 pulse (`30 ms` active-low on PMOD JA1 `Y18`).
+* **Paced Burst Loop ([`main/main.c`](../../esp32/main/main.c)):** Iterates over `g_telemetry_dataset[0..TELEMETRY_DATASET_FRAME_COUNT-1]`, calls `spi_injector_build_frame()` with `SPI_PKT_TYPE_TELEMETRY` (`0x02`) and monotonic `seq_id`, validates ACKs via `spi_injector_validate_ack()`, and delays `CONFIG_ESP32_INTER_FRAME_GAP_MS` (`30 ms` default) between frames.
 
 ---
 

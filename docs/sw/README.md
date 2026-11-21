@@ -20,14 +20,15 @@ The Cortex-A9 processor operates as the centralized supervisor of the heterogene
 
 | Source File | Header File | Primary Responsibility |
 | :--- | :--- | :--- |
-| `main.c` | --- | Boot banner, PMU calibration, DEVCFG check, test suite execution, continuous SPI loop |
-| `pipeline_mgr.c` | `pipeline_mgr.h` | 4-scenario driver (Cases 1, 2, 3, 4), BRAM staging, CSR polling, watchdog timers |
-| `test_sw_pipeline.c` | `test_sw_pipeline.h`| 5/5 self-test regression suite, 12-combination benchmark matrix sweep |
-| `aes_ctr_sw.c` | `aes_ctr_sw.h` | Software AES-128-CTR reference implementation (NIST SP 800-38A) |
-| `lzss_sw.c` | `lzss_sw.h` | Software LZSS/Heatshrink reference compressor |
-| `axi_spi_receiver.c`| `axi_spi_receiver.h`| AXI Quad SPI driver, packet parser, CRC-16 verifier |
-| `spi_frame.h` | --- | Shared frame structure definition with 32-bit word alignment padding |
-| `axi_io.h` | --- | Low-level volatile MMIO read/write macros |
+| [`pipeline/main.c`](../../cora7z/app/sw/src/pipeline/main.c) | --- | Boot banner, PMU calibration, DEVCFG check, test suite execution, continuous SPI loop |
+| [`pipeline/pipeline_mgr.c`](../../cora7z/app/sw/src/pipeline/pipeline_mgr.c) | [`pipeline/pipeline_mgr.h`](../../cora7z/app/sw/src/pipeline/pipeline_mgr.h) | 4-scenario driver (Cases 1, 2, 3, 4), BRAM staging, CSR polling, watchdog timers |
+| [`utils/test_sw_pipeline.c`](../../cora7z/app/sw/src/utils/test_sw_pipeline.c) | [`utils/test_sw_pipeline.h`](../../cora7z/app/sw/src/utils/test_sw_pipeline.h) | 5/5 self-test regression suite, 12-combination benchmark matrix sweep |
+| [`crypto/aes_ctr_sw.c`](../../cora7z/app/sw/src/crypto/aes_ctr_sw.c) | [`crypto/aes_ctr_sw.h`](../../cora7z/app/sw/src/crypto/aes_ctr_sw.h) | Software AES-128-CTR reference implementation (NIST SP 800-38A) |
+| [`crypto/aes_ctr.c`](../../cora7z/app/sw/src/crypto/aes_ctr.c) | [`crypto/aes_ctr.h`](../../cora7z/app/sw/src/crypto/aes_ctr.h) | Core FIPS-197 AES-128 block and CTR context primitives |
+| [`compression/lzss_sw.c`](../../cora7z/app/sw/src/compression/lzss_sw.c) | [`compression/lzss_sw.h`](../../cora7z/app/sw/src/compression/lzss_sw.h) | Software LZSS/Heatshrink reference compressor |
+| [`comms/axi_spi_receiver.c`](../../cora7z/app/sw/src/comms/axi_spi_receiver.c) | [`comms/axi_spi_receiver.h`](../../cora7z/app/sw/src/comms/axi_spi_receiver.h) | AXI Quad SPI driver, packet parser, CRC-16 verifier |
+| [`comms/spi_frame.h`](../../cora7z/app/sw/src/comms/spi_frame.h) | --- | Shared frame structure definition with 32-bit word alignment padding |
+| [`utils/axi_io.h`](../../cora7z/app/sw/src/utils/axi_io.h) | --- | Low-level volatile MMIO read/write macros |
 
 ---
 

@@ -7,10 +7,10 @@
  * bit-exact parity verification across all 4 execution scenarios.
  */
 
-#include "pipeline_mgr.h"
-#include "lzss_sw.h"
-#include "aes_ctr_sw.h"
-#include "axi_io.h"
+#include "pipeline/pipeline_mgr.h"
+#include "compression/lzss_sw.h"
+#include "crypto/aes_ctr_sw.h"
+#include "utils/axi_io.h"
 #include <string.h>
 
 #if defined(__arm__) || defined(__aarch64__)

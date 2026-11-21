@@ -47,7 +47,7 @@ Drive tasks of `utils/plan/Cronograma_e_Tarefas.csv` to `Concluída` with verifi
   "iteration": 1,
   "handoff": "utils/memory/handoff/2.1.md",
   "digests": ["utils/memory/modules/<dependency>.md"],
-  "inputs": ["cora7z/app/hw/src/INTERFACES.md"],
+  "inputs": ["docs/hw/INTERFACES.md"],
   "required_gates": ["vhdl-lint", "vhdl-sim"],
   "feedback": []
 }

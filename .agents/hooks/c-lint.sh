@@ -49,17 +49,23 @@ if command -v arm-none-eabi-gcc >/dev/null 2>&1; then
   CC="arm-none-eabi-gcc"
 fi
 
+# Collect include directories (root SRC plus any module subdirectories)
+INC_FLAGS=("-I$SRC")
+while IFS= read -r d; do
+  INC_FLAGS+=("-I$d")
+done < <(find "$SRC" -mindepth 1 -type d | sort)
+
 for f in "${FILES[@]}"; do
   if [[ "$f" == *.c ]]; then
     # If BSP headers are available or file is standalone algorithm
     if [ ${#EXTRA_INCLUDES[@]} -gt 0 ]; then
-      if ! $CC -std=c11 -Wall -Wextra -Werror -fsyntax-only "$f" -I"$SRC" "${EXTRA_INCLUDES[@]}" >> "$LOG" 2>&1; then
+      if ! $CC -std=c11 -Wall -Wextra -Werror -fsyntax-only "$f" "${INC_FLAGS[@]}" "${EXTRA_INCLUDES[@]}" >> "$LOG" 2>&1; then
         echo "[ERROR][c-lint] Syntax check failed on $f" >&2
         FAIL=1
       fi
     else
       # Try syntax check without BSP, ignore missing xilinx headers if BSP not generated yet
-      if ! $CC -std=c11 -Wall -Wextra -fsyntax-only "$f" -I"$SRC" >> "$LOG" 2>&1; then
+      if ! $CC -std=c11 -Wall -Wextra -fsyntax-only "$f" "${INC_FLAGS[@]}" >> "$LOG" 2>&1; then
         if grep -qiE 'fatal error: xil_.*\.h: No such file' "$LOG"; then
           echo "[INFO][c-lint] $f requires Vitis BSP headers (will be validated in vitis-build gate)."
         else

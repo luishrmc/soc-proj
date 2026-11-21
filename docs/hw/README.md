@@ -9,8 +9,8 @@ This directory houses the synthesizable VHDL-2008 RTL cores, True Dual-Port Bloc
 
 The Programmable Logic (PL) fabric accelerates the compute-intensive stages of the telemetry pipeline. Rather than multiplexing cores onto shared streaming buses, the architecture instantiates two **independent, decoupled hardware accelerators**:
 
-1. **`lzss_accel.vhdl`**: Sliding-window dictionary compressor (Heatshrink-compatible format, 256 B circular window, 16 B lookahead buffer).
-2. **`aes_accel.vhdl`**: NIST SP 800-38A compliant 128-bit AES Counter Mode (CTR) cryptographic engine (10-round iterative pipeline, on-the-fly key expansion).
+1. **[`compression/lzss_accel.vhdl`](../../cora7z/app/hw/src/compression/lzss_accel.vhdl)**: Sliding-window dictionary compressor (Heatshrink-compatible format, 256 B circular window, 16 B lookahead buffer).
+2. **[`crypto/aes_accel.vhdl`](../../cora7z/app/hw/src/crypto/aes_accel.vhdl)**: NIST SP 800-38A compliant 128-bit AES Counter Mode (CTR) cryptographic engine (10-round iterative pipeline, on-the-fly key expansion).
 
 Each accelerator is framed by dedicated **True Dual-Port Block RAMs (8 KB input, 8 KB output)** and controlled via memory-mapped **AXI4-Lite Control & Status Registers (CSRs)**.
 
@@ -68,7 +68,7 @@ The True Dual-Port BRAM architecture completely eliminates this vulnerability:
 ---
 
 ## 5. Verification & Simulation
-Testbenches in [`cora7z/app/hw/test/`](../test/) verify bit-exact parity against golden vectors:
+Testbenches in [`cora7z/app/hw/test/`](../../cora7z/app/hw/test/) verify bit-exact parity against golden vectors:
 ```bash
 # Run GHDL + VUnit RTL regression
 make -C cora7z/app/hw test

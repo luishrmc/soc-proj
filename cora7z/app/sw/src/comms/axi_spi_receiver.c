@@ -3,8 +3,8 @@
  * @brief High-Speed AXI Quad SPI v3.2 LogiCORE Slave Receiver Driver Implementation.
  */
 
-#include "axi_spi_receiver.h"
-#include "axi_io.h"
+#include "comms/axi_spi_receiver.h"
+#include "utils/axi_io.h"
 #include <string.h>
 
 void axi_spi_reset_tx_fifo(uintptr_t base_addr) {

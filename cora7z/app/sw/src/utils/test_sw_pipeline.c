@@ -3,10 +3,10 @@
  * @brief Comprehensive Unit Test Suite & Static Assertions Implementation.
  */
 
-#include "test_sw_pipeline.h"
-#include "pipeline_mgr.h"
-#include "lzss_sw.h"
-#include "aes_ctr_sw.h"
+#include "utils/test_sw_pipeline.h"
+#include "pipeline/pipeline_mgr.h"
+#include "compression/lzss_sw.h"
+#include "crypto/aes_ctr_sw.h"
 #include <string.h>
 
 #if defined(__arm__) || defined(__aarch64__)

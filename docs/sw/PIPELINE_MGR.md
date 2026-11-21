@@ -1,7 +1,7 @@
 # Módulo de Software: pipeline_mgr (Gerenciador do Pipeline Híbrido)
 ## Driver de Orquestração Heterogênea para ARM Cortex-A9 (Bare-Metal C11)
 
-Os arquivos [`pipeline_mgr.c`](pipeline_mgr.c) e [`pipeline_mgr.h`](pipeline_mgr.h) implementam o núcleo de co-projeto hardware/software do sistema, gerenciando a movimentação de dados entre a memória DDR3 e os aceleradores na lógica programável (PL).
+Os arquivos [`pipeline_mgr.c`](../../cora7z/app/sw/src/pipeline/pipeline_mgr.c) e [`pipeline_mgr.h`](../../cora7z/app/sw/src/pipeline/pipeline_mgr.h) implementam o núcleo de co-projeto hardware/software do sistema, gerenciando a movimentação de dados entre a memória DDR3 e os aceleradores na lógica programável (PL).
 
 ---
 

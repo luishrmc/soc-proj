@@ -233,7 +233,7 @@ def generate_critic_review(task_id, verdict_file=None):
         "## Review Mission",
         "Perform an adversarial, read-only audit of the code changes, gate results, and architectural conformance.",
         "Check against:",
-        "1. Spec conformance with utils/TEMA.md and cora7z/app/hw/src/INTERFACES.md.",
+        "1. Spec conformance with utils/TEMA.md and docs/hw/INTERFACES.md.",
         "2. RTL correctness: CDC synchronizers, no combinational loops, synchronous resets.",
         "3. Firmware invariants: zero dynamic allocation, ARM PMU calibration, cache coherence.",
         "4. Reproducibility: no uncommitted transient artifacts, build repeatability.",

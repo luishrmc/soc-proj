@@ -8,15 +8,15 @@ Goal (details in `utils/TEMA.md`): implement and compare compression (RLE, LZ4/L
 
 | Path | Content |
 |---|---|
-| `cora7z/app/hw/src/` | VHDL sources (`*.vhdl`), plus `INTERFACES.md` (ports, AXI register map, SPI contract) |
+| `cora7z/app/hw/src/` | VHDL sources (`*.vhdl`) organized in `compression/`, `crypto/` |
 | `cora7z/app/hw/test/` | VUnit testbenches (`tb_<name>.vhdl`) |
 | `cora7z/app/hw/scripts/` | Vivado Tcl (project creation, build, XSA export, reports) |
 | `cora7z/app/hw/utils/` | XDC constraints (protected) |
 | `cora7z/app/hw/{Makefile,run.py}` | Simulation entry points |
-| `cora7z/app/sw/` | Vitis workspace sources and scripts |
+| `cora7z/app/sw/src/` | Bare-metal C sources organized in `compression/`, `crypto/`, `comms/`, `pipeline/`, `utils/` |
 | `cora7z/app/test_results/` | Measurement CSVs (raw dumps are ignored by git) |
-| `esp32/` | ESP32 injector (developed later) |
-| `docs/` | Datasheets, manuals, diagrams, report |
+| `esp32/` | ESP32 injector (`main/`, `scripts/`) |
+| `docs/` | Architecture, module docs (`hw/`, `sw/`, `esp32/`), datasheets, diagrams, ADRs |
 | `utils/plan/` | Project management (CSVs, `STATUS.md`, `CHANGELOG.md`) |
 | `utils/memory/` | Technical memory between iterations |
 | `.agents/` | Agents, skills, hooks, manifest, env loader |

@@ -2,7 +2,7 @@
 module: interfaces
 status: verified
 sources:
-  - cora7z/app/hw/src/INTERFACES.md sha256=ef23c0b5e23ce4d20404c8fd8ee0f16722a8d5877973d19ac1de49ed45279c95
+  - docs/hw/INTERFACES.md sha256=ef23c0b5e23ce4d20404c8fd8ee0f16722a8d5877973d19ac1de49ed45279c95
   - docs/SYSTEM_ARCHITECTURE.md sha256=d00c496d19e89268995571f603c0f565c1f5437ae3bf0d7ed1bc58cdfe00042a
 gates_passed: [address-map]
 ---

@@ -12,6 +12,7 @@ using the Vitis 2026.1 Python API:
 =============================================================================
 """
 
+import re
 import sys
 import os
 import shutil
@@ -112,14 +113,54 @@ except Exception:
     )
     print(f"[VITIS] Application component '{app_name}' created.")
 
-# Synchronize source files into application component
+# Synchronize source files recursively into application component
 app_src_dir = workspace_dir / app_name / "src"
 app_src_dir.mkdir(parents=True, exist_ok=True)
 
-for src_file in src_dir.glob("*.[ch]"):
-    dest_file = app_src_dir / src_file.name
+# Remove stale flat or deleted .c/.h files from previous layouts while preserving Vitis CMake metadata
+for old_file in list(app_src_dir.rglob("*.[ch]")):
+    old_file.unlink()
+for sub in sorted([d for d in app_src_dir.iterdir() if d.is_dir() and not d.name.startswith(".")]):
+    if not any(sub.rglob("*")):
+        sub.rmdir()
+
+copied_c_relpaths = []
+include_subdirs = set()
+for src_file in sorted(src_dir.rglob("*.[ch]")):
+    rel_path = src_file.relative_to(src_dir)
+    dest_file = app_src_dir / rel_path
+    dest_file.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(src_file, dest_file)
-    print(f"[VITIS] Copied '{src_file.name}' -> {dest_file}")
+    if src_file.suffix == ".c" and rel_path.parent != Path("."):
+        copied_c_relpaths.append(rel_path.as_posix())
+    if rel_path.parent != Path("."):
+        include_subdirs.add(rel_path.parent.as_posix())
+    print(f"[VITIS] Copied '{rel_path.as_posix()}' -> {dest_file}")
+
+# Update UserConfig.cmake so Vitis CMake compiles subdirectory .c files and resolves headers
+user_cfg = app_src_dir / "UserConfig.cmake"
+if user_cfg.is_file():
+    cfg_text = user_cfg.read_text(encoding="utf-8")
+    inc_entries = "\n".join(
+        f"${{CMAKE_CURRENT_SOURCE_DIR}}/{d}" for d in sorted(include_subdirs)
+    )
+    src_entries = "\n".join(
+        f"${{CMAKE_CURRENT_SOURCE_DIR}}/{p}" for p in sorted(copied_c_relpaths)
+    )
+    cfg_text = re.sub(
+        r"set\(USER_INCLUDE_DIRECTORIES\b.*?\)",
+        f"set(USER_INCLUDE_DIRECTORIES\n{inc_entries}\n)",
+        cfg_text,
+        flags=re.DOTALL,
+    )
+    cfg_text = re.sub(
+        r"set\(USER_COMPILE_SOURCES\b.*?\)",
+        f"set(USER_COMPILE_SOURCES\n{src_entries}\n)",
+        cfg_text,
+        flags=re.DOTALL,
+    )
+    user_cfg.write_text(cfg_text, encoding="utf-8")
+    print(f"[VITIS] Updated UserConfig.cmake ({len(copied_c_relpaths)} subdirectory sources).")
 
 # -----------------------------------------------------------------------------
 # 3. Application Compilation

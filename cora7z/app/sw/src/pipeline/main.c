@@ -18,10 +18,10 @@
 #include "xil_io.h"
 #include "xparameters.h"
 #include "sleep.h"
-#include "axi_spi_receiver.h"
-#include "aes_ctr.h"
-#include "pipeline_mgr.h"
-#include "test_sw_pipeline.h"
+#include "comms/axi_spi_receiver.h"
+#include "crypto/aes_ctr.h"
+#include "pipeline/pipeline_mgr.h"
+#include "utils/test_sw_pipeline.h"
 
 /* ========================================================================= */
 /* PS EMIO GPIO Hardware Trigger for ESP32 Data Injector                     */

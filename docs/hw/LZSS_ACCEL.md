@@ -1,7 +1,7 @@
 # Módulo de Hardware: lzss_accel (Compressor LZSS / Heatshrink)
 ## Arquitetura RTL em VHDL-2008 para FPGA AMD Xilinx Artix-7 @ 100 MHz
 
-O arquivo [`lzss_accel.vhdl`](lzss_accel.vhdl) implementa o acelerador de hardware para compressão de dados por dicionário baseado no algoritmo LZSS (Lempel-Ziv-Storer-Szymanski), gerando fluxos binários 100% compatíveis com a biblioteca embarcada Heatshrink.
+O arquivo [`lzss_accel.vhdl`](../../cora7z/app/hw/src/compression/lzss_accel.vhdl) implementa o acelerador de hardware para compressão de dados por dicionário baseado no algoritmo LZSS (Lempel-Ziv-Storer-Szymanski), gerando fluxos binários 100% compatíveis com a biblioteca embarcada Heatshrink.
 
 ---
 

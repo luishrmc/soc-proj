@@ -1,7 +1,7 @@
 # Módulo de Hardware: aes_accel (Motor Criptográfico AES-128-CTR)
 ## Arquitetura RTL em VHDL-2008 para FPGA AMD Xilinx Artix-7 @ 100 MHz
 
-O arquivo [`aes_accel.vhdl`](aes_accel.vhdl) implementa o acelerador criptográfico de hardware para a cifra simétrica de bloco AES-128 operando no Modo Contador (CTR), em rigorosa conformidade com os padrões **NIST FIPS-197** e **NIST SP 800-38A**.
+O arquivo [`aes_accel.vhdl`](../../cora7z/app/hw/src/crypto/aes_accel.vhdl) implementa o acelerador criptográfico de hardware para a cifra simétrica de bloco AES-128 operando no Modo Contador (CTR), em rigorosa conformidade com os padrões **NIST FIPS-197** e **NIST SP 800-38A**.
 
 ---
 
