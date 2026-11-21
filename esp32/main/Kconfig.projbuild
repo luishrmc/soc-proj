@@ -1,0 +1,68 @@
+menu "Cora Z7 Telemetry Injector Configuration"
+
+    config ESP32_SPI_CLOCK_HZ
+        int "VSPI Clock Frequency (Hz)"
+        default 2000000
+        range 1000000 25000000
+        help
+            SPI Master clock frequency in Hz for VSPI Mode 0 transfers to the
+            Cora Z7 axi_quad_spi_0 slave (default 2 MHz, max 25 MHz).
+
+    config ESP32_INTER_FRAME_GAP_MS
+        int "Inter-Frame Gap (ms)"
+        default 30
+        range 0 5000
+        help
+            Delay in milliseconds between consecutive 1035-byte Telemetry Frame
+            transmissions within a triggered burst.
+
+    config ESP32_TRIGGER_LOCKOUT_MS
+        int "GPIO 32 Trigger Lockout Window (ms)"
+        default 50
+        range 10 2000
+        help
+            Software debounce/lockout window in milliseconds after a GPIO 32
+            falling-edge ISR event, preventing double-triggers during the
+            30 ms active-low Cora Z7 PMOD JA1 pulse.
+
+    config ESP32_DATASET_SEED
+        int "Embedded Dataset PRNG Seed"
+        default 42
+        range 0 2147483647
+        help
+            Deterministic seed passed to generate_telemetry.py at build time
+            to synthesize the flash-resident Embedded Dataset.
+
+    config ESP32_DATASET_FRAMES_PER_PROFILE
+        int "Frames per Entropy Profile"
+        default 10
+        range 1 100
+        help
+            Number of 1024-byte Telemetry Frames generated for each Entropy
+            Profile (Quiescent, Dynamic, Chaotic). Total burst size is 3x.
+
+    config ESP32_AUTO_TRIGGER_FALLBACK
+        bool "Enable Periodic Auto-Trigger Fallback"
+        default n
+        help
+            If enabled, periodically triggers a Telemetry Frame burst even
+            without a GPIO 32 falling-edge pulse (for standalone bench runs).
+
+    config ESP32_AUTO_TRIGGER_PERIOD_MS
+        int "Auto-Trigger Fallback Period (ms)"
+        depends on ESP32_AUTO_TRIGGER_FALLBACK
+        default 5000
+        range 100 600000
+        help
+            Period in milliseconds between automatic fallback bursts when
+            ESP32_AUTO_TRIGGER_FALLBACK is enabled.
+
+    config ESP32_UART_DEBUG_TRIGGER
+        bool "Enable Non-Blocking UART Debug Commands ('t' / 's')"
+        default y
+        help
+            Enables non-blocking console input over UART (/dev/ttyACM0):
+            send 't' to trigger a dataset burst or 's' to print dataset
+            and transfer statistics.
+
+endmenu

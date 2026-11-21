@@ -111,6 +111,23 @@ void spi_injector_build_frame(TelemetryFrame *frame, uint8_t pkt_type, uint16_t 
     frame->eof_delim = SPI_FRAME_EOF_DELIM;
 }
 
+static bool find_ack_frame_offset(const uint8_t *buf, size_t buf_len, size_t *out_offset, uint16_t *out_plen) {
+    for (size_t offset = 0; offset <= 4U; offset++) {
+        if (offset + 6U > buf_len) {
+            break;
+        }
+        if (buf[offset] == SPI_FRAME_PREAMBLE && buf[offset + 1U] == SPI_PKT_TYPE_ACK) {
+            uint16_t plen = (uint16_t)(((uint16_t)buf[offset + 4U] << 8) | buf[offset + 5U]);
+            if (plen <= SPI_MAX_PAYLOAD_LEN && (offset + 8U + (size_t)plen + 2U) < buf_len) {
+                *out_offset = offset;
+                *out_plen = plen;
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
 esp_err_t spi_injector_transfer_frame(const TelemetryFrame *tx_frame, TelemetryFrame *rx_ack_frame) {
     if (!s_is_initialized || s_spi_dev == NULL) {
         ESP_LOGE(TAG, "SPI injector not initialized.");
@@ -164,16 +181,12 @@ esp_err_t spi_injector_transfer_frame(const TelemetryFrame *tx_frame, TelemetryF
         memcpy(rx_ack_frame, s_dma_rx_buf, sizeof(TelemetryFrame));
 
         /* If dynamic ACK layout was received, sync crc16 and eof_delim in struct */
-        for (size_t offset = 0; offset <= 4; offset++) {
-            if (s_dma_rx_buf[offset] == SPI_FRAME_PREAMBLE && s_dma_rx_buf[offset + 1] == SPI_PKT_TYPE_ACK) {
-                uint16_t plen = (uint16_t)(((uint16_t)s_dma_rx_buf[offset + 4] << 8) | s_dma_rx_buf[offset + 5]);
-                if (plen <= SPI_MAX_PAYLOAD_LEN) {
-                    size_t crc_off = offset + 8U + (size_t)plen;
-                    memcpy(&rx_ack_frame->crc16, &s_dma_rx_buf[crc_off], 2);
-                    rx_ack_frame->eof_delim = s_dma_rx_buf[crc_off + 2];
-                }
-                break;
-            }
+        size_t offset = 0;
+        uint16_t plen = 0;
+        if (find_ack_frame_offset(s_dma_rx_buf, sizeof(TelemetryFrame), &offset, &plen)) {
+            size_t crc_off = offset + 8U + (size_t)plen;
+            memcpy(&rx_ack_frame->crc16, &s_dma_rx_buf[crc_off], 2);
+            rx_ack_frame->eof_delim = s_dma_rx_buf[crc_off + 2U];
         }
     }
 
@@ -186,26 +199,21 @@ bool spi_injector_validate_ack(const TelemetryFrame *ack_frame, uint16_t expecte
     const uint8_t *buf = (const uint8_t *)ack_frame;
 
     /* Scan up to first 4 bytes for preamble in case of any clock alignment offset */
-    for (size_t offset = 0; offset <= 4; offset++) {
-        if (buf[offset] == SPI_FRAME_PREAMBLE && buf[offset + 1] == SPI_PKT_TYPE_ACK) {
-            const uint8_t *raw = &buf[offset];
-            uint16_t rx_seq = (uint16_t)(((uint16_t)raw[2] << 8) | raw[3]);
-            if (rx_seq != expected_seq_id) {
-                return false;
-            }
-
-            /* Check dynamic layout (e.g. 15-byte ACK with 4-byte payload) */
-            uint16_t plen = (uint16_t)(((uint16_t)raw[4] << 8) | raw[5]);
-            if (plen <= SPI_MAX_PAYLOAD_LEN) {
-                size_t crc_off = 8U + (size_t)plen;
-                size_t eof_off = crc_off + 2U;
-                if (raw[eof_off] == SPI_FRAME_EOF_DELIM) {
-                    uint16_t expected_crc = (uint16_t)(((uint16_t)raw[crc_off] << 8) | raw[crc_off + 1]);
-                    uint16_t computed_crc = compute_crc16_ccitt(raw, crc_off);
-                    if (expected_crc == computed_crc) {
-                        return true;
-                    }
-                }
+    size_t offset = 0;
+    uint16_t plen = 0;
+    if (find_ack_frame_offset(buf, sizeof(TelemetryFrame), &offset, &plen)) {
+        const uint8_t *raw = &buf[offset];
+        uint16_t rx_seq = (uint16_t)(((uint16_t)raw[2] << 8) | raw[3]);
+        if (rx_seq != expected_seq_id) {
+            return false;
+        }
+        size_t crc_off = 8U + (size_t)plen;
+        size_t eof_off = crc_off + 2U;
+        if (raw[eof_off] == SPI_FRAME_EOF_DELIM) {
+            uint16_t expected_crc = (uint16_t)(((uint16_t)raw[crc_off] << 8) | raw[crc_off + 1U]);
+            uint16_t computed_crc = compute_crc16_ccitt(raw, crc_off);
+            if (expected_crc == computed_crc) {
+                return true;
             }
         }
     }

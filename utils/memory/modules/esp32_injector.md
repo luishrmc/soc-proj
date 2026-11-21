@@ -2,44 +2,33 @@
 module: esp32_injector
 status: verified
 sources:
-  - esp32/main/main.c sha256=904531b5f51fe1503b3c62816574e9a2713457b9ea2b624bfe8ebd74508df531
-  - esp32/main/spi_injector_master.c sha256=fa309efaddd801b59edccaa84f0f68e696f408fffd56e0e6655feaf4501aaa6f
-  - esp32/components/ui_controller/ui_controller.c sha256=18279652e25d67948f2663a52eec18af415eaa347dc1389b77519f9533106a86
-  - esp32/components/ui_controller/ui_controller.h sha256=986db277793083dfa065a0b31287bc20b47526631c6fe6cbf5098b9a5bd9cb2a
-gates_passed: [esp-idf-build, esp32-selftest]
+  - esp32/main/main.c sha256=d54de8b255ad6ecf4aca9001f8e5f3515355b789ca12802b11cff86642aa02e5
+  - esp32/main/spi_injector_master.c sha256=8170018862f35a46699319100dcb555cd8adca38a30e6c7c178252ba1bdcaf44
+  - esp32/main/trigger_gpio.c sha256=9480200db9eaf8af8152990f521fbb17835e56852dadfbc4f5ba0784238e52ae
+  - esp32/main/trigger_gpio.h sha256=bd576752bdea8a5762bf1cc5b585bef8f54fbbfd774c443850008c8db0de0bcc
+  - esp32/main/CMakeLists.txt sha256=f4a34f64899fa5654f96d62710417885ba4d11025171e01799b79b9c6d2384c9
+  - esp32/main/Kconfig.projbuild sha256=4dc06941554ccf97bd55c24d47bcdf0845bc8962a1eef76ec2a668bee51458e6
+  - esp32/scripts/generate_telemetry.py sha256=42fa3a5734b54e9a79e50686085fb7946e07e459b03ba5e436c47892a4eb1d72
+  - esp32/scripts/telemetry_profiles.py sha256=73fcf2a0d7ccf451fec901252f9a4dcba2329329236926075f9cefe2af4344ea
+gates_passed: [esp32-unittest, esp-idf-build, esp32-ttyACM0-verify]
 ---
 
-# ESP32 Autonomous UI & SPI Injector Digest
+# ESP32 Telemetry Generator & SPI Injector Digest
 
 ## 1. Module Overview
-- **Function**: Autonomous SPI Master synthetic data generator with physical UI controls (pushbuttons) and visual status indicators (LEDs) for the Cora Z7 benchmark setup.
-- **Microcontroller**: ESP32-D0WD-V3 (revision v3.1), Dual-Core Xtensa LX6 @ 240 MHz.
-- **Toolchain**: ESP-IDF v6.1 with FreeRTOS SMP.
+- **Function**: Streams flash-resident `Embedded Dataset` `Telemetry Frame`s (`1024` B payload, `pkt_type=0x02`, `1035` B wire) over VSPI Mode 0 upon falling-edge `GPIO 32` trigger from Cora Z7.
+- **Target**: ESP32-D0WD-V3 (rev v3.1), ESP-IDF v6.1 @ 240 MHz.
+- **Cleanup**: Removed unused `ui_controller` (LEDs `GPIO 2/21/22` and button polling).
 
-## 2. Pin Mapping & Hardware Interface
-- **SPI Master Bus (VSPI)**:
-  - SCLK: GPIO 18 (25 MHz) -> Cora Z7 J7.3 (G20)
-  - MOSI: GPIO 23 -> Cora Z7 J7.4 (T10)
-  - MISO: GPIO 19 -> Cora Z7 J7.1 (V15)
-  - CS#: GPIO 5 -> Cora Z7 J7.5 (F16)
-- **Minimalist Autonomous UI**:
-  - BTN_TRIGGER: GPIO 32 (Active-low to GND, internal pull-up, 40ms debounce) -> Dispatches Full Suite
-  - LED_GREEN: GPIO 21 (RGB Green: 1 Hz heartbeat in IDLE, Solid ON in BUSY, 3 rapid blinks in SUCCESS)
-  - LED_RED: GPIO 22 (RGB Red: 5 Hz rapid blink in ERROR / alert)
-  - LED_READY: GPIO 2 (Blue onboard mirror)
+## 2. Pinout & Trigger Interface
+- **VSPI Master**: `SCLK=18` (`H15`), `MOSI=23` (`T12`), `MISO=19` (`W15`), `CS=5` (`F16`), `2 MHz` default (`CONFIG_ESP32_SPI_CLOCK_HZ`, up to `25 MHz`).
+- **Hardware Trigger**: `GPIO 32` (`PMOD JA1 Y18`), `GPIO_INTR_NEGEDGE` + pull-up, `50 ms` ISR lockout (`xTaskNotifyFromISR`), `30 ms` inter-frame gap.
 
-## 3. Operational Mode
-- Single-button trigger: pressing GPIO 32 immediately transmits the full sequential benchmark suite:
-  1. 64 B High-Redundancy (`s_buf_64b` -> RLE)
-  2. 1 KB Pseudo-Random (`s_buf_1kb` -> LZ4)
-  3. 64 KB Telemetry (`s_buf_64kb` -> AES-128-CTR)
-  4. 64 KB Telemetry (`s_buf_64kb` -> ChaCha20)
+## 3. Build-Time Python Telemetry Generator
+- `esp32/main/CMakeLists.txt` invokes `generate_telemetry.py` (`seed=42`, `10` frames/profile = `30` frames) during `idf.py build`.
+- `telemetry_profiles.py` synthesizes `64` × `16`-byte `Telemetry Record`s (`<IhhhhHH`) across `Quiescent`, `Dynamic`, and `Chaotic` `Entropy Profile`s.
 
-## 4. On-Board Verification Evidence
-- **Build**: `idf.py build` produced `esp32_spi_injector.bin` (187,440 bytes, 82% free partition).
-- **Flash & Self-Test**: Tested on physical silicon via `/dev/ttyACM0`.
-  - LED chaser sequence passed.
-  - Pull-up default HIGH levels verified on GPIO 4 and GPIO 16.
-  - CRC-16-CCITT validated on 64B, 1KB, and 64KB buffers.
-  - Dry-run SPI DMA transmission passed in 198 us.
-  - Full execution log captured in `out/esp32_selftest.log`.
+## 4. Verification Evidence
+- **Host Unit Tests**: `python3 -m unittest discover -s esp32/scripts -v` -> 7/7 OK.
+- **ESP-IDF Build**: `idf.py build` (`-Wall -Wextra -Werror`) -> 0 warnings, `esp32_spi_injector.bin` = `220,896` bytes (`0x35ee0`, 79% free).
+- **Target `/dev/ttyACM0`**: Flashed & verified boot summary, `GPIO 32` armed state, UART `'s'` stats, and `'t'` 30-frame burst TX (`out/esp32_verify.log`).

@@ -1,74 +1,55 @@
-# SPI Telemetry Injector Module (`spi_injector_master`)
+# SPI Telemetry Injector & Dataset Pipeline (`spi_injector_master` / `trigger_gpio`)
 ## Autonomous Transmission Firmware for ESP32-WROOM (ESP-IDF v6.1 @ 240 MHz)
 
-The files [`esp32/main/spi_injector_master.c`](main/spi_injector_master.c) and [`esp32/main/spi_injector_master.h`](main/spi_injector_master.h) implement the SPI master telemetry injector operating on the ESP32-WROOM microcontroller.
-
-> [!NOTE]
-> **Engineering Status — Work-in-Progress (WIP: Testbench & Synthetic Data Pipeline):**  
-> Active work centers on coupling the firmware with a **Python-based synthetic telemetry generator**. The generator models time-series physical phenomena (simulated temperature, 3-axis vibration, supply voltage, status bitmasks, and timestamps) with configurable entropy and repetition characteristics. These streams feed the ESP32 transmission pipeline to validate the Cora Z7 AXI Quad SPI receiver and downstream accelerators. Real-world benchmark performance measurements are pending systematic HIL execution.
+The modules in [`esp32/main/`](main/) and [`esp32/scripts/`](scripts/) implement the build-time synthetic telemetry dataset pipeline, `GPIO 32` hardware trigger listener, and VSPI master injector targeting the Digilent Cora Z7-10.
 
 ---
 
-## 1. Operational Overview & Pipeline Capabilities
+## 1. Operational Overview
 
-* **Synthetic Data Ingestion:** Formats and transmits variable-length telemetry frames (**64 B, 256 B, 512 B, and 1024 B**) sourced from the Python synthetic data pipeline, exercising compression (RLE, LZ4) and encryption (AES-CTR, ChaCha20) engines under varied entropy profiles.
-* **SPI Master Bus Link:** Operates hardware SPI (`SPI3_HOST` / VSPI) in **Mode 0** (CPOL=0, CPHA=0, MSB-First) at 2.0 MHz for initial bring-up, scalable up to **25 MHz**.
-* **Dynamic Frame Construction:** Computes exact frame transaction lengths as $8\text{ (Header)} + \text{len} + 3\text{ (Trailer)}$ and inserts CRC-16 CCITT at dynamic offset $8 + \text{len}$.
-* **Hardware Handshake / Pacing:** Monitors **GPIO 32** with pull-up for active-low trigger pulses emitted by the Cora Z7 Processing System on PMOD JA1 (Pin Y18), while supporting autonomous periodic pacing via FreeRTOS `vTaskDelay`.
+* **Build-Time `Embedded Dataset` ([`scripts/generate_telemetry.py`](scripts/generate_telemetry.py)):** CMake (`main/CMakeLists.txt`) runs the Python generator during `idf.py build` to emit `telemetry_dataset.{h,c}` in flash `.rodata`. Each entry stores a `1024`-byte payload (`64` packed `16`-byte `Telemetry Record`s) tagged with its `Entropy Profile` (`Quiescent`, `Dynamic`, `Chaotic`).
+* **SPI Master Link ([`main/spi_injector_master.c`](main/spi_injector_master.c)):** Uses `SPI3_HOST` (VSPI) in Mode 0 with DMA buffers at `CONFIG_ESP32_SPI_CLOCK_HZ` (`2 MHz` default, up to `25 MHz`).
+* **Hardware Trigger ([`main/trigger_gpio.c`](main/trigger_gpio.c)):** `GPIO 32` (`GPIO_INTR_NEGEDGE`, internal pull-up) uses an `IRAM_ATTR` ISR with `esp_timer_get_time()` lockout (`CONFIG_ESP32_TRIGGER_LOCKOUT_MS`, default `50 ms`) and `xTaskNotifyFromISR()` to launch one complete burst per Cora Z7 pulse (`30 ms` active-low on PMOD JA1 `Y18`).
+* **Paced Burst Loop ([`main/main.c`](main/main.c)):** Iterates over `g_telemetry_dataset[0..TELEMETRY_DATASET_FRAME_COUNT-1]`, calls `spi_injector_build_frame()` with `SPI_PKT_TYPE_TELEMETRY` (`0x02`) and monotonic `seq_id`, validates ACKs via `spi_injector_validate_ack()`, and delays `CONFIG_ESP32_INTER_FRAME_GAP_MS` (`30 ms` default) between frames.
 
 ---
 
 ## 2. Physical Pinout Mapping to Digilent Cora Z7-10
 
-| SPI Signal | ESP32 GPIO | Cora Z7 Header / Pin | Function |
+| Signal | ESP32 GPIO | Cora Z7 Header / Pin | Function |
 | :--- | :---: | :---: | :--- |
 | **SCLK** | **GPIO 18** | **Header J7.3 (Pin H15)** | SPI Bus Clock (Mode 0) |
-| **MOSI** | **GPIO 23** | **Header J7.4 (Pin T12)** | Master-Out Slave-In serial data |
-| **MISO** | **GPIO 19** | **Header J7.1 (Pin W15)** | Master-In Slave-Out ACK / echo response |
+| **MOSI** | **GPIO 23** | **Header J7.4 (Pin T12)** | Master-Out Slave-In `Telemetry Frame` stream |
+| **MISO** | **GPIO 19** | **Header J7.1 (Pin W15)** | Master-In Slave-Out ACK (`0x81`) response |
 | **SS_N** | **GPIO 5** | **Header J7.5 (Pin F16)** | Active-low hardware slave select |
-| **TRIGGER** | **GPIO 32** | **PMOD JA1 (Pin Y18)** | Handshake trigger input from Cora Z7 PS |
+| **TRIGGER** | **GPIO 32** | **PMOD JA1 (Pin Y18)** | Falling-edge burst trigger from Cora Z7 PS EMIO |
 | **GND** | **GND** | **Header J7.6 (GND)** | Common ground reference |
 
 ---
 
-## 3. Dynamic Frame Construction (`spi_injector_build_frame`)
+## 3. Canonical 16-Byte `Telemetry Record` Layout
 
-The packet framing adheres directly to the implementation in [`main/spi_injector_master.c`](main/spi_injector_master.c):
+Each `1024`-byte payload packs `64` little-endian `Telemetry Record`s (`<IhhhhHH`):
+
+| Field | Type | Width | Description |
+| :--- | :---: | :---: | :--- |
+| `timestamp_ms` | `uint32_t` | 4 B | Monotonic sample timestamp (ms) |
+| `temp_c_x100` | `int16_t` | 2 B | Temperature in 0.01 °C units |
+| `vib_x` | `int16_t` | 2 B | X-axis vibration sample |
+| `vib_y` | `int16_t` | 2 B | Y-axis vibration sample |
+| `vib_z` | `int16_t` | 2 B | Z-axis vibration sample |
+| `vcc_mv` | `uint16_t` | 2 B | Supply rail voltage (mV) |
+| `status_flags` | `uint16_t` | 2 B | Sensor health/alarm bitmask |
+
+---
+
+## 4. Dynamic Frame Construction (`spi_injector_build_frame`)
 
 ```c
-void spi_injector_build_frame(TelemetryFrame *frame, uint8_t pkt_type, uint16_t seq_id, const uint8_t *payload, uint16_t len) {
-    if (frame == NULL) return;
-    if (len > SPI_MAX_PAYLOAD_LEN) len = SPI_MAX_PAYLOAD_LEN;
-
-    uint8_t *raw = (uint8_t *)frame;
-
-    /* 1. 8-byte Header */
-    frame->preamble       = SPI_FRAME_PREAMBLE;  /* 0xA5 */
-    frame->pkt_type       = pkt_type;            /* 0x01: Echo, 0x02: Telemetry */
-    frame->seq_id         = htons(seq_id);       /* Big-Endian sequence counter */
-    frame->payload_len    = htons(len);          /* Big-Endian payload length */
-    frame->reserved_align = 0;                   /* 32-bit word alignment padding */
-
-    /* 2. Payload population at byte offset 8 (32-bit aligned) */
-    if (payload != NULL) {
-        memcpy(frame->payload, payload, len);
-    } else {
-        /* Synthetic incremental pattern fallback */
-        for (uint16_t i = 0; i < len; i++) {
-            frame->payload[i] = (uint8_t)(i & 0xFFU);
-        }
-    }
-
-    /* 3. CRC-16 CCITT calculation over Header (8 B) + Payload (len B) */
-    uint16_t crc = compute_crc16_ccitt((const uint8_t *)frame, 8U + (size_t)len);
-
-    /* 4. Dynamic wire placement for CRC-16 and EOF delimiter */
-    raw[8U + (size_t)len]      = (uint8_t)((crc >> 8) & 0xFFU);
-    raw[8U + (size_t)len + 1U] = (uint8_t)(crc & 0xFFU);
-    raw[8U + (size_t)len + 2U] = SPI_FRAME_EOF_DELIM; /* 0x5A */
-
-    /* 5. Synchronize static struct members for debug inspection */
-    frame->crc16     = htons(crc);
-    frame->eof_delim = SPI_FRAME_EOF_DELIM;
-}
+void spi_injector_build_frame(TelemetryFrame *frame, uint8_t pkt_type,
+                              uint16_t seq_id, const uint8_t *payload, uint16_t len)
 ```
+
+1. Populates the 8-byte header (`preamble = 0xA5`, `pkt_type = 0x02`, Big-Endian `seq_id`, `payload_len = 1024`, `reserved_align = 0`).
+2. Copies the immutable `1024`-byte payload from `g_telemetry_dataset[i].payload` into `frame->payload` (32-bit aligned at byte offset 8).
+3. Computes CRC-16 CCITT (`0x1021`, init `0xFFFF`) over `[0 .. 1031]` and appends Big-Endian `crc16` + `0x5A` EOF delimiter (`1035` bytes total on wire).
