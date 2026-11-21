@@ -4,7 +4,6 @@ status: verified
 sources:
   - cora7z/app/sw/scripts/build_sw.py sha256=8b4d752829e74b1569682df73c8041ebe7df2eb76e696c069f1ad1e946652aed
   - cora7z/app/sw/src/main.c sha256=8422131873afa2ff4de23e0291810da5b617875a2f8a1b335d07579283409ed4
-  - cora7z/app/hw/scripts/export_hw_platform.tcl sha256=9d985c1f97695466f139fad10b648884367027226604f23d0e4b08560e034831
 gates_passed: [c-lint, vitis-build, elf-link]
 ---
 

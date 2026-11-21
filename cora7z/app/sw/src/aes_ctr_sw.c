@@ -7,18 +7,6 @@
 #include "aes_ctr.h"
 #include <string.h>
 
-/**
- * @brief Standard 128-bit Big-Endian counter incrementation per NIST SP 800-38A Section B.2.
- */
-static inline void increment_counter_128(uint8_t counter[16]) {
-    for (int i = 15; i >= 0; i--) {
-        counter[i]++;
-        if (counter[i] != 0U) {
-            break;
-        }
-    }
-}
-
 int aes_128_ctr_crypt(const uint8_t key[AES_CTR_KEY_SIZE],
                       const uint8_t nonce_counter[AES_CTR_BLOCK_SIZE],
                       const uint8_t *src,

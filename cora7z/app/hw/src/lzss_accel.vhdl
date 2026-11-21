@@ -272,7 +272,6 @@ begin
   p_lzss_fsm : process(aclk)
     variable v_read_byte  : std_logic_vector(7 downto 0);
     variable v_rem_stream : integer;
-    variable v_max_la     : integer;
     variable v_win_start  : unsigned(15 downto 0);
   begin
     if rising_edge(aclk) then
@@ -683,9 +682,6 @@ begin
             if reg_control_r(2) = '1' then
               irq_r <= '1';
             end if;
-            state_r <= ST_IDLE;
-
-          when others =>
             state_r <= ST_IDLE;
 
         end case;

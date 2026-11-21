@@ -158,7 +158,6 @@ architecture rtl of aes_accel is
     ST_FETCH_REQ,
     ST_FETCH_WAIT,
     ST_WRITE_WORD,
-    ST_NEXT_BLOCK,
     ST_DONE
   );
   signal state_r : fsm_state_t := ST_IDLE;
@@ -392,7 +391,6 @@ begin
     variable v_xor_data       : std_logic_vector(31 downto 0);
     variable v_keystream_word : std_logic_vector(31 downto 0);
     variable v_rem_bytes      : unsigned(31 downto 0);
-    variable v_temp_w         : state_t;
     variable v_sub_w          : std_logic_vector(7 downto 0);
   begin
     if rising_edge(aclk) then
@@ -631,9 +629,6 @@ begin
             if reg_control_r(2) = '1' then
               irq_r <= '1';
             end if;
-            state_r <= ST_IDLE;
-
-          when others =>
             state_r <= ST_IDLE;
 
         end case;
