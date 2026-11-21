@@ -145,3 +145,18 @@ Deliverables (see `utils/plan/Checklist_de_Entregaveis.csv`): VHDL sources, test
 - `utils/plan/Cronograma_e_Tarefas.csv` keeps its original columns first. Only the orchestrator edits `utils/plan/`, and only through `plan-sync.py`.
 - Before changing a protected or shared file, state which task and which decision justify it.
 - Temporary smoke files (`smoke_counter.vhdl`, `tb_smoke_counter.vhdl`) are removed when task 2.1 starts.
+
+## Agent skills
+
+### Issue tracker
+
+Issues and specifications are tracked as local Markdown files under `.scratch/`. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Standard five-state triage label vocabulary. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context repository layout with `GLOSSARY.md` and `docs/adr/` at the repository root. See `docs/agents/domain.md`.
+

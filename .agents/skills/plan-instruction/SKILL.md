@@ -1,143 +1,68 @@
 ---
 name: plan-instruction
-description: Ingests workspace context, repository layout, and PLAN stage artifacts (agent topologies, modular skills, and lifecycle hooks) to synthesize an authoritative, production-grade GEMINI.md instruction file. Triggers when initializing a workspace, finalizing the PLAN phase, compiling agent architectures, or updating global rules. Do not trigger for writing application code, executing tests directly, or handling simple single-turn prompts.
----
-# Gemini MD Architect
-
-System context engineer skill for synthesizing workspace realities and PLAN phase specifications into an authoritative, production-grade `GEMINI.md` project instruction file.
-
-## When to Use
-
-Activate this skill when:
-
-- Initializing a new repository or workspace instruction file (`GEMINI.md`).
-- Finalizing the PLAN stage after running `agent-architect`, `skill-recommender`, and `hook-recommender`.
-- Consolidating multi-agent topologies, modular skill mappings, and lifecycle hooks into global runtime instructions.
-- Updating or refactoring project-wide system directives, runtime guardrails, or build workflows.
-
-Do not activate when:
-
-- Implementing application features or writing business logic directly.
-- Executing tests, running linters, or debugging build scripts.
-- Designing individual agent roles or authoring isolated `SKILL.md` files.
-- Responding to single-turn queries that do not alter global workspace governance.
-
+description: "Synthesize repository conventions and planning artifacts into a concise, pointer-driven GEMINI.md or AGENTS.md steering file."
+disable-model-invocation: true
 ---
 
-## Discovery and Ingestion Pipeline
+# Steering File Architect (`GEMINI.md` / `AGENTS.md`)
 
-Execute the three-stage ingestion pipeline sequentially before drafting `GEMINI.md`:
+Compile workspace conventions and planning outputs from `plan-agents`, `router-skills`, and `plan-hooks` into a high-signal, low-context-load `GEMINI.md`, `AGENTS.md`, or `CLAUDE.md` steering file.
 
-### Stage 1: Workspace Reality Ingestion
+## Context Load & Pointer Principles
 
-1. Inspect root filesystem, directory structure, and version control status (`git status --porcelain`).
-2. Parse dependency manifests to identify languages, runtimes, package managers, and toolchains:
-   - Node.js / TypeScript: `package.json`, `tsconfig.json`, `pnpm-lock.yaml`, `yarn.lock`
-   - Python: `pyproject.toml`, `requirements.txt`, `Pipfile`, `setup.cfg`
-   - Rust: `Cargo.toml`, `Cargo.lock`
-   - Go: `go.mod`, `go.sum`
-   - General build systems: `Makefile`, `Dockerfile`, `docker-compose.yml`, `.github/workflows/`
-3. Inspect existing command runners, scripts, and linters to extract exact verification commands (`npm test`, `pytest`, `cargo test`, `eslint`, `flake8`, `golangci-lint`).
+Every line in `GEMINI.md` / `AGENTS.md` sits permanently in the agent's context window on every turn. Protect the context window by enforcing three rules:
 
-### Stage 2: Synthesis of PLAN Stage Artifacts
+1. **Prefer Context Pointers Over In-File Dumps**: State what an out-of-context document contains and the branch condition for reading it (`See docs/agents/issue-tracker.md`, `See GLOSSARY.md`), rather than pasting long schemas or reference tables into the steering file.
+2. **Treat the Environment as Source of Truth**: Cache only unwritten architectural conventions, non-obvious gotchas, and pointer paths. Leave standard one-file lookups (`package.json` scripts, directory trees) to the environment so the steering file never rots.
+3. **Positive, High-Leverage Directives**: Express rules as concrete positive actions ("Run single test files after each red-green slice") and prune no-op sentences that models already follow by default.
 
-Consolidate outputs generated across preceding planning modules:
+## Ingestion Pipeline
 
-1. **Agent Architecture (from `agent-architect`)**:
-   - Agent roles, unique slugs, model tier assignments (Flash vs. Pro), and tool allowlists.
-   - Interaction topology (Supervisor-Worker, Critic-in-the-Loop, State Relay).
-   - Loop governance: entry criteria, evaluation gates, and hard iteration caps ($N \le 5$).
-2. **Modular Skills Inventory (from `skill-recommender`)**:
-   - Approved skills matrix categorized across loop phases (Plan, Execute, Verify, Refine).
-   - Capability triggers and documentation grounding for each skill.
-3. **Runtime Hooks and Gates (from `hook-recommender`)**:
-   - Interceptors, post-execution verifiers, and convergence loop gates.
-   - Hook execution policies (Fail-Closed, Retry, Alert) and trigger paths in `.gemini/hooks/`.
+### Stage 1: Workspace Reality Check
 
-### Stage 3: Verification of Ecosystem Standards
+1. Inspect existing root instruction files (`GEMINI.md`, `AGENTS.md`, `CLAUDE.md`) and `docs/agents/*` pointer targets configured by `/setup-workspace`.
+2. Inspect project manifests (`package.json`, `pyproject.toml`, `Cargo.toml`, `go.mod`, `Makefile`) to identify the verification commands that aren't obvious from a glance.
 
-1. Conduct targeted web search queries to verify modern context engineering conventions, formatting standards, and platform configuration specifications.
-2. Confirm current conventions for model system instructions:
-   - Delimiter syntax (markdown headings, XML tags, code blocks).
-   - High-density constraint expression.
-   - Behavioral invariants and negative guardrail structures.
+### Stage 2: Synthesis of Planning Artifacts
 
----
+Consolidate outputs from prior planning skills if present in the session or repository:
 
-## Context Engineering Guidelines
+1. **Agent Topology (from `plan-agents`)**: Role boundaries, fresh-context subagent rules, and loop convergence caps ($N \le 5$).
+2. **Skill Routing (from `router-skills`)**: Active user-invoked orchestrators (`/shape-grill`, `/shape-spec`, `/shape-tickets`, `/dev-implement`, `/dev-parallel`) and model-invoked disciplines (`dev-tdd`, `review-diff`, `git-safety-guard`).
+3. **Runtime Guardrails (from `plan-hooks`)**: Pre-step and post-step verification gates.
 
-Enforce strict context engineering rules when authoring `GEMINI.md`:
+## Target Steering File Blueprint
 
-1. **High Signal-to-Noise Ratio**: Eliminate conversational filler, redundant greetings, and vague aspirations. Use direct, imperative directives ("Execute tests via...", "Never mutate...").
-2. **Token Budget Discipline**: Keep instructions compact, scannable, and dense. Use tables for multi-variable mappings and bulleted lists for sequential constraints.
-3. **Structural Delimiters**: Separate distinct operational domains with explicit Markdown headings (`##`, `###`) and horizontal rules (`---`).
-4. **Explicit Anti-Patterns**: Every directive must clearly define boundaries. State explicit negative constraints ("DO NOT") to prevent common model regressions and hallucinations.
-
----
-
-## Target `GEMINI.md` Blueprint
-
-Construct the target `GEMINI.md` file using the following six-section schema:
+Keep the generated steering file compact (under 100 lines) using this five-section structure:
 
 ```markdown
-# [Project Name] - System Instructions & Workspace Context
+# <Project Name> - Agent Steering Instructions
 
-## 1. Project Mission & Core Architecture
-- One-paragraph technical summary of purpose and domain.
-- Core design patterns, runtime stack, and workspace topology.
+## 1. Domain & Architecture Pointers
+- Ubiquitous language lives in `GLOSSARY.md`. Read it before naming symbols, tests, or tickets.
+- Architectural decisions live in `docs/adr/`. Flag any conflict before overriding an ADR.
+- Issue tracker and triage conventions: see `docs/agents/issue-tracker.md` and `docs/agents/triage-labels.md`.
 
-## 2. Multi-Agent Orchestration & Loop Topology
-- Roles, model assignments, and permissions (synthesized from agent-architect).
-- Feedback loop state machines, handoffs, and deterministic exit gates.
+## 2. Development Flow & Skill Routing
+- Shaping: `/shape-grill` -> `/shape-spec` -> `/shape-tickets` in one unbroken context window.
+- Execution: `/dev-implement` (single ticket) or `/dev-parallel` (multi-ticket worktree DAG), driving `dev-tdd` at confirmed public seams and closing with `review-diff`.
+- Commits: Stage explicit pathspecs via `git-commit-stager` and commit via `git-safety-guard`.
 
-## 3. Modular Skills & Capability Map
-- Inventory of enabled workspace skills and when to invoke each.
+## 3. Verification Commands
+- Typecheck: `<exact command>`
+- Single test file: `<exact command>`
+- Full test suite & linter: `<exact command>`
 
-## 4. Runtime Hooks & Safety Governance
-- Pre-execution assertions, post-execution verifiers, and loop convergence hooks.
+## 4. Subagent & Context Hygiene
+- Start every exploration, implementation, and review subagent with a fresh context window.
+- Pass file paths and issue references as context pointers rather than duplicating text.
 
-## 5. Development Workflows & Commands
-- Exact bash commands for build, test, lint, format, and local simulation.
-
-## 6. Critical Guardrails & Negative Constraints
-- Strictly forbidden operations, security boundaries, and edge-case invariants.
+## 5. Non-Obvious Repository Conventions
+- <Concise bullet list of repo-specific invariants that cannot be inferred from config files>
 ```
 
----
+## Verification Checklist
 
-## Operational Workflow
-
-Follow this sequence to inspect, synthesize, validate, and write `GEMINI.md`:
-
-### Step 1: Context Audit
-
-Run read-only workspace inspections to collect repo metadata, manifests, active skills, and hook scripts. Assemble all PLAN outputs into an active planning context buffer.
-
-### Step 2: Content Drafting
-
-Draft the complete `GEMINI.md` strictly adhering to the Target Blueprint. Populate every section with project-specific commands, schemas, and table definitions without placeholders.
-
-### Step 3: Verification Audit
-
-Audit the draft against the completeness checklist:
-
-- [ ] Contains all six blueprint sections.
-- [ ] Incorporates agent profiles and loop constraints ($N \le 5$) from `agent-architect`.
-- [ ] Maps modular skills across all four loop phases (Plan, Execute, Verify, Refine) from `skill-recommender`.
-- [ ] Integrates lifecycle interceptors and hook scripts from `hook-recommender`.
-- [ ] Provides runnable bash commands for build, lint, and test suites.
-- [ ] Contains a dedicated Negative Constraints section with explicit prohibitions.
-- [ ] Contains zero em-dashes, en-dashes, or conversational filler.
-
-### Step 4: Emission and Storage
-
-Present the complete `GEMINI.md` within a fenced markdown block for user review, or write the file directly to the workspace root or `.gemini/GEMINI.md` when requested.
-
----
-
-## Operational and Negative Constraints
-
-- Never use em-dashes or en-dashes; use standard hyphens or colons.
-- Never output vague summaries or incomplete placeholder templates (`TODO`, `<insert code>`).
-- Never combine unrelated responsibilities; keep `GEMINI.md` focused on system instructions, agent governance, and workspace context.
-- Keep `SKILL.md` body concise, procedural, and under 500 lines.
+- [ ] References `plan-agents`, `router-skills`, and `plan-hooks` accurately where applicable.
+- [ ] Uses context pointers to `GLOSSARY.md`, `docs/adr/`, and `docs/agents/*` rather than inlining large reference blocks.
+- [ ] Keeps total steering file length under 100 lines with zero em-dashes or en-dashes.

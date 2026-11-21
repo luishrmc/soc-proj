@@ -1,80 +1,49 @@
 ---
 name: refine-prompt
-description: Optimize, refine, and engineer prompts for Gemini and other LLMs. Use when the user asks to improve, rewrite, optimize, evaluate, or structure a prompt, diagnose prompt weaknesses, or convert a task into a high-performance prompt.
+description: Optimize, diagnose, and reconstruct prompts into deterministic Markdown instructions or type-safe Pydantic application code. Use when the user asks to "optimize a prompt", "refine prompt", "structure prompt", "pydantic prompt", or convert a raw task draft into a high-adherence prompt.
 ---
-# Prompt Optimizer
 
-A structured engine to analyze, critique, and systematically reconstruct user-provided prompts into high-performance, deterministic instructions tailored for Gemini and modern LLMs.
+# Dual-Mode Prompt Optimizer
 
-## When to Use
+Diagnose failure modes in draft prompts and reconstruct them into deterministic, high-signal instructions for interactive agent sessions or type-safe application pipelines. Focus exclusively on optimizing and outputting the prompt artifact rather than executing the underlying task.
 
-- When the user asks to improve, refine, polish, or optimize an existing prompt.
-- When the user provides a draft prompt and wants it structured for better LLM adherence.
-- When diagnosing why a prompt generates hallucinations, excessive verbosity, or inconsistent output.
-- When creating modular, reusable prompt templates for specific engineering, academic, or coding domains.
+## Dual-Mode Selection
 
-## Core Restrictions
+Select the output mode matching the user's target environment:
 
-- Do not execute the prompt itself. Always focus exclusively on analyzing and optimizing the prompt text.
-- Do not add artificial verbosity. Every added token must serve a structural or clarity purpose.
-- Do not alter the core intent or introduce hallucinated domain requirements outside what the user implied.
+### Mode 1: Interactive Markdown (Default)
 
-## Execution Pipeline
-
-Follow this 5-stage pipeline for every prompt optimization request:
-
-### 1. Intent Extraction
-
-Identify the foundational parameters of the input:
-
-- Primary goal: What is the single core outcome desired?
-- Target output format: Code, markdown table, prose, JSON, step-by-step reasoning.
-- Domain: Academic, software engineering, hardware design, creative, administrative.
-- Target audience: Beginner, expert, peer review, cross-functional stakeholder.
-
-### 2. Diagnosis
-
-Critique the input prompt against common failure modes:
-
-- Ambiguity and vague phrasing (for example, "make it good", "write something about").
-- Missing negative constraints and boundary conditions.
-- Weak structural hierarchy and poor visual separation.
-- Unstated assumptions about context or runtime environment.
-- Format vagueness (missing exact schema, length, or structural markers).
-- Token inefficiency and redundant phrasing.
-
-### 3. Reconstruction Strategy
-
-Incorporate modern LLM optimization heuristics:
-
-- Persona and role grounding: Assign domain-appropriate expertise and tone.
-- Delimiters and sections: Use clear Markdown headings, XML tags, or triple quotes to delineate instructions, context, and input variables.
-- Step-by-step decomposition: Break complex tasks into sequential logic steps.
-- Deterministic output specification: Define precise response structures and negative constraints.
-- Few-shot scaffolding: Add illustrative input/output pairs when the task involves schema compliance or stylistic nuance.
-
-### 4. Output Formatting
-
-Always render the response using the following structure:
+Use for human-in-the-loop chat, CLI agent sessions, and pair-programming prompts:
 
 ```markdown
 ## 🔍 Original Prompt Analysis
-- Goal: <Extracted intent primary>
-- Issues Identified: <Bulleted diagnosed list of weaknesses>
+- **Goal:** <Extracted primary objective>
+- **Issues Identified:** <Diagnosed weaknesses from references/failure-modes.md>
 
 ## 🚀 Optimized Prompt
-<Fully and copy paste prompt ready reconstructed to>
+<Copy-pasteable, delimited prompt specification>
 
 ## 🧠 Improvements Applied
-- <Specific 1 and improvement rationale>
-- <Specific 2 and improvement rationale>
-- <Specific 3 and improvement rationale>
+- <Structural improvement 1 and rationale>
+- <Structural improvement 2 and rationale>
 ```
 
-### 5. Quality Checklist
+### Mode 2: Application & Pydantic (Code-Ready)
 
-Before presenting the rewritten prompt, ensure:
+Use when the user targets API integration, automated agent pipelines, JSON extraction, or Pydantic models:
 
-- The rewritten prompt contains explicit constraints (length, style, format).
-- Clear delimiters separate instructions from variables or data inputs.
-- The prompt is directly copyable and executable without requiring user guesswork.
+1. **Pydantic Schema**: Validated `BaseModel` with explicit `Field` descriptions and literal types ([references/structured-outputs.md](./references/structured-outputs.md)).
+2. **Parameterized Prompt Template**: Decoupled prompt text with `{variable}` interpolation slots.
+3. **Execution Snippet**: Clean Python invocation using structured outputs.
+
+## 5-Stage Optimization Pipeline
+
+1. **Intent Extraction**: Pin down the single primary outcome, operating mode (Interactive vs. Pydantic), domain context, and target model capabilities.
+2. **Failure Mode Diagnosis**: Audit the input against [references/failure-modes.md](./references/failure-modes.md) for boundary ambiguity, Negative Constraint Collapse, format drift, and context bloat.
+3. **Reconstruction**:
+   - Assign a grounded domain persona and evaluation perspective.
+   - Separate instructions from variable inputs using XML tags (`<context>`, `<input>`) or Markdown headers.
+   - Apply structured reasoning and self-verification patterns from [references/reasoning-patterns.md](./references/reasoning-patterns.md).
+   - Consult [assets/prompt-template-library.md](./assets/prompt-template-library.md) for domain archetypes.
+4. **Output Rendering**: Emit the reconstructed prompt strictly following **Mode 1** or **Mode 2**.
+5. **Completion Check**: Confirm all constraints are positively framed, variable slots are delimited, and the output is immediately copy-pasteable without placeholders.

@@ -1,99 +1,48 @@
 ---
 name: gen-skill
-description: End-to-end meta-skill engine for architecting, validating, and generating production-ready modular agent skills across CLI and Web environments. Integrates prompt-optimization and precision-writing principles to produce deterministic SKILL.md specifications.
----
-# Skill Builder
-
-System engine for designing, testing, and generating modular agent skills compatible with both Gemini CLI and Gemini Web/Workspace interfaces.
-
-## When to Use
-
-Activate this skill when:
-
-- Creating a new agent skill from scratch or translating an existing workflow into a reusable module.
-- Structuring prompt engineering logic, tools, and execution steps into a standard `SKILL.md`.
-- Refactoring loose prompt templates into deterministic, portable agent specifications.
-
-Do not activate when:
-
-- Executing an existing operational skill.
-- Generating one-off responses that require no persistent skill architecture.
-
+description: "Architect, validate, and generate modular SKILL.md specifications and disclosed reference files."
+disable-model-invocation: true
 ---
 
-## Operational Architecture
+# Modular Skill Builder
 
-Every generated skill must satisfy four architectural constraints:
+Design and generate portable, low-context-load agent skills (`SKILL.md` plus disclosed `references/`, `assets/`, and `scripts/`) grounded in the mechanics in [references/skill-mechanics.md](./references/skill-mechanics.md).
 
-1. **Context Efficiency:** Zero boilerplate. Target strict signal-to-noise ratio.
-2. **Deterministic Control:** Concrete imperative steps with clear state transitions.
-3. **Environment Portability:** Operational in headless CLI environments (tool-driven) and conversational Web interfaces (prompt-driven).
-4. **Integration Hooks:** Defined inputs, outputs, validation checkpoints, and dependencies.
+## Architectural Standards
 
----
+Every generated skill must satisfy four structural invariants:
 
-## Execution Workflow
+1. **Invocation Alignment**: Explicitly choose **User-Invoked** (`disable-model-invocation: true` with a 1-line human summary) for slash-command orchestrators, or **Model-Invoked** (front-loaded trigger branches in `description`) for reusable disciplines ([references/skill-mechanics.md](./references/skill-mechanics.md)).
+2. **Progressive Disclosure (<150 Lines)**: Keep the root `SKILL.md` strictly under 150 lines containing ordered steps, leading words, and completion criteria. Push templates, schemas, and shell helpers into `references/`, `assets/`, or `scripts/`.
+3. **Positive Framing & Leading Words**: Recruit pretrained model priors with compact **leading words** (*design tree*, *frontier*, *tracer bullets*, *seam*) and positive directives rather than long lists of `"Do not..."` negations.
+4. **Checkable Completion Criteria**: End every operational step on a clear, exhaustive completion criterion (`Done when...`) so the agent never rushes to premature completion.
 
-Follow this 4-phase lifecycle sequentially:
+## 4-Phase Authoring Workflow
 
-```
-[Phase 1: Ingestion & Clarification]
-                 │
-                 ▼
-[Phase 2: Architectural Specification]
-                 │
-                 ▼
-[Phase 3: Precision Authoring]
-                 │
-                 ▼
-[Phase 4: Verification & Packaging]
-```
+### Phase 1: Requirement & Load Analysis
 
-### Phase 1: Ingestion & Intent Optimization
+1. Determine the skill's functional prefix (`shape-*`, `dev-*`, `review-*`, `arch-*`, `debug-*`, `env-*`, `setup-*`, `plan-*`, `refine-*`, `git-*`, `router-*`).
+2. Decide whether the skill is **User-Invoked** (zero context load, human-triggered orchestrator) or **Model-Invoked** (always-loaded description pointer, autonomous or skill-called discipline).
+3. Separate **in-file steps** (what the agent does every run) from **disclosed reference** (templates, edge-case tables, or bash scripts reached on demand).
 
-1. Deconstruct the user's raw requirement into:
-   - **Goal:** Primary task and expected deliverable.
-   - **Triggers:** Exact keywords, intent patterns, and file contexts.
-   - **Environment Targets:** CLI flags/tools vs. Web conversational interaction.
-   - **Constraints:** Format requirements, token budgets, safety boundaries.
-2. If critical parameters are missing, halt and request clarification on:
-   - Scope boundaries (what the skill must NOT do).
-   - Expected I/O interface.
+### Phase 2: Context Pointer & Hierarchy Design
 
-### Phase 2: Architectural Specification
-
-Structure the module around the standard Skill Schema:
-
-- **Metadata:** Unique hyphenated name, clear description (under 1024 characters), semantic version.
-- **Trigger Surface:** Positive triggers and negative anti-triggers.
-- **Workflow Pipeline:** Ordered, numbered execution phases.
-- **Negative Constraints:** Explicit behavioral boundaries.
+1. If Model-Invoked, write a sharp `description` that front-loads the leading word and lists one trigger per distinct branch (collapsing synonymous triggers).
+2. If User-Invoked, set `disable-model-invocation: true` and write a clean one-line `description` without trigger lists.
+3. Omit redundant `## When to Use` body sections that repeat the YAML `description`.
 
 ### Phase 3: Precision Authoring
 
-Draft the `SKILL.md` file applying these rules:
-
-- Use imperative active voice ("Parse input", "Validate schema", never "The agent should parse").
-- Exclude introductory fluff, corporate buzzwords, and redundant pleasantries.
-- Eliminate all em-dashes and en-dashes; use standard hyphens or colons.
-- Use explicit markdown headers and blank lines before all lists.
-- Keep the complete body focused and under 500 lines.
+1. Write imperative steps using active verbs and co-located rules.
+2. State positive target behaviors ("Write one-line comments", "Stage files by explicit pathspec") and prune no-op instructions that models already obey by default.
+3. Use standard hyphens, commas, colons, or periods in place of em-dashes or en-dashes.
 
 ### Phase 4: Verification Checklist
 
-Verify each artifact against these criteria prior to finalization:
+Verify every generated file before finishing:
 
-- [ ] Name contains only lowercase alphanumeric characters and hyphens (`[a-z0-9-]+`).
-- [ ] Frontmatter description states both *what* the skill does and *when* it triggers.
-- [ ] All procedures have verifiable outputs.
-- [ ] No placeholder blocks (e.g., `<insert code here>` or `TODO`).
-- [ ] Cross-environment compatibility documented (CLI flags / Web prompt equivalents).
-
----
-
-## Negative Constraints
-
-- Never include conversational preamble, generic apologies, or sign-offs in generated skills.
-- Never use em-dashes (`—`) or en-dashes (`–`).
-- Never generate abstract or placeholder logic without working examples.
-- Never omit negative constraints from generated skill definitions.
+- [ ] Root `SKILL.md` is strictly under 150 lines.
+- [ ] `name` uses lowercase alphanumeric characters and hyphens (`[a-z0-9-]+`).
+- [ ] Invocation mode (`disable-model-invocation: true` vs. model-facing trigger pointer) matches [references/skill-mechanics.md](./references/skill-mechanics.md).
+- [ ] Inter-skill calls target only **model-invoked** skills via explicit Skill tool instructions.
+- [ ] Zero em-dashes, en-dashes, or placeholder `TODO` blocks exist.

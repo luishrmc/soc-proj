@@ -1,96 +1,45 @@
 ---
 name: refine-skill
-description: Audit, troubleshoot, and fine-tune existing agent skills and SKILL.md specifications. Activate when users report instruction drift, false triggers, formatting inconsistencies, or tool failures in an existing skill, or when updating a skill based on conversation logs.
+description: "Audit, prune, and calibrate existing SKILL.md specifications using unified diffs and writing-for-agents mechanics."
+disable-model-invocation: true
 ---
-# Skill Optimizer
 
-System engine for evaluating, debugging, and iteratively calibrating operational agent skills. Converts runtime execution traces, failure logs, and user feedback into deterministic skill improvements.
+# Skill Optimizer & Pruner
 
-## When to Use
+Diagnose, prune, and calibrate operational `SKILL.md` files against runtime traces, user feedback, and the architectural rules in [references/skill-mechanics.md](./references/skill-mechanics.md).
 
-Activate this skill when:
+## 5-Phase Calibration Workflow
 
-- A user requests a revision, bug fix, or optimization for an existing skill.
-- An existing skill triggers on unrelated queries or fails to trigger on valid tasks.
-- A skill produces invalid output structures, schema violations, or hallucinated fields.
-- Runtime logs show missed negative constraints or tool parameter errors.
-- A skill requires token pruning or structural reorganization to meet context budgets.
+### Phase 1: Telemetry & Load Audit
 
-Do not activate when:
+Ingest the target `SKILL.md` (and any failure trace or user report) and classify defects across six levers:
 
-- Generating a new skill from scratch without an existing baseline file.
-- Executing an operational skill during routine agent workflows.
-- Authoring standard application code or general system documentation.
+1. **Invocation & Context Load**: Is a human-only workflow missing `disable-model-invocation: true`, or is a model-invoked skill carrying a weak/bloated `description` pointer?
+2. **In-File Sprawl (>150 Lines)**: Are templates, JSON schemas, or bash scripts buried inside `SKILL.md` instead of disclosed in `references/`, `assets/`, or `scripts/`?
+3. **Premature Completion**: Do steps lack checkable, high-demand completion criteria (`Done when...`)?
+4. **Negative Constraint Collapse**: Does the skill rely on long `"Do not / Never"` lists instead of positive framing and compact **leading words**?
+5. **Duplication & No-Op Sediment**: Does the body repeat the YAML `description` in a `## When to Use` block, cache environment facts, or state default behaviors?
+6. **Dangling Cross-References**: Does the skill attempt to invoke a user-invoked skill or reference outdated skill slugs?
 
-## Multi-Environment Target Support
+### Phase 2: Root-Cause Mapping
 
-### Gemini CLI
+Consult [references/skill-mechanics.md](./references/skill-mechanics.md) and map each defect to a concrete structural transformation:
 
-- Consumes file paths to target SKILL.md files and associated runtime execution logs.
-- Outputs standard unified diff patches and CLI test command strings.
+- **Pointer Sharpening**: Front-load leading words and keep exactly one trigger per distinct branch in model-invoked `description` fields.
+- **Progressive Disclosure**: Move large reference blocks, schemas, and shell logic to sibling `references/`, `assets/`, or `scripts/` files behind explicit pointers.
+- **Positive Reframing**: Rewrite prohibitions into positive target directives and co-locate rules with the step they govern.
 
-### Gemini Web and Workspace
+### Phase 3: Unified Diff & Rationale Delivery
 
-- Consumes pasted SKILL.md text blocks and conversation transcript excerpts.
-- Outputs formatted Markdown diff blocks, rationale explanations, and copyable validation prompts.
+1. Present proposed modifications as a clean Unified Diff (or side-by-side before/after line count summary when extracting `scripts/` and `references/`).
+2. Cite the specific lever from [references/skill-mechanics.md](./references/skill-mechanics.md) justifying each change.
+3. Verify `skills.json` synchronization if the skill's `description` or path changed.
 
-## Operational Workflow
+### Phase 4: Verification Audit
 
-Execute the following five phases sequentially:
+Confirm the refactored skill passes every check before writing:
 
-### Phase 1: Context and Telemetry Audit
-
-1. Ingest baseline materials:
-   - Target SKILL.md file.
-   - User issue descriptions, failure logs, or desired behavioral shifts.
-2. Classify observed defects into primary failure categories:
-   - Trigger Calibration: False positive activations or false negative omissions.
-   - Constraint Leakage: Failure to enforce negative boundaries and explicit bans.
-   - Format Drift: Structural deviations, missing schemas, or markdown syntax errors.
-   - Instruction Ambiguity: Vague directives causing variable agent interpretation.
-   - Tool Call Misuse: Malformed tool arguments or incorrect tool sequencing.
-   - Token Bloat: Redundant instructions, conversational filler, or excessive examples.
-3. Establish a baseline problem statement defining observed behavior versus required behavior.
-
-### Phase 2: Knowledge Retrieval and Research
-
-1. Formulate 2 to 3 targeted technical queries addressing the identified failure mode. Focus on:
-   - Structural boundary patterns for complex system instructions.
-   - Standardized input and output schemas for specific domains.
-   - Negative constraint syntax that minimizes model hallucination.
-2. Filter findings to extract actionable implementation patterns. Discard broad generalizations.
-
-### Phase 3: Root Cause Analysis and Optimization Hypothesis
-
-1. Map the gap between current skill performance and verified prompt engineering patterns.
-2. Formulate explicit optimization hypotheses:
-   - Instruction Clarification: Convert descriptive guidance into sequential imperative steps.
-   - Trigger Calibration: Refine YAML description fields with positive and negative boundaries.
-   - Negative Guardrails: Draft deterministic negative rules targeting observed error modes.
-   - Few-Shot Calibration: Replace outdated examples with targeted edge cases.
-
-### Phase 4: Structured Diff and Rationale Delivery
-
-1. Present all proposed changes exclusively in Unified Diff format using standard diff syntax markers.
-2. Provide a technical rationale for each modification hunk, connecting it directly to user feedback.
-3. Update the semantic version according to standard SemVer rules:
-   - Patch increment (0.0.+1) for constraint additions, bug fixes, and phrasing adjustments.
-   - Minor increment (0.+1.0) for new operational phases, new tools, or expanded scopes.
-   - Major increment (+1.0.0) for breaking changes to trigger contracts or I/O formats.
-4. Record an entry in the skill changelog detailing modified sections.
-
-### Phase 5: Interactive Validation and Human-in-the-Loop Refinement
-
-1. Produce 2 to 3 targeted verification test prompts designed to trigger the previous failure mode.
-2. Define the exact expected behavior and pass criteria for each test prompt.
-3. Request explicit user confirmation before applying the patch to storage.
-4. Apply iterative refinements if the user identifies remaining edge cases.
-
-## Negative Constraints
-
-- Never rewrite an entire skill without providing a unified diff showing specific alterations.
-- Never alter the primary domain purpose of a skill without explicit user direction.
-- Never remove safety boundaries or negative constraints during optimization.
-- Never use placeholder text, incomplete logic blocks, or unverified instructions.
-- Never use em-dashes or en-dashes in modified skills.
-- Never use semicolons in modified skills.
+- [ ] Root `SKILL.md` is strictly under 150 lines.
+- [ ] Invocation mode (`disable-model-invocation: true` vs. model-invoked pointer) is explicit and accurate.
+- [ ] Redundant trigger blocks and no-op sentences are removed.
+- [ ] Zero em-dashes or en-dashes appear in any modified file.
