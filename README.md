@@ -48,7 +48,7 @@ The parameters below define the physical hardware testbed on the Digilent Cora Z
 | **3. SPI Receiver (PS/PL)** | [`axi_spi_receiver.c`](cora7z/app/sw/src/comms/axi_spi_receiver.c) | [AXI_SPI_RECEIVER.md](docs/sw/AXI_SPI_RECEIVER.md) | 256 B FIFO drainage and 32-bit word alignment | `0` CRC/frame/len errors across `30/30` bursts |
 | **4. Compression Accel (PL)** | [`lzss_accel.vhdl`](cora7z/app/hw/src/compression/lzss_accel.vhdl) | [LZSS_ACCEL.md](docs/hw/LZSS_ACCEL.md) | Sliding window hardware compressor (256 B / 16 B) | VUnit `7/7` + HIL verified; Risk R9 confirmed |
 | **5. Compression Baseline (PS)** | [`lzss_sw.c`](cora7z/app/sw/src/compression/lzss_sw.c) | [LZSS_SW.md](docs/sw/LZSS_SW.md) | Heatshrink-compatible C11 reference for Cortex-A9 | L1/L2 cache execution, bit-exact parity with HW model |
-| **6. Crypto Accel (PL)** | [`aes_accel.vhdl`](cora7z/app/hw/src/crypto/aes_accel.vhdl) | [AES_ACCEL.md](docs/hw/AES_ACCEL.md) | Iterative 10-round AES-128-CTR hardware engine | VUnit `5/5` + HIL verified (`1.19x–1.24x` speedup) |
+| **6. Crypto Accel (PL)** | [`aes_accel.vhdl`](cora7z/app/hw/src/crypto/aes_accel.vhdl) | [AES_ACCEL.md](docs/hw/AES_ACCEL.md) | Iterative 10-round AES-128-CTR hardware engine | VUnit `5/5` + HIL verified (`1.17x–1.24x` speedup) |
 | **7. Crypto Baseline (PS)** | [`aes_ctr_sw.c`](cora7z/app/sw/src/crypto/aes_ctr_sw.c) | [AES_CTR_SW.md](docs/sw/AES_CTR_SW.md) | NIST SP 800-38A reference model in C11 | Golden vector validated; baseline CPU profiling target |
 | **8. Pipeline Manager** | [`pipeline_mgr.c`](cora7z/app/sw/src/pipeline/pipeline_mgr.c) | [PIPELINE_MGR.md](docs/sw/PIPELINE_MGR.md) | Orchestration of 4 scenarios and DEVCFG bus safety | `PCFG_DONE` interlock + calibrated PMU (`650 MHz`) |
 | **9. Architectural Diagrams** | [`cora7z_top.png`](docs/diagrams/cora7z_top.png) | [Diagrams README](docs/diagrams/README.md) | High-resolution 3200 $\times$ 1800 block diagram | Memory map, bus interconnects, pin allocation |
@@ -126,7 +126,7 @@ In streaming AXI DMA architectures, if compressed output size is smaller than ex
 The compression modules implement a Heatshrink-compatible sliding window dictionary algorithm:
 * **Sliding Window:** 256-byte circular buffer ($W = 8$).
 * **Lookahead Comparison Buffer:** 16 bytes ($L = 4$) with linear window search.
-* **Token Packing:** Bit-level token encoding where a `'1'` bit precedes an 8-bit literal byte, and a `'0'` bit precedes an offset-length tuple for repeated sequences of 2 to 16 bytes.
+* **Token Packing:** Bit-level token encoding where a `'0'` flag bit precedes an 8-bit literal byte, and a `'1'` flag bit precedes a 2-byte offset-length tuple (`dist-1`, `len-3`) for repeated sequences of 3 to 16 bytes (`c_min_match = 3`, `c_max_lookahead = 16`).
 * **Hardware Architecture:** Designed without dynamic heap memory allocation, operating over BRAM Port B at 100 MHz.
 
 ---
@@ -145,7 +145,7 @@ The encryption module implements AES-128 in Counter (CTR) mode compliant with **
 
 The bare-metal C11 firmware in [`cora7z/app/sw/src/`](cora7z/app/sw/src/) orchestrates the system:
 * **Bus Safety Interlock (`is_pl_programmed`):** Checks Bit 2 of the DEVCFG status register (`0xF800700C`, `PCFG_DONE`). If the FPGA is unprogrammed, accesses to `M_AXI_GP0` are inhibited, preventing fatal Cortex-A9 bus lockups.
-* **Cycle-Accurate Profiling (ARM PMU):** Directly accesses CP15 register `PMCCNTR` at 667 MHz with a calibrated overhead of 29 cycles.
+* **Cycle-Accurate Profiling (ARM PMU):** Directly accesses CP15 register `PMCCNTR` at `650 MHz` (`XPAR_CPU_CORE_CLOCK_FREQ_HZ`) with a calibrated overhead of `28` cycles subtracted cleanly.
 * **Zero Dynamic Allocation:** Uses static memory allocation exclusively, adhering to MISRA-C principles.
 
 ---

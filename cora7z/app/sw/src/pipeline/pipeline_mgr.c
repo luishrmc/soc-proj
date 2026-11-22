@@ -62,7 +62,7 @@ void pipeline_set_pmu_overhead(uint32_t overhead_cycles) {
 static inline uint32_t calc_calibrated_cycles(uint32_t start_cyc, uint32_t end_cyc) {
     uint32_t raw = (end_cyc >= start_cyc) ?
                    (end_cyc - start_cyc) :
-                   ((0xFFFFFFFFU - start_cyc) + end_cyc);
+                   ((0xFFFFFFFFU - start_cyc) + end_cyc + 1U);
     return (raw > s_pmu_overhead_cycles) ? (raw - s_pmu_overhead_cycles) : 0U;
 }
 

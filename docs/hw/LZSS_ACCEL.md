@@ -66,9 +66,9 @@ Medido em silício na Cora Z7-10 (`100 MHz` PL) e verificado bit-a-bit em VUnit/
 
 | Perfil de Entropia (`1024 B`) | Saída Comprimida | Space Savings (CR) | Ciclos PL (`100 MHz`) | Tempo PL | Observação (Risco R9) |
 | :--- | :---: | :---: | :---: | :---: | :--- |
-| **Quiescent** | `440–469 B` | `+55.7%` | `~193k–207k` | `~2.0 ms` | Alta redundância periódica |
-| **Dynamic** | `994–1005 B` | `+2.5%` | `~572k–578k` | `~5.7 ms` | Redundância moderada |
-| **Chaotic** | `1152–1154 B` | `-12.6%` | `~743k–746k` | `~7.4 ms` | Expansão máxima de framing (`<= 2048 B`) |
+| **Quiescent** | `440–469 B` | `+55.7%` | `193,192–211,667` | `~2.0 ms` | Alta redundância periódica |
+| **Dynamic** | `994–1005 B` | `+2.5%` | `570,538–578,440` | `~5.7 ms` | Redundância moderada |
+| **Chaotic** | `1152–1154 B` | `-12.6%` | `742,593–746,048` | `~7.4 ms` | Expansão máxima de framing (`<= 2048 B`) |
 
 ### Recursos de Silício Consumidos (`lzss_accel_0` pós-implementação Vivado)
 * **Slice LUTs:** `667` (`3.79%` dos `17,600` disponíveis no XC7Z010)

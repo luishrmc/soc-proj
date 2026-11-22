@@ -68,9 +68,9 @@ Validates `test_sw_pipeline_run_all()`, `test_sw_pipeline_benchmark_sweep()`, al
    - `VSPI MOSI` (ESP32 `GPIO 23`) <-> Cora `T12` (`J7.4`)
    - `VSPI MISO` (ESP32 `GPIO 19`) <-> Cora `W15` (`J7.1`)
    - `VSPI CS0`  (ESP32 `GPIO 5`)  <-> Cora `F16` (`J7.5`)
-   - `TRIGGER`   (ESP32 `GPIO 32`) <-  Cora `Y18` (`PMOD JA1`, 30 ms active-low pulse)
+   - `TRIGGER`   (ESP32 `GPIO 32`) <-  Cora `Y18` (`PMOD JA1`, `250 us` active-low falling-edge pulse)
 2. **Burst Execution & Consolidation:**
-   - Cora Z7 executes `test_sw_pipeline_run_all()`, `test_sw_pipeline_benchmark_sweep()`, emits the active-low trigger on `PMOD JA1`, and receives the 30-frame ESP32 burst (`10 Quiescent`, `10 Dynamic`, `10 Chaotic`, 30 ms inter-frame gap).
+   - Cora Z7 executes `test_sw_pipeline_run_all()`, `test_sw_pipeline_benchmark_sweep()`, emits the active-low `250 us` trigger pulse on `PMOD JA1`, and buffers all 30 incoming SPI frames (`10 Quiescent`, `10 Dynamic`, `10 Chaotic`, `30 ms` inter-frame gap) with immediate ACK staging before running 4-scenario evaluation.
    - For each valid SPI frame, Cora Z7 stages `0x81` ACK immediately, evaluates all 4 scenarios (`Case 1..4`) with loopback verification, and prints a compact `[HIL_BENCH]` trace (~11 ms UART budget).
    - Consolidate captured UART logs into CSV matrices:
      ```bash

@@ -38,4 +38,4 @@ None.
 
 ## Open Technical Risks & Findings
 
-- **R9** (Task 4.3): **Empirically Confirmed.** Sequential Port-B BRAM lookahead searches at `100 MHz` (`200,972–744,661` PL cycles) plus AXI MMIO BRAM transfer overhead make PL LZSS (`Scenario 2`: `0.61x–0.63x`, `Scenario 4`: `0.69x–0.72x`) slower than Cortex-A9 L1/L2 cache execution at `650 MHz`. Conversely, **Scenario 3 (`SW LZSS + PL AES-CTR`)** achieves **1.19x–1.24x** end-to-end speedup across all entropy regimes (`668–1,679` PL cycles).
+- **R9** (Task 4.3): **Empirically Confirmed.** Sequential Port-B BRAM lookahead searches at `100 MHz` (`200,972–744,661` PL cycles) plus AXI MMIO BRAM transfer overhead make PL LZSS (`Scenario 2`: `0.63x`, `Scenario 4`: `0.69x–0.72x`) slower than Cortex-A9 L1/L2 cache execution at `650 MHz`. Conversely, **Scenario 3 (`SW LZSS + PL AES-CTR`)** achieves **1.17x–1.24x** end-to-end speedup across all entropy regimes (`668–1,679` PL cycles).
