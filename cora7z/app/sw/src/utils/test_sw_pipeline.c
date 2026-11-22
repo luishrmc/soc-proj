@@ -4,6 +4,7 @@
  */
 
 #include "utils/test_sw_pipeline.h"
+#include "utils/telemetry_dataset.h"
 #include "pipeline/pipeline_mgr.h"
 #include "compression/lzss_sw.h"
 #include "crypto/aes_ctr_sw.h"
@@ -107,21 +108,16 @@ static int test_buffer_boundary_stress(void) {
 }
 
 static int test_pipeline_loopback(void) {
-    LOG_PRINT("[TEST 4/5] End-to-End Pipeline Loopback (Raw -> Comp -> Encrypt -> Decrypt -> Decomp)... ");
+    LOG_PRINT("[TEST 4/5] End-to-End 1024 B Pipeline Loopback (Quiescent Telemetry)... ");
     pipeline_init();
 
-    static uint8_t raw_payload[64];
-    static uint8_t cipher_buf[256];
-    static uint8_t recovered_buf[64];
-
-    /* Standard 64-byte incremental pattern matching active ESP32 injector */
-    for (size_t i = 0; i < sizeof(raw_payload); i++) {
-        raw_payload[i] = (uint8_t)(i & 0xFFU);
-    }
+    static uint8_t cipher_buf[PIPELINE_MAX_FRAME_SIZE];
+    static uint8_t recovered_buf[TELEMETRY_PAYLOAD_SIZE];
+    const uint8_t *raw_payload = g_telemetry_dataset[0].payload;
 
     pipeline_metrics_t m;
     size_t cipher_len = 0;
-    int rc = pipeline_process_frame(raw_payload, sizeof(raw_payload),
+    int rc = pipeline_process_frame(raw_payload, TELEMETRY_PAYLOAD_SIZE,
                                     cipher_buf, sizeof(cipher_buf),
                                     &cipher_len, &m);
     if (rc != PIPELINE_SUCCESS) {
@@ -138,10 +134,10 @@ static int test_pipeline_loopback(void) {
         return 1;
     }
 
-    if (recovered_len != sizeof(raw_payload) ||
-        memcmp(raw_payload, recovered_buf, sizeof(raw_payload)) != 0) {
+    if (recovered_len != TELEMETRY_PAYLOAD_SIZE ||
+        memcmp(raw_payload, recovered_buf, TELEMETRY_PAYLOAD_SIZE) != 0) {
         LOG_PRINT("FAIL (Loopback payload mismatch: rec_len=%u)\r\n", (unsigned int)recovered_len);
-        for (size_t i = 0; i < sizeof(raw_payload); i++) {
+        for (size_t i = 0; i < TELEMETRY_PAYLOAD_SIZE; i++) {
             if (raw_payload[i] != recovered_buf[i]) {
                 LOG_PRINT("       Mismatch at byte %u: expected=0x%02X, got=0x%02X\r\n",
                           (unsigned int)i, raw_payload[i], recovered_buf[i]);
@@ -151,7 +147,7 @@ static int test_pipeline_loopback(void) {
         return 1;
     }
 
-    LOG_PRINT("PASS (64 B -> Cipher %u B | Comp: %u cyc, Crypt: %u cyc)\r\n",
+    LOG_PRINT("PASS (1024 B -> Cipher %u B | Comp: %u cyc, Crypt: %u cyc)\r\n",
               (unsigned int)cipher_len,
               (unsigned int)m.comp_cycles,
               (unsigned int)m.crypt_cycles);
@@ -159,25 +155,34 @@ static int test_pipeline_loopback(void) {
 }
 
 static int test_hybrid_hardware_parity(void) {
-    LOG_PRINT("[TEST 5/5] Hybrid 4-Scenario Parity & Dual-Port BRAM HW Offload... ");
+    LOG_PRINT("[TEST 5/5] Hybrid 4-Scenario Parity (Dynamic + Chaotic 1024 B / Tail Expansion)... ");
     if (!pipeline_is_pl_ready()) {
         LOG_PRINT("SKIPPED (PL not programmed)\r\n");
         return 0;
     }
 
-    static uint8_t test_payload[64];
-    for (size_t i = 0; i < sizeof(test_payload); i++) {
-        test_payload[i] = (uint8_t)((i * 3 + 0x20) & 0xFFU);
+    static const size_t check_indices[2] = {
+        TELEMETRY_FRAMES_PER_PROFILE,       /* Dynamic frame 0 (1024 B) */
+        2U * TELEMETRY_FRAMES_PER_PROFILE   /* Chaotic frame 0 (1024 B -> 1154 B expansion) */
+    };
+
+    for (size_t i = 0; i < 2U; i++) {
+        const telemetry_dataset_entry_t *entry = &g_telemetry_dataset[check_indices[i]];
+        int rc = pipeline_verify_profile_scenarios(telemetry_profile_name(entry->profile),
+                                                   (uint16_t)(i + 1U),
+                                                   entry->payload,
+                                                   TELEMETRY_PAYLOAD_SIZE,
+                                                   false,
+                                                   NULL);
+        if (rc != PIPELINE_SUCCESS) {
+            LOG_PRINT("FAIL (profile=%s, error code %d)\r\n",
+                      telemetry_profile_name(entry->profile), rc);
+            return 1;
+        }
     }
 
-    int rc = pipeline_verify_all_scenarios(test_payload, sizeof(test_payload));
-    if (rc == PIPELINE_SUCCESS) {
-        LOG_PRINT("PASS\r\n");
-        return 0;
-    } else {
-        LOG_PRINT("FAIL (error code %d)\r\n", rc);
-        return 1;
-    }
+    LOG_PRINT("PASS\r\n");
+    return 0;
 }
 
 int test_sw_pipeline_run_all(void) {
@@ -205,38 +210,44 @@ int test_sw_pipeline_run_all(void) {
 
 int test_sw_pipeline_benchmark_sweep(void) {
     LOG_PRINT("\r\n================================================================\r\n");
-    LOG_PRINT("  Executing 12-Combination Benchmark Sweep (256B, 512B, 1024B)  \r\n");
+    LOG_PRINT("  Executing 12-Combination ADR-020 Sweep (1024 B x 3 Profiles)  \r\n");
     LOG_PRINT("================================================================\r\n");
 
-    static const size_t sweep_sizes[] = { 256U, 512U, 1024U };
-    const size_t num_sizes = sizeof(sweep_sizes) / sizeof(sweep_sizes[0]);
+    static const size_t profile_indices[] = {
+        0U,                                  /* Quiescent */
+        TELEMETRY_FRAMES_PER_PROFILE,        /* Dynamic */
+        2U * TELEMETRY_FRAMES_PER_PROFILE    /* Chaotic */
+    };
+    const size_t num_profiles = sizeof(profile_indices) / sizeof(profile_indices[0]);
 
-    static uint8_t sweep_buf[1024] __attribute__((aligned(4)));
     int total_failures = 0;
 
-    for (size_t s = 0; s < num_sizes; s++) {
-        size_t sz = sweep_sizes[s];
-        LOG_PRINT("\r\n--- Benchmark Sweep Iteration [%u/3]: Payload Size = %u Bytes ---\r\n",
-                  (unsigned int)(s + 1), (unsigned int)sz);
+    for (size_t p = 0; p < num_profiles; p++) {
+        size_t idx = profile_indices[p];
+        const telemetry_dataset_entry_t *entry = &g_telemetry_dataset[idx];
+        const char *prof_name = telemetry_profile_name(entry->profile);
 
-        /* Generate realistic synthetic telemetry pattern with structured redundancy */
-        for (size_t i = 0; i < sz; i++) {
-            sweep_buf[i] = (uint8_t)((((i % 32) ^ (i / 16)) + (uint8_t)sz) & 0xFFU);
-        }
+        LOG_PRINT("\r\n--- Benchmark Sweep Iteration [%u/3]: Profile = %s (Payload = %u B) ---\r\n",
+                  (unsigned int)(p + 1U), prof_name, (unsigned int)TELEMETRY_PAYLOAD_SIZE);
 
-        int rc = pipeline_verify_all_scenarios(sweep_buf, sz);
+        int rc = pipeline_verify_profile_scenarios(prof_name,
+                                                   (uint16_t)(idx + 1U),
+                                                   entry->payload,
+                                                   TELEMETRY_PAYLOAD_SIZE,
+                                                   false,
+                                                   NULL);
         if (rc != PIPELINE_SUCCESS) {
-            LOG_PRINT("[SWEEP ERROR] Verification failed for payload size %u B (code %d)\r\n",
-                      (unsigned int)sz, rc);
+            LOG_PRINT("[SWEEP ERROR] Verification failed for %s 1024 B (code %d)\r\n",
+                      prof_name, rc);
             total_failures++;
         }
     }
 
     LOG_PRINT("\r\n================================================================\r\n");
     if (total_failures == 0) {
-        LOG_PRINT("  [SWEEP COMPLETE] All 12 Benchmark Combinations Verified PASS! \r\n");
+        LOG_PRINT("  [SWEEP COMPLETE] All 12 ADR-020 Matrix Cells Verified PASS!  \r\n");
     } else {
-        LOG_PRINT("  [SWEEP FAILURE] %d / 3 payload sweeps failed!                 \r\n", total_failures);
+        LOG_PRINT("  [SWEEP FAILURE] %d / 3 entropy profile sweeps failed!        \r\n", total_failures);
     }
     LOG_PRINT("================================================================\r\n\r\n");
 

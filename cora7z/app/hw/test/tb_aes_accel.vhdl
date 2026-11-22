@@ -22,6 +22,9 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
+library work;
+use work.tb_adr020_vectors_pkg.all;
+
 entity tb_aes_accel is
   generic (runner_cfg : string);
 end entity tb_aes_accel;
@@ -93,30 +96,34 @@ begin
     variable v_idx_out : integer;
   begin
     if rising_edge(aclk) then
-      -- BRAM IN Port B
-      if bram_in_en = '1' then
-        v_idx_in := to_integer(unsigned(bram_in_addr(10 downto 2)));
-        if v_idx_in < 512 then
-          bram_in_dout <= ram_in_mem(v_idx_in);
+      if aresetn = '0' then
+        ram_out_mem <= (others => x"A5A5A5A5");
+      else
+        -- BRAM IN Port B
+        if bram_in_en = '1' then
+          v_idx_in := to_integer(unsigned(bram_in_addr(10 downto 2)));
+          if v_idx_in < 512 then
+            bram_in_dout <= ram_in_mem(v_idx_in);
+          end if;
         end if;
-      end if;
 
-      -- BRAM OUT Port B
-      if bram_out_en = '1' then
-        v_idx_out := to_integer(unsigned(bram_out_addr(10 downto 2)));
-        if v_idx_out < 512 then
-          bram_out_dout <= ram_out_mem(v_idx_out);
-          if bram_out_we(0) = '1' then
-            ram_out_mem(v_idx_out)(7 downto 0) <= bram_out_din(7 downto 0);
-          end if;
-          if bram_out_we(1) = '1' then
-            ram_out_mem(v_idx_out)(15 downto 8) <= bram_out_din(15 downto 8);
-          end if;
-          if bram_out_we(2) = '1' then
-            ram_out_mem(v_idx_out)(23 downto 16) <= bram_out_din(23 downto 16);
-          end if;
-          if bram_out_we(3) = '1' then
-            ram_out_mem(v_idx_out)(31 downto 24) <= bram_out_din(31 downto 24);
+        -- BRAM OUT Port B
+        if bram_out_en = '1' then
+          v_idx_out := to_integer(unsigned(bram_out_addr(10 downto 2)));
+          if v_idx_out < 512 then
+            bram_out_dout <= ram_out_mem(v_idx_out);
+            if bram_out_we(0) = '1' then
+              ram_out_mem(v_idx_out)(7 downto 0) <= bram_out_din(7 downto 0);
+            end if;
+            if bram_out_we(1) = '1' then
+              ram_out_mem(v_idx_out)(15 downto 8) <= bram_out_din(15 downto 8);
+            end if;
+            if bram_out_we(2) = '1' then
+              ram_out_mem(v_idx_out)(23 downto 16) <= bram_out_din(23 downto 16);
+            end if;
+            if bram_out_we(3) = '1' then
+              ram_out_mem(v_idx_out)(31 downto 24) <= bram_out_din(31 downto 24);
+            end if;
           end if;
         end if;
       end if;
@@ -212,6 +219,79 @@ begin
     variable v_data   : std_logic_vector(31 downto 0);
     variable v_status : std_logic_vector(31 downto 0);
 
+    procedure run_aes_vector_check(
+      constant label_str : in string;
+      constant pt_vec    : in byte_vec_t;
+      constant ct_vec    : in byte_vec_t
+    ) is
+      variable v_word      : std_logic_vector(31 downto 0);
+      variable v_num_words : integer;
+      variable v_byte_idx  : integer;
+      variable v_got_byte  : std_logic_vector(7 downto 0);
+      variable v_widx      : integer;
+      variable v_lane      : integer;
+    begin
+      info("Running ADR-020 AES-128-CTR vector check [" & label_str & ", len=" &
+           integer'image(pt_vec'length) & " B]...");
+
+      for w in 0 to 511 loop
+        ram_in_mem(w) <= (others => '0');
+      end loop;
+
+      v_num_words := (pt_vec'length + 3) / 4;
+      for w in 0 to v_num_words - 1 loop
+        v_word := (others => '0');
+        for lane in 0 to 3 loop
+          v_byte_idx := w * 4 + lane;
+          if v_byte_idx < pt_vec'length then
+            v_word(lane * 8 + 7 downto lane * 8) := pt_vec(v_byte_idx);
+          end if;
+        end loop;
+        ram_in_mem(w) <= v_word;
+      end loop;
+      wait until rising_edge(aclk);
+
+      -- NIST key: 2b7e1516 28aed2a6 abf71588 09cf4f3c
+      axi_write(16#14#, x"2B7E1516");
+      axi_write(16#18#, x"28AED2A6");
+      axi_write(16#1C#, x"ABF71588");
+      axi_write(16#20#, x"09CF4F3C");
+
+      -- pipeline_mgr seq_id=1 IV: f0f1f2f3 f4f5f6f7 f8f90001 | ctr=00000001
+      axi_write(16#24#, x"F0F1F2F3");
+      axi_write(16#28#, x"F4F5F6F7");
+      axi_write(16#2C#, x"F8F90001");
+      axi_write(16#30#, x"00000001");
+
+      axi_write(16#08#, std_logic_vector(to_unsigned(pt_vec'length, 32)));
+      axi_write(16#00#, x"00000001");
+
+      loop
+        axi_read(16#04#, v_status);
+        exit when v_status(1) = '1';
+        wait for 10 ns;
+      end loop;
+
+      axi_read(16#10#, v_data);
+      check(unsigned(v_data) > 0, label_str & ": hardware cycle counter must be > 0");
+      info(label_str & ": completed in " & integer'image(to_integer(unsigned(v_data))) & " cycles.");
+
+      for i in 0 to pt_vec'length - 1 loop
+        v_widx := i / 4;
+        v_lane := i mod 4;
+        v_got_byte := ram_out_mem(v_widx)(v_lane * 8 + 7 downto v_lane * 8);
+        check_equal(v_got_byte, ct_vec(i),
+                    label_str & ": ciphertext byte mismatch at index " & integer'image(i));
+      end loop;
+
+      -- Check partial trailing word byte-masking (e.g. 1154 B leaves upper 2 bytes untouched)
+      if (pt_vec'length mod 4) = 2 then
+        check_equal(ram_out_mem(pt_vec'length / 4)(31 downto 16),
+                    std_logic_vector'(x"A5A5"),
+                    label_str & ": trailing BRAM byte-enable clobbered upper halfword");
+      end if;
+    end procedure run_aes_vector_check;
+
   begin
     test_runner_setup(runner, runner_cfg);
 
@@ -283,6 +363,12 @@ begin
         check_equal(ram_out_mem(1), std_logic_vector'(x"26E320B6"), "Ciphertext word 1 mismatch");
         check_equal(ram_out_mem(2), std_logic_vector'(x"6468EF1B"), "Ciphertext word 2 mismatch");
         check_equal(ram_out_mem(3), std_logic_vector'(x"CEB60D99"), "Ciphertext word 3 mismatch");
+
+      elsif run("test_adr020_1024b_blocks") then
+        run_aes_vector_check("AES-1024B-Dynamic", c_aes_1024b_pt, c_aes_1024b_ct);
+
+      elsif run("test_adr020_1154b_unaligned_tail") then
+        run_aes_vector_check("AES-1154B-ChaoticTail", c_aes_unaligned_pt, c_aes_unaligned_ct);
 
       elsif run("test_soft_reset") then
         info("Testing synchronous soft reset...");

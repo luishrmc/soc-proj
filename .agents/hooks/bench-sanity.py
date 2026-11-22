@@ -34,6 +34,13 @@ def record(status, detail=""):
     subprocess.run(cmd, check=True)
 
 
+_UNPOPULATED = {"", "Pending", "PENDING", "N/A"}
+
+
+def _is_populated(val):
+    return (val or "").strip() not in _UNPOPULATED
+
+
 def main():
     if not MATRIX.exists():
         record("PASS", "Matrix CSV missing")
@@ -43,12 +50,29 @@ def main():
     raw = MATRIX.read_bytes().decode("utf-8")
     rows = list(csv.DictReader(io.StringIO(raw)))
 
-    # If all result fields are empty, we are still before Phase 5
-    populated = [r for r in rows if (r.get("Latência (ms)") or "").strip()]
+    # Validate ADR-020 fixed 1024 B + 3-profile schema if rows exist
+    valid_profiles = {"Quiescent", "Dynamic", "Chaotic"}
+    schema_errors = []
+    for idx, r in enumerate(rows, 1):
+        blk = (r.get("Tamanho do Bloco") or "").strip()
+        prof = (r.get("Perfil de Dados") or "").strip()
+        if blk != "1024 B":
+            schema_errors.append(f"Row {idx}: expected '1024 B' per ADR-020, got '{blk}'")
+        if prof not in valid_profiles:
+            schema_errors.append(f"Row {idx}: invalid Entropy Profile '{prof}'")
+
+    if schema_errors:
+        for e in schema_errors:
+            print(f"[ERROR][bench-sanity] {e}", file=sys.stderr)
+        record("FAIL", "; ".join(schema_errors[:3]))
+        return 1
+
+    # If all result fields are empty/Pending, we are still before Phase 5 HIL runs
+    populated = [r for r in rows if _is_populated(r.get("Latência (ms)"))]
     if not populated:
-        record("PASS", "Benchmark matrix awaiting Phase 5 execution")
+        record("PASS", "Benchmark matrix (12 ADR-020 rows) awaiting HIL execution")
         print(
-            "[OK][bench-sanity] No measurement rows populated yet (pre-Phase 5)."
+            f"[OK][bench-sanity] {len(rows)} ADR-020 rows schema-verified (awaiting HIL measurement)."
         )
         return 0
 

@@ -1,13 +1,8 @@
 # Project Status & Architectural Progress Tracking
 
 > [!NOTE]
-> **Engineering Status — Work-in-Progress (WIP: Testbench & Synthetic Data Pipeline):**  
-> The 100% metric in the course syllabus table below marks completion of the baseline RTL modules, Vivado block designs, bare-metal C firmware scaffolding, and VUnit simulation suites.
->
-> **Active Milestone Focus:**  
-> Development of a **Python-based synthetic telemetry generator** that outputs realistic, time-series sensor streams (simulated temperature, 3-axis vibration, supply voltage, status bitmasks, and monotonic timestamps) with variable entropy and repetition profiles. This pipeline will stream benchmark payloads into the ESP32 injector and Cora Z7 platform.
->
-> All quantitative benchmark performance metrics (cycle counts, latencies, throughputs, and speedups) are **Pending Measurement / WIP** awaiting systematic physical execution sweeps.
+> **Engineering Status — HIL Verification Complete (ADR-020: 4 Scenarios × 3 Profiles @ 1024 B):**
+> Physical Hardware-in-the-Loop (HIL) execution between the ESP32 SPI injector (`2 MHz`, `GPIO 32` trigger, `seed=42`) and the Digilent Cora Z7-10 (`650 MHz` ARM Cortex-A9 PS / `100 MHz` Artix-7 PL) has completed cleanly across zero-drop `30/30` frame bursts (`N = 20` balanced samples per Entropy Profile: `Quiescent`, `Dynamic`, `Chaotic`), with calibrated ARM PMU (`28`-cycle overhead subtraction) and zero CRC/frame/length errors.
 
 ## Progress by Phase (Course Schedule Baseline)
 
@@ -23,8 +18,7 @@ Estimated course schedule effort completed: 50 of 50 days (100% of baseline syll
 
 ## In Progress
 
-- Development and integration of the Python synthetic telemetry generator pipeline.
-- Preparation for systematic HIL benchmark matrix measurement sweeps.
+- Final technical report formatting and archival packaging (`Checklist_de_Entregaveis.csv`).
 
 ## Waiting for Validation
 
@@ -36,7 +30,7 @@ None.
 
 ## Next Eligible Tasks
 
-- Execution and statistical consolidation of physical benchmark runs using the Python telemetry generator.
+- Isolated standalone synthesis utilization characterization for Scenario 2 (`lzss_accel` only) and Scenario 3 (`aes_accel` only) to replace `"Pending"` resource cells in `Matriz_de_Testes_e_Métricas.csv`.
 
 ## Remaining Critical Path
 
@@ -44,4 +38,4 @@ None.
 
 ## Open Technical Risks & Findings
 
-- **R9** (Task 4.3): PL compression accelerator latency (LZSS) vs. PS software baseline — Architectural hypothesis under evaluation (sequential BRAM lookahead searches at 100 MHz vs. Cortex-A9 667 MHz L1 cache execution). Quantitative validation is pending execution with synthetic telemetry streams.
+- **R9** (Task 4.3): **Empirically Confirmed.** Sequential Port-B BRAM lookahead searches at `100 MHz` (`200,972–744,661` PL cycles) plus AXI MMIO BRAM transfer overhead make PL LZSS (`Scenario 2`: `0.61x–0.63x`, `Scenario 4`: `0.69x–0.72x`) slower than Cortex-A9 L1/L2 cache execution at `650 MHz`. Conversely, **Scenario 3 (`SW LZSS + PL AES-CTR`)** achieves **1.19x–1.24x** end-to-end speedup across all entropy regimes (`668–1,679` PL cycles).

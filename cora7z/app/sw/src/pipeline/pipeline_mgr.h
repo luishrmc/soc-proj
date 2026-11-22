@@ -196,6 +196,11 @@ void pipeline_set_frame_seq_id(uint16_t seq_id);
 uint16_t pipeline_get_frame_seq_id(void);
 
 /**
+ * @brief Register calibrated PMCCNTR read overhead (CPU cycles) to subtract from stage counts.
+ */
+void pipeline_set_pmu_overhead(uint32_t overhead_cycles);
+
+/**
  * @brief Check if Programmable Logic (PL) bitstream is loaded.
  * @return true if PCFG_DONE=1, false otherwise.
  */
@@ -288,6 +293,36 @@ int pipeline_reverse_frame(const uint8_t *cipher_in,
                            uint8_t *raw_out,
                            size_t max_out_len,
                            size_t *recovered_len);
+
+/**
+ * @brief Aggregate metrics container for 4-scenario parity/benchmark runs.
+ */
+typedef struct {
+    pipeline_metrics_t scen[4]; /**< Metrics for Cases 1..4 (SW/SW, HW/SW, SW/HW, HW/HW) */
+    bool               pl_tested; /**< True when PL hardware scenarios 2..4 executed */
+} pipeline_4scen_result_t;
+
+/**
+ * @brief Profile-aware 4-scenario verification and cycle instrumentation harness.
+ *
+ * Executes Scenarios 1..4 on raw_in with the supplied seq_id, verifies SW and HW
+ * loopback reconstruction plus Case 3==Case 1 and Case 4==Case 2 parity, and emits
+ * either multi-line [VERIFY] output or a compact single-line [HIL_BENCH] summary.
+ *
+ * @param[in]  profile_label Entropy profile name (e.g. "Quiescent", "Dynamic", "Chaotic").
+ * @param[in]  seq_id        Frame sequence ID used for AES-128-CTR nonce derivation.
+ * @param[in]  raw_in        Pointer to test payload.
+ * @param[in]  raw_len       Length of test payload in bytes.
+ * @param[in]  compact_log   True to emit compact single-line [HIL_BENCH] output.
+ * @param[out] out_res       Optional pointer receiving all 4 scenario metric structures.
+ * @return PIPELINE_SUCCESS on bit-exact match, negative error code on failure.
+ */
+int pipeline_verify_profile_scenarios(const char *profile_label,
+                                      uint16_t seq_id,
+                                      const uint8_t *raw_in,
+                                      size_t raw_len,
+                                      bool compact_log,
+                                      pipeline_4scen_result_t *out_res);
 
 /**
  * @brief Verification unit test routine validating bit-exact parity across all 4 scenarios.

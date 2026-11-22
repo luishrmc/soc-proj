@@ -3,7 +3,7 @@ module: aes_accel
 status: verified
 sources:
   - cora7z/app/hw/src/crypto/aes_accel.vhdl sha256=93e2dc15d699bb4e27c41bfd3c3545ed48897dcbdc0cb41f31b93e0d97e01628
-  - cora7z/app/hw/test/tb_aes_accel.vhdl sha256=54a173d2fca8ff29c40501e0a37e53ffaa37f0c0fd1371c1a1115b5a696b22d0
+  - cora7z/app/hw/test/tb_aes_accel.vhdl sha256=6ec23e84dd90c0ecd05cd485b079896903c6d0db22b08333024bf41e5ce4ea1e
 gates_passed: [vhdl-lint, vhdl-sim, vivado-build]
 ---
 

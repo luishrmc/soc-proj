@@ -1,16 +1,20 @@
 #!/usr/bin/env python3
-"""test_matrix_sync.py: Benchmark parser and test matrix consolidator.
+"""test_matrix_sync.py: ADR-020 benchmark parser and test matrix consolidator.
 
 Extracts empirical performance metrics (PMU cycles, PL hardware cycles,
-latency, compression ratio, throughput, FPGA resource utilization)
-from target UART serial traces or log files, and updates:
+latency, Space Savings % compression ratio, throughput, FPGA utilization)
+from target UART serial traces or log files across the 12 ADR-020 cells:
+  4 Scenarios x 3 Entropy Profiles (Quiescent, Dynamic, Chaotic) @ 1024 B.
+
+Updates:
   1. utils/plan/Matriz_de_Testes_e_Métricas.csv
-  2. cora7z/app/test_results/benchmark_matrix.csv
+  2. cora7z/app/test_results/benchmark_matrix_consolidated.csv
 
 Usage:
   python3 .agents/hooks/test_matrix_sync.py [--input <log_file>] [--serial <device>] [--apply] [--dry-run]
 """
 import argparse
+from collections import defaultdict
 import csv
 import math
 import re
@@ -21,152 +25,170 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 MATRIX_CSV = ROOT / "utils" / "plan" / "Matriz_de_Testes_e_Métricas.csv"
 RESULTS_DIR = ROOT / "cora7z" / "app" / "test_results"
-CPU_FREQ_HZ = 667000000.0  # Cortex-A9 clock frequency: 667 MHz
+CPU_FREQ_HZ = 650000000.0  # Cortex-A9 APU clock frequency per ps7_init/xparameters.h: 650 MHz
 
-# FPGA resource budgets derived from Vivado synthesis & implementation
+# FPGA resource budgets derived from Vivado post-implementation utilization.rpt
 RESOURCES_MAP = {
     "Cenário 1: SW Puro": "N/A",
-    "Cenário 2: Offload Compressão": "2,840 LUTs / 1,420 FFs / 2 BRAMs",
-    "Cenário 3: Offload Cifragem": "3,410 LUTs / 2,150 FFs / 2 BRAMs",
-    "Cenário 4: Aceleração HW Total": "8,856 LUTs / 12,047 FFs / 9 BRAMs",
+    "Cenário 2: Offload Compressão": "Pending",
+    "Cenário 3: Offload Cifragem": "Pending",
+    "Cenário 4: Aceleração HW Total": "8810 LUTs / 12048 FFs / 9 BRAMs",
 }
 
-# Regex patterns for parsing UART output
+VALID_PROFILES = {"Quiescent", "Dynamic", "Chaotic"}
+
+# Regex patterns for ADR-020 startup sweep logs
 RE_VERIFY_HEADER = re.compile(
-    r"\[VERIFY\] 4-Scenario Bit-Exact Parity & Loopback Verified! \(Raw:\s*(\d+)\s*B\s*->\s*Comp:\s*(\d+)\s*B\)"
+    r"\[VERIFY\] 4-Scenario Bit-Exact Parity & Loopback Verified!\s*"
+    r"\(Profile:\s*(\w+)\s*\|\s*Raw:\s*(\d+)\s*B\s*\|\s*SW Comp:\s*(\d+)\s*B\s*\|\s*HW Comp:\s*(\d+)\s*B\)"
 )
 RE_CASE1 = re.compile(r"Case 1 \(SW/SW\):\s*(\d+)\s*CPU cyc")
 RE_CASE2 = re.compile(r"Case 2 \(HW/SW\):\s*(\d+)\s*CPU cyc \(LZSS PL:\s*(\d+)\s*cyc\)")
 RE_CASE3 = re.compile(r"Case 3 \(SW/HW\):\s*(\d+)\s*CPU cyc \(AES\s+PL:\s*(\d+)\s*cyc\)")
 RE_CASE4 = re.compile(r"Case 4 \(HW/HW\):\s*(\d+)\s*CPU cyc \(LZSS PL:\s*(\d+)\s*cyc,\s*AES PL:\s*(\d+)\s*cyc\)")
 
-RE_STREAM_PKT = re.compile(
-    r"\[SPI_RX\s*#\d+\]\s*Seq:\s*\d+\s*\|\s*Raw:\s*(\d+)\s*B\s*->\s*Comp:\s*(\d+)\s*B\s*->\s*Cipher:\s*(\d+)\s*B\s*\|\s*T_comp:\s*(\d+)\s*us\s*\((\d+)\s*cyc\),\s*T_crypt:\s*(\d+)\s*us\s*\((\d+)\s*cyc\)\s*\|\s*CR:\s*(\d+)%\s*\|\s*([\d\.]+)\s*MB/s"
-)
-RE_STREAM_HW = re.compile(
-    r"\[PL Accel\] HW Cycles:\s*LZSS=(\d+)\s*cyc,\s*AES=(\d+)\s*cyc\s*\(Scenario:\s*Case\s*(\d+)\)"
+# Regex pattern for live SPI HIL compact single-line telemetry trace
+RE_HIL_BENCH = re.compile(
+    r"\[HIL_BENCH\]\s*Seq:(\d+)\s+Prof:(\w+)\s+Raw:(\d+)B\s*\|\s*"
+    r"C1:(\d+)/0cyc\((\d+)B\)\s+"
+    r"C2:(\d+)/(\d+)cyc\((\d+)B\)\s+"
+    r"C3:(\d+)/(\d+)cyc\((\d+)B\)\s+"
+    r"C4:(\d+)/(\d+)\+(\d+)cyc\((\d+)B\)"
 )
 
 
-def parse_log_text(text):
-    """Parses verification logs and returns dictionary of (scenario, block_size) -> metrics."""
-    results = {}
+def _calc_metrics(raw_len: int, comp_len: int, pmu: int, pl_hw: int) -> dict:
+    """Compute canonical ADR-020 latency, throughput, and Space Savings % CR."""
+    lat_ms = (pmu / CPU_FREQ_HZ) * 1000.0
+    tp_mbs = (raw_len / (lat_ms / 1000.0)) / (1024.0 * 1024.0) if lat_ms > 0.0 else 0.0
+    cr_pct = (1.0 - (float(comp_len) / float(raw_len))) * 100.0 if raw_len > 0 else 0.0
+    return {
+        "pmu": float(pmu),
+        "pl_hw": float(pl_hw),
+        "lat_ms": lat_ms,
+        "cr_pct": cr_pct,
+        "tp_mbs": tp_mbs,
+    }
+
+
+def _aggregate_samples(samples_by_key: dict) -> dict:
+    """Average collected samples per (scenario, profile) cell with sample count/std."""
+    aggregated = {}
+    for key, samples in samples_by_key.items():
+        n = len(samples)
+        if n == 0:
+            continue
+        mean_pmu = sum(s["pmu"] for s in samples) / n
+        mean_pl = sum(s["pl_hw"] for s in samples) / n
+        mean_lat = sum(s["lat_ms"] for s in samples) / n
+        mean_cr = sum(s["cr_pct"] for s in samples) / n
+        mean_tp = sum(s["tp_mbs"] for s in samples) / n
+        std_pmu = (
+            math.sqrt(sum((s["pmu"] - mean_pmu) ** 2 for s in samples) / (n - 1))
+            if n > 1
+            else 0.0
+        )
+        aggregated[key] = {
+            "n": n,
+            "pmu": int(round(mean_pmu)),
+            "pmu_std": std_pmu,
+            "pl_hw": int(round(mean_pl)),
+            "lat_ms": mean_lat,
+            "cr_pct": mean_cr,
+            "tp_mbs": mean_tp,
+        }
+    return aggregated
+
+
+def parse_log_text(text: str, include_verify: bool = False) -> dict:
+    """Parse live [HIL_BENCH] and fallback [VERIFY] traces keyed by (scenario, profile).
+
+    By default, when [HIL_BENCH] traces are present, cold-cache startup [VERIFY]
+    traces are excluded so matrix statistics represent pure live SPI HIL bursts.
+    """
+    hil_samples = defaultdict(list)
+    verify_samples = defaultdict(list)
     lines = text.splitlines()
 
-    current_raw = None
-    current_comp = None
+    cur_profile = None
+    cur_raw = 0
+    cur_sw_comp = 0
+    cur_hw_comp = 0
 
-    for i, line in enumerate(lines):
-        # 1. Check for 4-scenario verification blocks
-        m_hdr = RE_VERIFY_HEADER.search(line)
-        if m_hdr:
-            current_raw = int(m_hdr.group(1))
-            current_comp = int(m_hdr.group(2))
+    for line in lines:
+        m_hil = RE_HIL_BENCH.search(line)
+        if m_hil:
+            prof = m_hil.group(2)
+            raw_len = int(m_hil.group(3))
+            if prof in VALID_PROFILES and raw_len == 1024:
+                c1_pmu, c1_comp = int(m_hil.group(4)), int(m_hil.group(5))
+                c2_pmu, c2_pl, c2_comp = int(m_hil.group(6)), int(m_hil.group(7)), int(m_hil.group(8))
+                c3_pmu, c3_pl, c3_comp = int(m_hil.group(9)), int(m_hil.group(10)), int(m_hil.group(11))
+                c4_pmu, c4_lz, c4_ae, c4_comp = (
+                    int(m_hil.group(12)),
+                    int(m_hil.group(13)),
+                    int(m_hil.group(14)),
+                    int(m_hil.group(15)),
+                )
+                hil_samples[("Cenário 1: SW Puro", prof)].append(_calc_metrics(raw_len, c1_comp, c1_pmu, 0))
+                hil_samples[("Cenário 2: Offload Compressão", prof)].append(_calc_metrics(raw_len, c2_comp, c2_pmu, c2_pl))
+                hil_samples[("Cenário 3: Offload Cifragem", prof)].append(_calc_metrics(raw_len, c3_comp, c3_pmu, c3_pl))
+                hil_samples[("Cenário 4: Aceleração HW Total", prof)].append(_calc_metrics(raw_len, c4_comp, c4_pmu, c4_lz + c4_ae))
             continue
 
-        if current_raw:
+        m_hdr = RE_VERIFY_HEADER.search(line)
+        if m_hdr:
+            prof = m_hdr.group(1)
+            raw_len = int(m_hdr.group(2))
+            if prof in VALID_PROFILES and raw_len == 1024:
+                cur_profile = prof
+                cur_raw = raw_len
+                cur_sw_comp = int(m_hdr.group(3))
+                cur_hw_comp = int(m_hdr.group(4))
+            else:
+                cur_profile = None
+            continue
+
+        if cur_profile:
             m1 = RE_CASE1.search(line)
             if m1:
-                pmu = int(m1.group(1))
-                cr = (current_comp / current_raw) * 100.0
-                lat_ms = (pmu / CPU_FREQ_HZ) * 1000.0
-                tp_mbs = (current_raw / (lat_ms / 1000.0)) / (1024.0 * 1024.0) if lat_ms > 0 else 0
-                results[("Cenário 1: SW Puro", f"{current_raw} B")] = {
-                    "pmu": pmu,
-                    "pl_hw": 0,
-                    "lat_ms": lat_ms,
-                    "cr_pct": cr,
-                    "tp_mbs": tp_mbs,
-                }
+                verify_samples[("Cenário 1: SW Puro", cur_profile)].append(
+                    _calc_metrics(cur_raw, cur_sw_comp, int(m1.group(1)), 0)
+                )
                 continue
 
             m2 = RE_CASE2.search(line)
             if m2:
-                pmu = int(m2.group(1))
-                pl = int(m2.group(2))
-                cr = (current_comp / current_raw) * 100.0
-                lat_ms = (pmu / CPU_FREQ_HZ) * 1000.0
-                tp_mbs = (current_raw / (lat_ms / 1000.0)) / (1024.0 * 1024.0) if lat_ms > 0 else 0
-                results[("Cenário 2: Offload Compressão", f"{current_raw} B")] = {
-                    "pmu": pmu,
-                    "pl_hw": pl,
-                    "lat_ms": lat_ms,
-                    "cr_pct": cr,
-                    "tp_mbs": tp_mbs,
-                }
+                verify_samples[("Cenário 2: Offload Compressão", cur_profile)].append(
+                    _calc_metrics(cur_raw, cur_hw_comp, int(m2.group(1)), int(m2.group(2)))
+                )
                 continue
 
             m3 = RE_CASE3.search(line)
             if m3:
-                pmu = int(m3.group(1))
-                pl = int(m3.group(2))
-                cr = (current_comp / current_raw) * 100.0
-                lat_ms = (pmu / CPU_FREQ_HZ) * 1000.0
-                tp_mbs = (current_raw / (lat_ms / 1000.0)) / (1024.0 * 1024.0) if lat_ms > 0 else 0
-                results[("Cenário 3: Offload Cifragem", f"{current_raw} B")] = {
-                    "pmu": pmu,
-                    "pl_hw": pl,
-                    "lat_ms": lat_ms,
-                    "cr_pct": cr,
-                    "tp_mbs": tp_mbs,
-                }
+                verify_samples[("Cenário 3: Offload Cifragem", cur_profile)].append(
+                    _calc_metrics(cur_raw, cur_sw_comp, int(m3.group(1)), int(m3.group(2)))
+                )
                 continue
 
             m4 = RE_CASE4.search(line)
             if m4:
-                pmu = int(m4.group(1))
-                pl_lzss = int(m4.group(2))
-                pl_aes = int(m4.group(3))
-                cr = (current_comp / current_raw) * 100.0
-                lat_ms = (pmu / CPU_FREQ_HZ) * 1000.0
-                tp_mbs = (current_raw / (lat_ms / 1000.0)) / (1024.0 * 1024.0) if lat_ms > 0 else 0
-                results[("Cenário 4: Aceleração HW Total", f"{current_raw} B")] = {
-                    "pmu": pmu,
-                    "pl_hw": pl_lzss + pl_aes,
-                    "lat_ms": lat_ms,
-                    "cr_pct": cr,
-                    "tp_mbs": tp_mbs,
-                }
-                current_raw = None
+                pl_tot = int(m4.group(2)) + int(m4.group(3))
+                verify_samples[("Cenário 4: Aceleração HW Total", cur_profile)].append(
+                    _calc_metrics(cur_raw, cur_hw_comp, int(m4.group(1)), pl_tot)
+                )
+                cur_profile = None
                 continue
 
-        # 2. Check for streaming packet logs
-        m_stream = RE_STREAM_PKT.search(line)
-        if m_stream:
-            raw_len = int(m_stream.group(1))
-            comp_len = int(m_stream.group(2))
-            comp_cyc = int(m_stream.group(5))
-            crypt_cyc = int(m_stream.group(7))
-            cr_pct = float(m_stream.group(8))
-            tp_mbs = float(m_stream.group(9))
-            tot_pmu = comp_cyc + crypt_cyc
+    if hil_samples and not include_verify:
+        return _aggregate_samples(hil_samples)
 
-            # Check next line for HW cycles
-            pl_hw = 0
-            scen_num = 4
-            if i + 1 < len(lines):
-                m_hw = RE_STREAM_HW.search(lines[i + 1])
-                if m_hw:
-                    pl_hw = int(m_hw.group(1)) + int(m_hw.group(2))
-                    scen_num = int(m_hw.group(3))
-
-            scen_name = f"Cenário {scen_num}: " + {
-                1: "SW Puro",
-                2: "Offload Compressão",
-                3: "Offload Cifragem",
-                4: "Aceleração HW Total",
-            }.get(scen_num, "Aceleração HW Total")
-
-            lat_ms = (tot_pmu / CPU_FREQ_HZ) * 1000.0
-            results[(scen_name, f"{raw_len} B")] = {
-                "pmu": tot_pmu,
-                "pl_hw": pl_hw,
-                "lat_ms": lat_ms,
-                "cr_pct": cr_pct,
-                "tp_mbs": tp_mbs,
-            }
-
-    return results
+    combined = defaultdict(list)
+    for k, vals in hil_samples.items():
+        combined[k].extend(vals)
+    for k, vals in verify_samples.items():
+        combined[k].extend(vals)
+    return _aggregate_samples(combined)
 
 
 def capture_serial(device="/dev/ttyUSB1", baud=115200, timeout_sec=10):
@@ -196,24 +218,25 @@ def capture_serial(device="/dev/ttyUSB1", baud=115200, timeout_sec=10):
 
 
 def update_matrix_csv(metrics_map, dry_run=False):
-    """Updates Matriz_de_Testes_e_Métricas.csv with parsed values."""
+    """Updates Matriz_de_Testes_e_Métricas.csv and consolidated dump with parsed values."""
     if not MATRIX_CSV.is_file():
         print(f"[ERROR][test_matrix_sync] Matrix CSV not found: {MATRIX_CSV}", file=sys.stderr)
         return 1
 
     with open(MATRIX_CSV, "r", encoding="utf-8") as f:
         reader = list(csv.DictReader(f))
-        fieldnames = reader[0].keys() if reader else []
+        fieldnames = list(reader[0].keys()) if reader else []
 
     updated_rows = []
+    consolidated_rows = []
     matches = 0
 
     for row in reader:
         scen = row.get("Cenário", "").strip()
-        block_sz = row.get("Tamanho do Bloco", "").strip()
+        profile = row.get("Perfil de Dados", "").strip()
 
-        # Check if we have empirical measurements for this row
-        key = (scen, block_sz)
+        key = (scen, profile)
+        cons_row = dict(row)
         if key in metrics_map:
             m = metrics_map[key]
             row["Latência (ms)"] = f"{m['lat_ms']:.3f}"
@@ -221,28 +244,36 @@ def update_matrix_csv(metrics_map, dry_run=False):
             row["Ciclos PL HW"] = str(m["pl_hw"]) if m["pl_hw"] > 0 else "0"
             row["Razão de Compressão (%)"] = f"{m['cr_pct']:.1f}%"
             row["Vazão (MB/s)"] = f"{m['tp_mbs']:.2f}"
-            row["Recursos FPGA (LUTs/FFs/BRAMs)"] = RESOURCES_MAP.get(scen, "")
+            row["Recursos FPGA (LUTs/FFs/BRAMs)"] = RESOURCES_MAP.get(scen, "Pending")
+
+            cons_row = dict(row)
+            cons_row["Amostras (N)"] = str(m["n"])
+            cons_row["Desvio Padrão PMU (ciclos)"] = f"{m['pmu_std']:.1f}"
             matches += 1
         else:
-            # If not yet measured, preserve existing or fill resource budget
             if not row.get("Recursos FPGA (LUTs/FFs/BRAMs)"):
-                row["Recursos FPGA (LUTs/FFs/BRAMs)"] = RESOURCES_MAP.get(scen, "")
+                row["Recursos FPGA (LUTs/FFs/BRAMs)"] = RESOURCES_MAP.get(scen, "Pending")
+            cons_row = dict(row)
+            cons_row["Amostras (N)"] = "0"
+            cons_row["Desvio Padrão PMU (ciclos)"] = "0.0"
 
         updated_rows.append(row)
+        consolidated_rows.append(cons_row)
 
-    print(f"\n[INFO][test_matrix_sync] Matched {matches} rows in test matrix.")
+    print(f"\n[INFO][test_matrix_sync] Matched {matches} / {len(updated_rows)} ADR-020 rows.")
 
-    # Write formatted preview table
-    print("=" * 110)
-    print(f"{'CENÁRIO':<30} {'BLOCO':<8} {'LAT (ms)':<10} {'ARM PMU':<12} {'PL HW':<10} {'CR (%)':<10} {'VAZÃO (MB/s)':<14} {'RECURSOS'}")
-    print("=" * 110)
-    for r in updated_rows:
+    print("=" * 136)
+    print(f"{'CENÁRIO':<31} {'PERFIL':<11} {'N':<4} {'LAT (ms)':<9} {'ARM PMU (MEAN +/- STD)':<24} {'PL HW':<9} {'CR (%)':<9} {'VAZÃO':<8} {'RECURSOS'}")
+    print("=" * 136)
+    for r in consolidated_rows:
+        pmu_str = f"{r.get('Ciclos ARM PMU','')} +/- {r.get('Desvio Padrão PMU (ciclos)','0')}"
         print(
-            f"{r['Cenário']:<30} {r['Tamanho do Bloco']:<8} {r.get('Latência (ms)',''):<10} "
-            f"{r.get('Ciclos ARM PMU',''):<12} {r.get('Ciclos PL HW',''):<10} {r.get('Razão de Compressão (%)',''):<10} "
-            f"{r.get('Vazão (MB/s)',''):<14} {r.get('Recursos FPGA (LUTs/FFs/BRAMs)','')}"
+            f"{r['Cenário']:<31} {r.get('Perfil de Dados',''):<11} {r.get('Amostras (N)','0'):<4} "
+            f"{r.get('Latência (ms)',''):<9} {pmu_str:<24} "
+            f"{r.get('Ciclos PL HW',''):<9} {r.get('Razão de Compressão (%)',''):<9} "
+            f"{r.get('Vazão (MB/s)',''):<8} {r.get('Recursos FPGA (LUTs/FFs/BRAMs)','')}"
         )
-    print("-" * 110)
+    print("-" * 136)
 
     if not dry_run:
         with open(MATRIX_CSV, "w", encoding="utf-8", newline="") as f:
@@ -251,13 +282,13 @@ def update_matrix_csv(metrics_map, dry_run=False):
             writer.writerows(updated_rows)
         print(f"[OK][test_matrix_sync] Successfully updated: {MATRIX_CSV.relative_to(ROOT)}")
 
-        # Also write results CSV dump into test_results
         RESULTS_DIR.mkdir(parents=True, exist_ok=True)
         dump_file = RESULTS_DIR / "benchmark_matrix_consolidated.csv"
+        cons_fields = list(fieldnames) + ["Amostras (N)", "Desvio Padrão PMU (ciclos)"]
         with open(dump_file, "w", encoding="utf-8", newline="") as f:
-            writer = csv.DictWriter(f, fieldnames=fieldnames)
+            writer = csv.DictWriter(f, fieldnames=cons_fields)
             writer.writeheader()
-            writer.writerows(updated_rows)
+            writer.writerows(consolidated_rows)
         print(f"[OK][test_matrix_sync] Exported benchmark archive: {dump_file.relative_to(ROOT)}")
     else:
         print("[INFO][test_matrix_sync] Dry run mode active: files not modified.")
@@ -266,7 +297,7 @@ def update_matrix_csv(metrics_map, dry_run=False):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Test Matrix benchmark synchronizer")
+    parser = argparse.ArgumentParser(description="ADR-020 Test Matrix benchmark synchronizer")
     parser.add_argument("--input", "-i", metavar="LOG_FILE", help="Input UART serial log or test trace file")
     parser.add_argument("--serial", "-s", metavar="DEV", help="Read directly from serial port (e.g. /dev/ttyUSB1)")
     parser.add_argument("--apply", action="store_true", help="Apply updates to Matriz_de_Testes_e_Métricas.csv")
@@ -287,7 +318,6 @@ def main():
             print(f"[ERROR] Input file not found: {args.input}", file=sys.stderr)
             return 1
     else:
-        # Check if default benchmark log exists in cora7z/app/test_results or out
         candidates = [
             RESULTS_DIR / "latest_uart.log",
             ROOT / "out" / "latest_uart.log",
@@ -300,7 +330,7 @@ def main():
                 break
 
     metrics = parse_log_text(log_content) if log_content else {}
-    print(f"[INFO][test_matrix_sync] Extracted {len(metrics)} benchmark data points from logs.")
+    print(f"[INFO][test_matrix_sync] Extracted {len(metrics)} ADR-020 matrix cells from logs.")
 
     dry_run = not args.apply or args.dry_run
     return update_matrix_csv(metrics, dry_run=dry_run)

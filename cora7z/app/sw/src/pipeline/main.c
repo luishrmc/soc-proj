@@ -21,7 +21,19 @@
 #include "comms/axi_spi_receiver.h"
 #include "crypto/aes_ctr.h"
 #include "pipeline/pipeline_mgr.h"
+#include "utils/telemetry_dataset.h"
 #include "utils/test_sw_pipeline.h"
+
+static const char *identify_entropy_profile(const uint8_t *payload, size_t len) {
+    if (payload != NULL && len == TELEMETRY_PAYLOAD_SIZE) {
+        for (size_t i = 0; i < TELEMETRY_DATASET_FRAME_COUNT; i++) {
+            if (memcmp(payload, g_telemetry_dataset[i].payload, TELEMETRY_PAYLOAD_SIZE) == 0) {
+                return telemetry_profile_name(g_telemetry_dataset[i].profile);
+            }
+        }
+    }
+    return "Custom";
+}
 
 /* ========================================================================= */
 /* PS EMIO GPIO Hardware Trigger for ESP32 Data Injector                     */
@@ -48,12 +60,12 @@ static void esp32_trigger_init(void) {
 }
 
 static void trigger_esp32_burst(void) {
-    /* Drive LOW (simulates button press) */
+    /* Drive LOW (ESP32 GPIO 32 triggers on falling-edge ISR with 50 ms lockout) */
     uint32_t data = Xil_In32(PS_GPIO_BASEADDR + PS_GPIO_DATA_2_OFFSET);
     Xil_Out32(PS_GPIO_BASEADDR + PS_GPIO_DATA_2_OFFSET, data & ~0x01U);
 
-    /* Hold LOW for 30 ms (debouncer threshold on ESP32 is 20ms) */
-    usleep(30000);
+    /* Short 250 us pulse avoids blocking past Frame 0 (~4.14 ms @ 2 MHz) */
+    usleep(250);
 
     /* Release back to HIGH (idle) */
     data = Xil_In32(PS_GPIO_BASEADDR + PS_GPIO_DATA_2_OFFSET);
@@ -166,12 +178,13 @@ int main(void) {
     xil_printf("\r\n");
     xil_printf("================================================================\r\n");
     xil_printf("  Digilent Cora Z7-10: SoC PS/PL Baseline Firmware Initialized  \r\n");
-    xil_printf("  ARM Cortex-A9 Core 0 @ 667 MHz (Bare-Metal Standalone BSP)    \r\n");
+    xil_printf("  ARM Cortex-A9 Core 0 @ 650 MHz (Bare-Metal Standalone BSP)    \r\n");
     xil_printf("================================================================\r\n\r\n");
 
     /* Initialize and calibrate ARM PMU */
     pmu_enable();
     uint32_t pmu_overhead = pmu_calibrate();
+    pipeline_set_pmu_overhead(pmu_overhead);
     xil_printf("[PMU] Performance Monitor Unit initialized.\r\n");
     xil_printf("[PMU] Average PMCCNTR read overhead: %d CPU cycles\r\n\r\n", (int)pmu_overhead);
 
@@ -222,13 +235,23 @@ int main(void) {
     xil_printf("[AXI_SPI] AXI Quad SPI core at 0x%08X initialized in Slave Mode 0.\r\n",
                (unsigned int)AXI_SPI_DEFAULT_BASEADDR);
 
-    /* Trigger initial burst automatically */
-    xil_printf("[TRIGGER] Emitting initial active-low pulse (30 ms) to ESP32 on PMOD JA1...\r\n");
+    /* Trigger initial burst automatically (250 us pulse -> immediate RX entry) */
+    xil_printf("[TRIGGER] Emitting initial active-low pulse (250 us) to ESP32 on PMOD JA1...\r\n");
     trigger_esp32_burst();
 
+    #define HIL_BURST_CAPACITY 30U
+    typedef struct {
+        uint16_t seq_id;
+        uint16_t payload_len;
+        uint8_t  payload[SPI_MAX_PAYLOAD_LEN];
+    } burst_slot_t;
+
+    static burst_slot_t s_burst_buf[HIL_BURST_CAPACITY] __attribute__((aligned(4)));
     static TelemetryFrame rx_frame __attribute__((aligned(4)));
     static axi_spi_metrics_t metrics = {0};
-    uint32_t hb_ticks = 0;
+    size_t burst_count = 0U;
+    uint32_t burst_idle_ticks = 0U;
+    uint32_t hb_ticks = 0U;
 
     while (1) {
         int rc = axi_spi_read_frame(AXI_SPI_DEFAULT_BASEADDR, &rx_frame, 5000U);
@@ -238,58 +261,25 @@ int main(void) {
             uint16_t rx_seq = ntohs(rx_frame.seq_id);
             uint16_t rx_len = ntohs(rx_frame.payload_len);
 
-            /* Set dynamic frame sequence ID for AES-128-CTR IV generation */
-            pipeline_set_frame_seq_id(rx_seq);
-
-            /* Stage ACK response (0x81) into TX FIFO with mirrored seq_id */
+            /* Stage ACK (0x81) immediately (< 50 us) and buffer frame for zero-drop burst RX */
             axi_spi_stage_ack(AXI_SPI_DEFAULT_BASEADDR, rx_seq, 0x00U);
 
-            /* Execute Pure-Software Compress-then-Encrypt Pipeline */
-            static uint8_t s_ciphertext[PIPELINE_MAX_FRAME_SIZE];
-            size_t cipher_len = 0;
-            pipeline_metrics_t pm = {0};
-
-            int pipe_rc = pipeline_process_frame(rx_frame.payload,
-                                                 (size_t)rx_len,
-                                                 s_ciphertext,
-                                                 sizeof(s_ciphertext),
-                                                 &cipher_len,
-                                                 &pm);
-
-            if (pipe_rc == PIPELINE_SUCCESS) {
-                int cr_pct = (int)(pm.compression_ratio * 100.0f);
-                int tp_int = (int)pm.throughput_mbs;
-                int tp_frac = (int)((pm.throughput_mbs - (float)tp_int) * 100.0f);
-                if (tp_frac < 0) tp_frac = -tp_frac;
-
-                xil_printf("[SPI_RX #%u] Seq: %u | Raw: %u B -> Comp: %u B -> Cipher: %u B | T_comp: %u us (%u cyc), T_crypt: %u us (%u cyc) | CR: %d%% | %d.%02d MB/s\r\n",
-                           (unsigned int)metrics.valid_packets,
-                           (unsigned int)rx_seq,
-                           (unsigned int)pm.raw_len,
-                           (unsigned int)pm.comp_len,
-                           (unsigned int)pm.crypt_len,
-                           (unsigned int)pm.comp_time_us,
-                           (unsigned int)pm.comp_cycles,
-                           (unsigned int)pm.crypt_time_us,
-                           (unsigned int)pm.crypt_cycles,
-                           cr_pct,
-                           tp_int,
-                           tp_frac);
-                if (pm.comp_hw_cycles > 0 || pm.crypt_hw_cycles > 0) {
-                    xil_printf("           [PL Accel] HW Cycles: LZSS=%u cyc, AES=%u cyc (Scenario: Case %d)\r\n",
-                               (unsigned int)pm.comp_hw_cycles,
-                               (unsigned int)pm.crypt_hw_cycles,
-                               (int)pm.scenario + 1);
-                }
-            } else {
-                xil_printf("[SPI_RX #%u] Seq: %u | Pipeline Processing Error: %d\r\n",
-                           (unsigned int)metrics.valid_packets,
-                           (unsigned int)rx_seq,
-                           pipe_rc);
+            if (rx_len > 0U && rx_len <= SPI_MAX_PAYLOAD_LEN && burst_count < HIL_BURST_CAPACITY) {
+                s_burst_buf[burst_count].seq_id = rx_seq;
+                s_burst_buf[burst_count].payload_len = rx_len;
+                memcpy(s_burst_buf[burst_count].payload, rx_frame.payload, (size_t)rx_len);
+                burst_count++;
+            }
+            burst_idle_ticks = 0U;
+        } else if (rc == -1) {
+            metrics.timeouts++;
+            if (burst_count > 0U) {
+                burst_idle_ticks++;
             }
         } else if (rc == -2) {
             metrics.total_packets_received++;
             metrics.frame_errors++;
+            burst_idle_ticks = 0U;
             xil_printf("[SPI_RX] Frame Error! Bad EOF delimiter (expected 0x5A, got 0x%02X) [Err: %u/%u]\r\n",
                        (unsigned int)rx_frame.eof_delim,
                        (unsigned int)metrics.frame_errors,
@@ -297,25 +287,68 @@ int main(void) {
         } else if (rc == -3) {
             metrics.total_packets_received++;
             metrics.crc_mismatches++;
+            burst_idle_ticks = 0U;
             xil_printf("[SPI_RX] Checksum Error! CRC mismatch (Recv: 0x%04X) [CRC Err: %u/%u]\r\n",
-                       (unsigned int)ntohs(rx_frame.crc16),
+                       (unsigned int)rx_frame.crc16,
                        (unsigned int)metrics.crc_mismatches,
+                       (unsigned int)metrics.total_packets_received);
+        } else if (rc == -4) {
+            metrics.total_packets_received++;
+            metrics.len_errors++;
+            burst_idle_ticks = 0U;
+            xil_printf("[SPI_RX] Length Error! Oversized payload_len=%u (> %u) [LenErr: %u/%u]\r\n",
+                       (unsigned int)ntohs(rx_frame.payload_len),
+                       (unsigned int)SPI_MAX_PAYLOAD_LEN,
+                       (unsigned int)metrics.len_errors,
                        (unsigned int)metrics.total_packets_received);
         }
 
+        /* Evaluate complete 30-frame burst (or flush partial burst after idle gap) offline */
+        if (burst_count >= HIL_BURST_CAPACITY || (burst_count > 0U && burst_idle_ticks >= 40U)) {
+            xil_printf("[BURST] Captured %u/%u frames (CRC Err: %u | Frame Err: %u | Len Err: %u). Running 4-scenario eval...\r\n",
+                       (unsigned int)burst_count,
+                       (unsigned int)HIL_BURST_CAPACITY,
+                       (unsigned int)metrics.crc_mismatches,
+                       (unsigned int)metrics.frame_errors,
+                       (unsigned int)metrics.len_errors);
+
+            for (size_t i = 0; i < burst_count; i++) {
+                const char *prof_name = identify_entropy_profile(s_burst_buf[i].payload,
+                                                                 (size_t)s_burst_buf[i].payload_len);
+                int pipe_rc = pipeline_verify_profile_scenarios(prof_name,
+                                                                s_burst_buf[i].seq_id,
+                                                                s_burst_buf[i].payload,
+                                                                (size_t)s_burst_buf[i].payload_len,
+                                                                true,
+                                                                NULL);
+                if (pipe_rc != PIPELINE_SUCCESS) {
+                    xil_printf("[SPI_RX] Seq: %u | Prof: %s | 4-Scenario Error: %d\r\n",
+                               (unsigned int)s_burst_buf[i].seq_id,
+                               prof_name,
+                               pipe_rc);
+                }
+            }
+
+            axi_spi_reset_rx_fifo(AXI_SPI_DEFAULT_BASEADDR);
+            burst_count = 0U;
+            burst_idle_ticks = 0U;
+            hb_ticks = 0U;
+        }
+
         hb_ticks++;
-        if (hb_ticks >= 2000U) {
+        if (burst_count == 0U && hb_ticks >= 2000U) {
             hb_ticks = 0;
             uint32_t spisr = Xil_In32(AXI_SPI_DEFAULT_BASEADDR + SPI_REG_SPISR);
             uint32_t fifo_cnt = axi_spi_rx_count(AXI_SPI_DEFAULT_BASEADDR);
-            xil_printf("[CORA_Z7] Standby | J7 SPI Listening | SPISR=0x%02X | FIFO=%u | Valid: %u | CRC Err: %u | Frame Err: %u\r\n",
+            xil_printf("[CORA_Z7] Standby | J7 SPI Listening | SPISR=0x%02X | FIFO=%u | Valid: %u | CRC Err: %u | Frame Err: %u | Len Err: %u\r\n",
                        (unsigned int)spisr,
                        (unsigned int)fifo_cnt,
                        (unsigned int)metrics.valid_packets,
                        (unsigned int)metrics.crc_mismatches,
-                       (unsigned int)metrics.frame_errors);
+                       (unsigned int)metrics.frame_errors,
+                       (unsigned int)metrics.len_errors);
 
-            /* Periodically pulse the trigger line if waiting for frames */
+            /* Trigger next burst while idle */
             xil_printf("[CORA_Z7] Triggering burst on ESP32 via PMOD JA1...\r\n");
             trigger_esp32_burst();
         }

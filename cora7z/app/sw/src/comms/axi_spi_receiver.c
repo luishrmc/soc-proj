@@ -48,7 +48,7 @@ int axi_spi_read_frame(uintptr_t base_addr,
                     /* Header fully received (8 bytes: preamble, pkt_type, seq_id, payload_len, reserved_align) */
                     payload_len = ntohs(frame_out->payload_len);
                     if (payload_len > SPI_MAX_PAYLOAD_LEN) {
-                        return -2; /* Framing / length error: exceeds maximum payload capacity */
+                        return -4; /* Length error: exceeds maximum payload capacity */
                     }
                 }
             } else if (rx_idx < (TELEMETRY_FRAME_HEADER_SIZE + (size_t)payload_len)) {

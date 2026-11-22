@@ -22,8 +22,15 @@
 #define PIPELINE_LOG printf
 #endif
 
-/* Cortex-A9 CPU Clock Frequency on Digilent Cora Z7-10: 666,666,667 Hz (667 MHz) */
-#define CPU_CLOCK_FREQ_MHZ 667U
+/* Cortex-A9 CPU Clock Frequency on Digilent Cora Z7-10 (BSP APU_FREQ = 650 MHz) */
+#ifdef XPAR_CPU_CORE_CLOCK_FREQ_HZ
+  #define CPU_CLOCK_FREQ_HZ  ((uint32_t)XPAR_CPU_CORE_CLOCK_FREQ_HZ)
+#else
+  #define CPU_CLOCK_FREQ_HZ  650000000U
+#endif
+#define CPU_CLOCK_FREQ_MHZ   (CPU_CLOCK_FREQ_HZ / 1000000U)
+
+static uint32_t s_pmu_overhead_cycles = 0U;
 
 /* Pre-allocated static buffers (aligned to 32-bit cache line boundaries) */
 static uint8_t s_comp_buf[PIPELINE_MAX_FRAME_SIZE] __attribute__((aligned(4)));
@@ -46,6 +53,17 @@ void pipeline_set_frame_seq_id(uint16_t seq_id) {
 
 uint16_t pipeline_get_frame_seq_id(void) {
     return s_pipeline_seq_id;
+}
+
+void pipeline_set_pmu_overhead(uint32_t overhead_cycles) {
+    s_pmu_overhead_cycles = overhead_cycles;
+}
+
+static inline uint32_t calc_calibrated_cycles(uint32_t start_cyc, uint32_t end_cyc) {
+    uint32_t raw = (end_cyc >= start_cyc) ?
+                   (end_cyc - start_cyc) :
+                   ((0xFFFFFFFFU - start_cyc) + end_cyc);
+    return (raw > s_pmu_overhead_cycles) ? (raw - s_pmu_overhead_cycles) : 0U;
 }
 
 void pipeline_generate_frame_iv(uint16_t seq_id, uint8_t iv_out[AES_CTR_BLOCK_SIZE]) {
@@ -480,12 +498,8 @@ int pipeline_process_frame_scenario(pipeline_scenario_t scenario,
         metrics->comp_hw_cycles  = comp_hw_cycles;
         metrics->crypt_hw_cycles = crypt_hw_cycles;
 
-        metrics->comp_cycles  = (t_comp_end_cyc >= t_comp_start_cyc) ?
-                                (t_comp_end_cyc - t_comp_start_cyc) :
-                                ((0xFFFFFFFFU - t_comp_start_cyc) + t_comp_end_cyc);
-        metrics->crypt_cycles = (t_crypt_end_cyc >= t_crypt_start_cyc) ?
-                                (t_crypt_end_cyc - t_crypt_start_cyc) :
-                                ((0xFFFFFFFFU - t_crypt_start_cyc) + t_crypt_end_cyc);
+        metrics->comp_cycles  = calc_calibrated_cycles(t_comp_start_cyc, t_comp_end_cyc);
+        metrics->crypt_cycles = calc_calibrated_cycles(t_crypt_start_cyc, t_crypt_end_cyc);
         metrics->total_cycles = metrics->comp_cycles + metrics->crypt_cycles;
 
         metrics->comp_time_us  = cycles_to_us(metrics->comp_cycles);
@@ -498,7 +512,7 @@ int pipeline_process_frame_scenario(pipeline_scenario_t scenario,
             metrics->compression_ratio = 0.0f;
         }
 
-        float elapsed_sec = (float)metrics->total_cycles / 666666667.0f;
+        float elapsed_sec = (float)metrics->total_cycles / (float)CPU_CLOCK_FREQ_HZ;
         metrics->throughput_mbs = (elapsed_sec > 0.0f) ?
                                   (((float)raw_len / (1024.0f * 1024.0f)) / elapsed_sec) : 0.0f;
     }
@@ -563,13 +577,18 @@ int pipeline_reverse_frame(const uint8_t *cipher_in,
 /* Comprehensive 4-Scenario Bit-Exact Parity Verification Harness            */
 /* ========================================================================= */
 
-int pipeline_verify_all_scenarios(const uint8_t *raw_in, size_t raw_len) {
+int pipeline_verify_profile_scenarios(const char *profile_label,
+                                      uint16_t seq_id,
+                                      const uint8_t *raw_in,
+                                      size_t raw_len,
+                                      bool compact_log,
+                                      pipeline_4scen_result_t *out_res) {
     if (raw_in == NULL || raw_len == 0U || raw_len > ACCEL_BRAM_CAPACITY_BYTES) {
         return PIPELINE_ERR_PARAM;
     }
 
-    /* Lock sequence ID to deterministic test value so all 4 scenarios use identical IV */
-    pipeline_set_frame_seq_id(0x0001U);
+    const char *label = (profile_label != NULL) ? profile_label : "Custom";
+    pipeline_set_frame_seq_id(seq_id);
 
     static uint8_t ct_sw_sw[PIPELINE_MAX_FRAME_SIZE];
     static uint8_t ct_hw_sw[PIPELINE_MAX_FRAME_SIZE];
@@ -590,15 +609,27 @@ int pipeline_verify_all_scenarios(const uint8_t *raw_in, size_t raw_len) {
 
     /* Execute Case 1: Pure Software */
     int rc1 = pipeline_process_frame_scenario(PIPELINE_SCENARIO_SW_SW, raw_in, raw_len,
-                                             ct_sw_sw, sizeof(ct_sw_sw), &len_sw_sw, &m1);
+                                              ct_sw_sw, sizeof(ct_sw_sw), &len_sw_sw, &m1);
     if (rc1 != PIPELINE_SUCCESS) {
-        PIPELINE_LOG("[VERIFY] Case 1 (SW/SW) failed: %d\r\n", rc1);
+        PIPELINE_LOG("[VERIFY] Case 1 (SW/SW) [%s] failed: %d\r\n", label, rc1);
         return rc1;
     }
 
-    /* If PL is not ready, we cannot test hardware offload cases */
+    /* Verify Case 1 round-trip reverse loopback on both host and target */
+    int rc_sw_rev = pipeline_reverse_frame(ct_sw_sw, len_sw_sw, recovered, sizeof(recovered), &rec_len);
+    if (rc_sw_rev != PIPELINE_SUCCESS || rec_len != raw_len || memcmp(raw_in, recovered, raw_len) != 0) {
+        PIPELINE_LOG("[VERIFY] ERROR: Reverse loopback on Case 1 (SW/SW) [%s] failed!\r\n", label);
+        return PIPELINE_ERR_VERIFY_MISMATCH;
+    }
+
+    /* If PL is not ready, populate Case 1 result and skip hardware offload cases */
     if (!pipeline_is_pl_ready()) {
-        PIPELINE_LOG("[VERIFY] Warning: PL not programmed; skipping HW offload checks.\r\n");
+        if (out_res != NULL) {
+            out_res->scen[0] = m1;
+            out_res->pl_tested = false;
+        }
+        PIPELINE_LOG("[VERIFY] Warning: PL not programmed; skipping HW offload checks [%s] (Raw: %u B | SW Comp: %u B).\r\n",
+                     label, (unsigned int)raw_len, (unsigned int)m1.comp_len);
         return PIPELINE_SUCCESS;
     }
 
@@ -684,15 +715,38 @@ int pipeline_verify_all_scenarios(const uint8_t *raw_in, size_t raw_len) {
         return PIPELINE_ERR_VERIFY_MISMATCH;
     }
 
-    PIPELINE_LOG("[VERIFY] 4-Scenario Bit-Exact Parity & Loopback Verified! (Raw: %u B -> Comp: %u B)\r\n",
-                 (unsigned int)raw_len, (unsigned int)len_hw_hw);
-    PIPELINE_LOG("         Case 1 (SW/SW): %u CPU cyc\r\n", (unsigned int)m1.total_cycles);
-    PIPELINE_LOG("         Case 2 (HW/SW): %u CPU cyc (LZSS PL: %u cyc)\r\n",
-                 (unsigned int)m2.total_cycles, (unsigned int)m2.comp_hw_cycles);
-    PIPELINE_LOG("         Case 3 (SW/HW): %u CPU cyc (AES  PL: %u cyc)\r\n",
-                 (unsigned int)m3.total_cycles, (unsigned int)m3.crypt_hw_cycles);
-    PIPELINE_LOG("         Case 4 (HW/HW): %u CPU cyc (LZSS PL: %u cyc, AES PL: %u cyc)\r\n",
-                 (unsigned int)m4.total_cycles, (unsigned int)m4.comp_hw_cycles, (unsigned int)m4.crypt_hw_cycles);
+    if (out_res != NULL) {
+        out_res->scen[0] = m1;
+        out_res->scen[1] = m2;
+        out_res->scen[2] = m3;
+        out_res->scen[3] = m4;
+        out_res->pl_tested = true;
+    }
+
+    if (compact_log) {
+        PIPELINE_LOG("[HIL_BENCH] Seq:%u Prof:%s Raw:%uB | C1:%u/0cyc(%uB) C2:%u/%ucyc(%uB) C3:%u/%ucyc(%uB) C4:%u/%u+%ucyc(%uB)\r\n",
+                     (unsigned int)seq_id,
+                     label,
+                     (unsigned int)raw_len,
+                     (unsigned int)m1.total_cycles, (unsigned int)m1.comp_len,
+                     (unsigned int)m2.total_cycles, (unsigned int)m2.comp_hw_cycles, (unsigned int)m2.comp_len,
+                     (unsigned int)m3.total_cycles, (unsigned int)m3.crypt_hw_cycles, (unsigned int)m3.comp_len,
+                     (unsigned int)m4.total_cycles, (unsigned int)m4.comp_hw_cycles, (unsigned int)m4.crypt_hw_cycles, (unsigned int)m4.comp_len);
+    } else {
+        PIPELINE_LOG("[VERIFY] 4-Scenario Bit-Exact Parity & Loopback Verified! (Profile: %s | Raw: %u B | SW Comp: %u B | HW Comp: %u B)\r\n",
+                     label, (unsigned int)raw_len, (unsigned int)m1.comp_len, (unsigned int)m4.comp_len);
+        PIPELINE_LOG("         Case 1 (SW/SW): %u CPU cyc\r\n", (unsigned int)m1.total_cycles);
+        PIPELINE_LOG("         Case 2 (HW/SW): %u CPU cyc (LZSS PL: %u cyc)\r\n",
+                     (unsigned int)m2.total_cycles, (unsigned int)m2.comp_hw_cycles);
+        PIPELINE_LOG("         Case 3 (SW/HW): %u CPU cyc (AES  PL: %u cyc)\r\n",
+                     (unsigned int)m3.total_cycles, (unsigned int)m3.crypt_hw_cycles);
+        PIPELINE_LOG("         Case 4 (HW/HW): %u CPU cyc (LZSS PL: %u cyc, AES PL: %u cyc)\r\n",
+                     (unsigned int)m4.total_cycles, (unsigned int)m4.comp_hw_cycles, (unsigned int)m4.crypt_hw_cycles);
+    }
 
     return PIPELINE_SUCCESS;
+}
+
+int pipeline_verify_all_scenarios(const uint8_t *raw_in, size_t raw_len) {
+    return pipeline_verify_profile_scenarios("Custom", 0x0001U, raw_in, raw_len, false, NULL);
 }

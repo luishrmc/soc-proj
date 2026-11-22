@@ -22,6 +22,9 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
+library work;
+use work.tb_adr020_vectors_pkg.all;
+
 entity tb_lzss_accel is
   generic (runner_cfg : string);
 end entity tb_lzss_accel;
@@ -220,6 +223,69 @@ begin
     variable v_status : std_logic_vector(31 downto 0);
     variable v_dst_len: integer;
 
+    procedure run_lzss_vector_check(
+      constant label_str : in string;
+      constant raw_vec   : in byte_vec_t;
+      constant gold_vec  : in byte_vec_t;
+      constant gold_len  : in integer
+    ) is
+      variable v_word      : std_logic_vector(31 downto 0);
+      variable v_num_words : integer;
+      variable v_byte_idx  : integer;
+      variable v_got_byte  : std_logic_vector(7 downto 0);
+      variable v_widx      : integer;
+      variable v_lane      : integer;
+      variable v_cyc       : integer;
+    begin
+      info("Running ADR-020 LZSS 1024 B vector check [" & label_str & "]...");
+      -- Clear input BRAM window (ram_out_mem is cleared on reset inside p_bram_models)
+      for w in 0 to 511 loop
+        ram_in_mem(w) <= (others => '0');
+      end loop;
+
+      v_num_words := (raw_vec'length + 3) / 4;
+      for w in 0 to v_num_words - 1 loop
+        v_word := (others => '0');
+        for lane in 0 to 3 loop
+          v_byte_idx := w * 4 + lane;
+          if v_byte_idx < raw_vec'length then
+            v_word(lane * 8 + 7 downto lane * 8) := raw_vec(v_byte_idx);
+          end if;
+        end loop;
+        ram_in_mem(w) <= v_word;
+      end loop;
+      wait until rising_edge(aclk);
+
+      axi_write(16#08#, std_logic_vector(to_unsigned(raw_vec'length, 32)));
+      axi_write(16#00#, x"00000001");
+
+      loop
+        axi_read(16#04#, v_status);
+        exit when v_status(1) = '1';
+        wait for 10 ns;
+      end loop;
+
+      axi_read(16#10#, v_data);
+      check(unsigned(v_data) > 0, label_str & ": hardware cycle counter must be > 0");
+      v_cyc := to_integer(unsigned(v_data));
+
+      axi_read(16#0C#, v_data);
+      v_dst_len := to_integer(unsigned(v_data));
+      info(label_str & ": Raw=" & integer'image(raw_vec'length) &
+           " B -> Comp=" & integer'image(v_dst_len) &
+           " B (expected " & integer'image(gold_len) & " B), cyc=" &
+           integer'image(v_cyc));
+      check_equal(v_dst_len, gold_len, label_str & ": compressed length mismatch");
+
+      for i in 0 to gold_len - 1 loop
+        v_widx := i / 4;
+        v_lane := i mod 4;
+        v_got_byte := ram_out_mem(v_widx)(v_lane * 8 + 7 downto v_lane * 8);
+        check_equal(v_got_byte, gold_vec(i),
+                    label_str & ": output byte mismatch at index " & integer'image(i));
+      end loop;
+    end procedure run_lzss_vector_check;
+
   begin
     test_runner_setup(runner, runner_cfg);
 
@@ -308,6 +374,15 @@ begin
         for w in 0 to 3 loop
           info("ram_out_mem(" & integer'image(w) & ") = 0x" & to_hstring(ram_out_mem(w)));
         end loop;
+
+      elsif run("test_adr020_quiescent_1024b") then
+        run_lzss_vector_check("Quiescent", c_quiescent_raw, c_quiescent_lzss_gold, c_quiescent_lzss_len);
+
+      elsif run("test_adr020_dynamic_1024b") then
+        run_lzss_vector_check("Dynamic", c_dynamic_raw, c_dynamic_lzss_gold, c_dynamic_lzss_len);
+
+      elsif run("test_adr020_chaotic_1024b") then
+        run_lzss_vector_check("Chaotic", c_chaotic_raw, c_chaotic_lzss_gold, c_chaotic_lzss_len);
 
       elsif run("test_soft_reset") then
         info("Testing synchronous soft reset on LZSS...");

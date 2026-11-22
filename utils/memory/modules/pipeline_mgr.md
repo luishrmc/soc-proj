@@ -2,8 +2,8 @@
 module: pipeline_mgr
 status: verified
 sources:
-  - cora7z/app/sw/src/pipeline/pipeline_mgr.c sha256=8feb3b676761cf71cc5e03ad9f8e00ba3947a65c2d6aff1fd84af08327f49ccd
-  - cora7z/app/sw/src/pipeline/pipeline_mgr.h sha256=18e7b38360cb9048ddeb3a0d284ebe29684444cdb0ab164c326ed4dae832a691
+  - cora7z/app/sw/src/pipeline/pipeline_mgr.c sha256=065b10d12465fc133acf45f3add38ec3c8ca906cf3f9808a3cade7eb14738043
+  - cora7z/app/sw/src/pipeline/pipeline_mgr.h sha256=eac7b809b007e88375aa97623a1587566a97a5cd5b51a59b2f888cc235cd3ba6
 gates_passed: [c-lint, vitis-build, elf-link]
 ---
 
@@ -12,17 +12,17 @@ gates_passed: [c-lint, vitis-build, elf-link]
 ## 1. Overview
 - **Function**: Bare-metal Cortex-A9 orchestrator for 4-scenario telemetry pipeline (Compress-then-Encrypt).
 - **Architecture**: Decoupled Dual-Port BRAM memory buffers (2 KB Input, 2 KB Output per accelerator) over `M_AXI_GP0`.
-- **Instrumentation**: Dual-domain timing via ARM Cortex-A9 PMU cycle counter (`PMCCNTR`) and PL 32-bit hardware cycle counters.
+- **Instrumentation**: Dual-domain timing via ARM Cortex-A9 PMU cycle counter (`PMCCNTR` @ `650 MHz` `XPAR_CPU_CORE_CLOCK_FREQ_HZ` with calibrated overhead subtraction via `pipeline_set_pmu_overhead()`) and PL 32-bit hardware cycle counters (`100 MHz`).
 
 ## 2. Memory Map & Peripheral Bindings
-- `LZSS_ACCEL_BASE_ADDR`: `0x40000000`
-  - Control/Status CSRs: `0x40000000` - `0x40000010` (START, STATUS, IN_LEN, OUT_LEN, CYCLES)
-  - Input BRAM: `0x40000800` (2048 bytes)
-  - Output BRAM: `0x40001000` (2048 bytes)
-- `AES_ACCEL_BASE_ADDR`: `0x40010000`
-  - Control/Status CSRs: `0x40010000` - `0x40010010`
-  - Input BRAM: `0x40010800` (2048 bytes)
-  - Output BRAM: `0x40011000` (2048 bytes)
+- **AXI4-Lite CSRs (`M_AXI_GP0`)**:
+  - `LZSS_CSR_BASEADDR`: `0x43C00000` (`CONTROL`, `STATUS`, `INPUT_LEN`, `OUTPUT_LEN`, `CYCLES`)
+  - `AES_CSR_BASEADDR`: `0x43C10000` (`CONTROL`, `STATUS`, `INPUT_LEN`, `OUTPUT_LEN`, `CYCLES`, `KEY0..3`, `IV0..2`, `CTR_INIT`)
+- **Dual-Port BRAM Apertures (`axi_bram_ctrl` Port A)**:
+  - `LZSS_BRAM_IN_BASEADDR`: `0x40000000` (8 KB block, 2048 B active capacity)
+  - `LZSS_BRAM_OUT_BASEADDR`: `0x40002000` (8 KB block, 2048 B active capacity)
+  - `AES_BRAM_IN_BASEADDR`: `0x40010000` (8 KB block, 2048 B active capacity)
+  - `AES_BRAM_OUT_BASEADDR`: `0x40012000` (8 KB block, 2048 B active capacity)
 
 ## 3. Four Execution Scenarios
 - **Scenario 1 (SW/SW)**: C11 Heatshrink LZSS + NIST AES-128-CTR in Cortex-A9 RAM.

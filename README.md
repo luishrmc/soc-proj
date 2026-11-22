@@ -7,22 +7,15 @@
 [![Firmware: C11 Bare-Metal](https://img.shields.io/badge/Firmware-C11_Bare--Metal_(Cortex--A9)-green.svg)](#)
 [![Injector: ESP-IDF v6.1](https://img.shields.io/badge/Injector-ESP--IDF_v6.1_(ESP32)-orange.svg)](#)
 [![Institution: UFMG DELT](https://img.shields.io/badge/UFMG-Engenharia_Eletr%C3%B4nica_(DELT)-darkred.svg)](https://www.ufmg.br/)
-[![Status: WIP: Testbench & Synthetic Data Pipeline](https://img.shields.io/badge/Status-WIP%3A_Testbench_%26_Synthetic_Data_Pipeline-yellow.svg)]()
-[![Hardware: Scaffolding Complete](https://img.shields.io/badge/Hardware-Scaffolding_Complete-blue.svg)]()
+[![Status: HIL Verified (ADR-020)](https://img.shields.io/badge/Status-HIL_Verified_(ADR--020)-brightgreen.svg)]()
+[![Hardware: Integrated & Tested](https://img.shields.io/badge/Hardware-Integrated_%26_Tested-blue.svg)]()
 
-> [!IMPORTANT]
-> **Engineering Status — Work-in-Progress (WIP: Testbench & Synthetic Data Pipeline):**  
-> This project is in **active development**. Current engineering efforts center on developing a **Python-based synthetic telemetry generator** that produces realistic, time-series sensor streams to rigorously validate the heterogeneous co-design pipeline.
-> 
-> * **Active Focus: Python Synthetic Telemetry Generator:**
->   - Generates realistic, time-series telemetry streams modeled after industrial sensor clusters (simulated ambient/die temperature, 3-axis vibration signals, supply rail voltages, status bitmasks, and monotonic microsecond timestamps).
->   - Emulates controllable data entropy and repetition profiles to systematically challenge both dictionary compression (RLE, LZ4) and stream/block encryption (AES-CTR, ChaCha20) under known statistical distributions.
->   - Formats binary payloads in strict compliance with the project's binary frame contract ([`spi_frame.h`](esp32/main/spi_frame.h): 64 B to 1024 B payloads, native 32-bit word alignment, and CRC-16 CCITT integrity verification).
-> * **Hardware-in-the-Loop (HIL) Testbench Role:**
->   - The ESP32 microcontroller acts as a hardware bridge, streaming test vector frames over high-speed SPI Mode 0 (up to 25 MHz) to the Digilent Cora Z7-10 (Xilinx Zynq-7010).
->   - Synthesizable VHDL-2008 cores for LZSS compression and AES-128-CTR encryption interface via True Dual-Port BRAMs (ADR-012) to an ARM Cortex-A9 bare-metal supervisor.
-> * **Benchmark Status:**
->   - All quantitative throughput, execution latency, and speedup metrics across the test matrix are **Pending Measurement / WIP** awaiting systematic physical execution sweeps with the synthetic telemetry generator.
+> [!NOTE]
+> **Engineering Status — HIL Verified (`N = 20` / Entropy Profile @ 1024 B):**  
+> End-to-end Hardware-in-the-Loop (HIL) execution between the ESP32 SPI master injector (`2 MHz` VSPI, `GPIO 32` trigger, `seed=42`) and Digilent Cora Z7-10 (`650 MHz` ARM Cortex-A9 PS / `100 MHz` Artix-7 PL) is validated across zero-drop `30/30` telemetry bursts with bit-exact parity (`Case 3 == Case 1`, `Case 4 == Case 2`, and reverse loopback).
+>
+> * **Synthetic Telemetry Pipeline (`esp32/scripts/telemetry_profiles.py`):** Emits fixed `1024 B` payloads (`64 × 16 B` records) across `Quiescent`, `Dynamic`, and `Chaotic` Entropy Profiles ([`spi_frame.h`](esp32/main/spi_frame.h), `1035 B` wire frame with CRC-16 CCITT).
+> * **Hardware Architecture:** Synthesizable VHDL-2008 `lzss_accel` (`256/16`) and `aes_accel` (`AES-128-CTR`) coprocessors interfaced via True Dual-Port BRAMs (ADR-012) and AXI4-Lite CSRs.
 
 ---
 
@@ -32,17 +25,17 @@ The parameters below define the physical hardware testbed on the Digilent Cora Z
 
 | Parameter / Magnitude | Symbol | Value | Unit | Implementation Details |
 | :--- | :---: | :---: | :---: | :--- |
-| **CPU Clock (PS)** | $f_{\text{cpu}}$ | **667** | MHz | ARM Cortex-A9 MPCore (Core 0, bare-metal C11) |
+| **CPU Clock (PS)** | $f_{\text{cpu}}$ | **650** | MHz | ARM Cortex-A9 MPCore (Core 0, BSP `APU_FREQ`) |
 | **Accelerator Clock (PL)** | $f_{\text{accel}}$ | **100** | MHz | Clock domain `FCLK_CLK1` (Artix-7 fabric) |
 | **AXI Bus Clock** | $f_{\text{axi}}$ | **50** | MHz | Clock domain `FCLK_CLK0` (`M_AXI_GP0`) |
 | **DDR3 Memory Capacity** | $M_{\text{ddr}}$ | **512** | MB | 16-bit wide bus @ 533 MHz (1066 Mbps DDR3) |
 | **True Dual-Port BRAM** | $M_{\text{bram}}$ | **4 $\times$ 8 (32)** | KB | 4 independent Block RAM buffers (Port A PS, Port B HW) |
 | **External SPI Clock** | $f_{\text{spi}}$ | **Up to 25** | MHz | SPI Mode 0 (CPOL=0, CPHA=0, MSB-First) |
-| **Payload Spectrum** | $L_{\text{pay}}$ | **64, 256, 512, 1024** | Bytes | Dynamic frames with CRC-16 CCITT and 0x5A EOF delimiter |
+| **Payload Size** | $L_{\text{pay}}$ | **1024** | Bytes | Fixed ADR-020 payload (64 × 16 B records, CRC-16, `0x5A` EOF) |
 | **LZSS Window Geometry** | $W$ / $L$ | **256 / 16** | Bytes | Sliding circular window ($2^8$) and lookahead buffer ($2^4$) |
 | **Cryptographic Primitive** | --- | **AES-128-CTR** | Bits/Mode | NIST SP 800-38A (10 iterative rounds, 11 cycles/block) |
 | **FPGA Logic Budget** | --- | **17,600 LUT / 35,200 FF** | Cells | AMD Xilinx Zynq XC7Z010-1CLG400C |
-| **ARM PMU Measurement Overhead** | $C_{\text{pmu}}$ | **29** | Cycles | Direct CP15 inline register access (`PMCCNTR`) |
+| **ARM PMU Measurement Overhead** | $C_{\text{pmu}}$ | **28** | Cycles | Direct CP15 inline register access (`PMCCNTR`), subtracted in SW |
 
 ---
 
@@ -50,14 +43,14 @@ The parameters below define the physical hardware testbed on the Digilent Cora Z
 
 | Subsystem / Module | Source Files | Linked Specification | Architectural Role | Deliverable & Verification Status |
 |---|---|:---:|---|---|
-| **1. Telemetry Generator (Host)** | `utils/` (Python WIP) | [Architecture §6.3](docs/SYSTEM_ARCHITECTURE.md#63-synthetic-telemetry-generation--esp-idf-ingestion-setup-esp32) | Time-series sensor stream synthesis (temperature, vibration, voltage) | Active WIP; generates test vectors for HIL sweeps |
-| **2. SPI Injector (ESP32)** | [`spi_injector_master.c`](esp32/main/spi_injector_master.c) | [SPI_INJECTOR.md](docs/esp32/SPI_INJECTOR.md) | Physical SPI Master bridge for `Embedded Dataset` frames | Mode 0 + `GPIO 32` trigger verified; HIL sweeps WIP |
-| **3. SPI Receiver (PS/PL)** | [`axi_spi_receiver.c`](cora7z/app/sw/src/comms/axi_spi_receiver.c) | [AXI_SPI_RECEIVER.md](docs/sw/AXI_SPI_RECEIVER.md) | 256 B FIFO drainage and 32-bit word alignment | Preamble validation (`0xA5`), CRC check, echo/ACK response |
-| **4. Compression Accel (PL)** | [`lzss_accel.vhdl`](cora7z/app/hw/src/compression/lzss_accel.vhdl) | [LZSS_ACCEL.md](docs/hw/LZSS_ACCEL.md) | Sliding window hardware compressor (256 B / 16 B) | RTL verified in VUnit; physical benchmark pending |
+| **1. Telemetry Generator (Host)** | [`esp32/scripts/`](esp32/scripts/) | [Architecture §6.3](docs/SYSTEM_ARCHITECTURE.md#63-synthetic-telemetry-generation--esp-idf-ingestion-setup-esp32) | 1024 B synthetic telemetry (`Quiescent`, `Dynamic`, `Chaotic`) | `unittest` 7/7 PASS; `seed=42` |
+| **2. SPI Injector (ESP32)** | [`spi_injector_master.c`](esp32/main/spi_injector_master.c) | [SPI_INJECTOR.md](docs/esp32/SPI_INJECTOR.md) | Physical SPI Master bridge for 30-frame `Embedded Dataset` | Mode 0 @ `2 MHz` + `GPIO 32` trigger HIL-verified |
+| **3. SPI Receiver (PS/PL)** | [`axi_spi_receiver.c`](cora7z/app/sw/src/comms/axi_spi_receiver.c) | [AXI_SPI_RECEIVER.md](docs/sw/AXI_SPI_RECEIVER.md) | 256 B FIFO drainage and 32-bit word alignment | `0` CRC/frame/len errors across `30/30` bursts |
+| **4. Compression Accel (PL)** | [`lzss_accel.vhdl`](cora7z/app/hw/src/compression/lzss_accel.vhdl) | [LZSS_ACCEL.md](docs/hw/LZSS_ACCEL.md) | Sliding window hardware compressor (256 B / 16 B) | VUnit `7/7` + HIL verified; Risk R9 confirmed |
 | **5. Compression Baseline (PS)** | [`lzss_sw.c`](cora7z/app/sw/src/compression/lzss_sw.c) | [LZSS_SW.md](docs/sw/LZSS_SW.md) | Heatshrink-compatible C11 reference for Cortex-A9 | L1/L2 cache execution, bit-exact parity with HW model |
-| **6. Crypto Accel (PL)** | [`aes_accel.vhdl`](cora7z/app/hw/src/crypto/aes_accel.vhdl) | [AES_ACCEL.md](docs/hw/AES_ACCEL.md) | Iterative 10-round AES-128-CTR hardware engine | VUnit verified with NIST vectors; benchmark pending |
+| **6. Crypto Accel (PL)** | [`aes_accel.vhdl`](cora7z/app/hw/src/crypto/aes_accel.vhdl) | [AES_ACCEL.md](docs/hw/AES_ACCEL.md) | Iterative 10-round AES-128-CTR hardware engine | VUnit `5/5` + HIL verified (`1.19x–1.24x` speedup) |
 | **7. Crypto Baseline (PS)** | [`aes_ctr_sw.c`](cora7z/app/sw/src/crypto/aes_ctr_sw.c) | [AES_CTR_SW.md](docs/sw/AES_CTR_SW.md) | NIST SP 800-38A reference model in C11 | Golden vector validated; baseline CPU profiling target |
-| **8. Pipeline Manager** | [`pipeline_mgr.c`](cora7z/app/sw/src/pipeline/pipeline_mgr.c) | [PIPELINE_MGR.md](docs/sw/PIPELINE_MGR.md) | Orchestration of 4 scenarios and DEVCFG bus safety | Interlock implemented (`PCFG_DONE`); scenario dispatcher ready |
+| **8. Pipeline Manager** | [`pipeline_mgr.c`](cora7z/app/sw/src/pipeline/pipeline_mgr.c) | [PIPELINE_MGR.md](docs/sw/PIPELINE_MGR.md) | Orchestration of 4 scenarios and DEVCFG bus safety | `PCFG_DONE` interlock + calibrated PMU (`650 MHz`) |
 | **9. Architectural Diagrams** | [`cora7z_top.png`](docs/diagrams/cora7z_top.png) | [Diagrams README](docs/diagrams/README.md) | High-resolution 3200 $\times$ 1800 block diagram | Memory map, bus interconnects, pin allocation |
 
 ---
@@ -157,41 +150,39 @@ The bare-metal C11 firmware in [`cora7z/app/sw/src/`](cora7z/app/sw/src/) orches
 
 ---
 
-## 6. Benchmark Evaluation Methodology & Test Matrix (WIP)
+## 6. Benchmark Evaluation Methodology & HIL Results
 
-The experimental framework defines four execution scenarios evaluated across standardized payload sizes (256 B, 512 B, 1024 B). All empirical performance figures are currently **Pending Measurement / WIP** awaiting execution sweeps with the Python synthetic telemetry generator:
+The experimental framework evaluates four execution scenarios at a fixed **1024-byte payload** across three synthetic **Entropy Profiles** (`Quiescent`, `Dynamic`, and `Chaotic`) per [ADR-020](docs/adr/0020-fixed-1024b-benchmark-payload.md). All figures below are hardware-measured on the Digilent Cora Z7-10 (`650 MHz` Cortex-A9 PS / `100 MHz` PL) across two zero-drop `30/30` ESP32 SPI bursts (`N = 20` balanced samples per Entropy Profile, `28`-cycle PMU overhead subtracted):
 
-| Scenario | Pipeline Description | Payload | Latency | PMU Cycles | PL Cycles | Throughput | Speedup | Status |
-| :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| **Scenario 1: PS Only** | SW LZSS + SW AES-CTR | 256 B | *Pending* | *Pending* | *0* | *Pending* | *1.00x (Ref)* | Pending HIL Run |
-| **Scenario 1: PS Only** | SW LZSS + SW AES-CTR | 512 B | *Pending* | *Pending* | *0* | *Pending* | *1.00x (Ref)* | Pending HIL Run |
-| **Scenario 1: PS Only** | SW LZSS + SW AES-CTR | 1024 B | *Pending* | *Pending* | *0* | *Pending* | *1.00x (Ref)* | Pending HIL Run |
-| **Scenario 2: Offload Comp** | PL LZSS + SW AES-CTR | 256 B | *Pending* | *Pending* | *Pending* | *Pending* | *Pending* | Pending HIL Run |
-| **Scenario 2: Offload Comp** | PL LZSS + SW AES-CTR | 512 B | *Pending* | *Pending* | *Pending* | *Pending* | *Pending* | Pending HIL Run |
-| **Scenario 2: Offload Comp** | PL LZSS + SW AES-CTR | 1024 B | *Pending* | *Pending* | *Pending* | *Pending* | *Pending* | Pending HIL Run |
-| **Scenario 3: Offload Crypto** | SW LZSS + PL AES-CTR | 256 B | *Pending* | *Pending* | *Pending* | *Pending* | *Pending* | Pending HIL Run |
-| **Scenario 3: Offload Crypto** | SW LZSS + PL AES-CTR | 512 B | *Pending* | *Pending* | *Pending* | *Pending* | *Pending* | Pending HIL Run |
-| **Scenario 3: Offload Crypto** | SW LZSS + PL AES-CTR | 1024 B | *Pending* | *Pending* | *Pending* | *Pending* | *Pending* | Pending HIL Run |
-| **Scenario 4: All Hardware** | PL LZSS + PL AES-CTR | 256 B | *Pending* | *Pending* | *Pending* | *Pending* | *Pending* | Pending HIL Run |
-| **Scenario 4: All Hardware** | PL LZSS + PL AES-CTR | 512 B | *Pending* | *Pending* | *Pending* | *Pending* | *Pending* | Pending HIL Run |
-| **Scenario 4: All Hardware** | PL LZSS + PL AES-CTR | 1024 B | *Pending* | *Pending* | *Pending* | *Pending* | *Pending* | Pending HIL Run |
+| Scenario | Pipeline Description | Payload | Entropy Profile | Latency (ms) | PMU Cycles (Mean ± Std) | PL Cycles (Mean) | Space Savings (CR) | Throughput | Speedup |
+| :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| **Scenario 1: PS Only** | SW LZSS + SW AES-CTR | 1024 B | Quiescent | 3.796 | 2,467,688 ± 57,741 | 0 | 55.7% | 0.26 MB/s | 1.00x (Ref) |
+| **Scenario 1: PS Only** | SW LZSS + SW AES-CTR | 1024 B | Dynamic | 10.188 | 6,621,969 ± 20,324 | 0 | 2.5% | 0.10 MB/s | 1.00x (Ref) |
+| **Scenario 1: PS Only** | SW LZSS + SW AES-CTR | 1024 B | Chaotic | 12.907 | 8,389,708 ± 15,135 | 0 | -12.6% | 0.08 MB/s | 1.00x (Ref) |
+| **Scenario 2: Offload Comp** | PL LZSS + SW AES-CTR | 1024 B | Quiescent | 5.990 | 3,893,369 ± 89,334 | 200,972 | 55.7% | 0.16 MB/s | 0.63x |
+| **Scenario 2: Offload Comp** | PL LZSS + SW AES-CTR | 1024 B | Dynamic | 16.112 | 10,473,009 ± 36,864 | 573,622 | 2.5% | 0.06 MB/s | 0.63x |
+| **Scenario 2: Offload Comp** | PL LZSS + SW AES-CTR | 1024 B | Chaotic | 20.563 | 13,366,113 ± 21,824 | 744,661 | -12.6% | 0.05 MB/s | 0.63x |
+| **Scenario 3: Offload Crypto** | SW LZSS + PL AES-CTR | 1024 B | Quiescent | **3.068** | **1,994,017 ± 53,850** | 668 | 55.7% | **0.32 MB/s** | **1.24x** |
+| **Scenario 3: Offload Crypto** | SW LZSS + PL AES-CTR | 1024 B | Dynamic | **8.579** | **5,576,620 ± 22,043** | 1,452 | 2.5% | **0.11 MB/s** | **1.19x** |
+| **Scenario 3: Offload Crypto** | SW LZSS + PL AES-CTR | 1024 B | Chaotic | **11.039** | **7,175,201 ± 10,382** | 1,679 | -12.6% | **0.09 MB/s** | **1.17x** |
+| **Scenario 4: All Hardware** | PL LZSS + PL AES-CTR | 1024 B | Quiescent | 5.260 | 3,419,303 ± 85,605 | 201,639 | 55.7% | 0.19 MB/s | 0.72x |
+| **Scenario 4: All Hardware** | PL LZSS + PL AES-CTR | 1024 B | Dynamic | 14.503 | 9,427,015 ± 37,116 | 575,075 | 2.5% | 0.07 MB/s | 0.70x |
+| **Scenario 4: All Hardware** | PL LZSS + PL AES-CTR | 1024 B | Chaotic | 18.694 | 12,150,877 ± 17,163 | 746,340 | -12.6% | 0.05 MB/s | 0.69x |
 
-### Evaluation Protocol & Metrics
-* **Latency ($T_{\text{lat}}$):** Total elapsed time in milliseconds from frame ingestion to completion.
-* **CPU Cycles ($C_{\text{PMU}}$):** Sampled via `PMCCNTR` (calibrated: $C_{\text{actual}} = C_{\text{raw}} - 29$).
-* **Hardware Cycles ($C_{\text{PL}}$):** Sampled from accelerator status registers at 100 MHz.
-* **Throughput ($TH$):** Calculated as $\text{Payload Size} / T_{\text{lat}}$ (MB/s).
-* **Speedup ($S$):** Calculated relative to Scenario 1 software baseline.
-* **Architectural Risk R9 Investigation:** Characterization sweeps will experimentally evaluate the hypothesis that sequential lookahead searches in BRAM at 100 MHz incur latency penalties compared to Cortex-A9 L1/L2 cache execution at 667 MHz.
+### Evaluation Protocol & Key Findings
+* **Latency ($T_{\text{lat}}$) & Cycles ($C_{\text{PMU}}$):** Sampled via `PMCCNTR` at `650 MHz` (calibrated: `28` CPU cycles overhead, subtracted).
+* **Hardware Cycles ($C_{\text{PL}}$):** Sampled from accelerator status registers at `100 MHz`.
+* **Compression Ratio (Space Savings %):** Computed as `(1 - comp_len / raw_len) * 100%` (`+55.7%` Quiescent, `+2.5%` Dynamic, `-12.6%` Chaotic expansion to `1154 B`).
+* **Architectural Risk R9 Confirmed (PS vs. PL Compression):** Sequential BRAM sliding-window lookahead search in PL (`201k–745k` cycles at `100 MHz` + AXI BRAM copy) is ~`1.58x` slower than Cortex-A9 L1/L2 cache SW LZSS at `650 MHz`. Conversely, **Scenario 3 (`SW LZSS + PL AES-CTR`)** achieves **1.17x–1.24x** end-to-end speedup across all three entropy profiles (`668–1,679` PL cycles @ `100 MHz`).
 
 ### Target FPGA Silicon Resource Budgets (AMD Xilinx XC7Z010)
 
 | Hardware Resource | Device Total Budget | Target Design Budget (85%) | Post-Implementation Utilization | Timing Status |
 | :--- | :---: | :---: | :---: | :---: |
-| **LUTs (Combinational Logic)** | 17,600 | $\le$ 14,960 | *Pending Closure / WIP* | WNS $\ge 0.0$ ns (Target) |
-| **Flip-Flops (Registers)** | 35,200 | $\le$ 29,920 | *Pending Closure / WIP* | — |
-| **Block RAM (RAMB36 Equivalents)** | 60 | $\le$ 51 | *Pending Closure / WIP* | — |
-| **DSP48E1 Slices** | 80 | $\le$ 68 | *Pending Closure / WIP* | — |
+| **LUTs (Combinational Logic)** | 17,600 | $\le$ 14,960 | 8,810 (50.06%) | `WNS = +0.551 ns` / `WHS = +0.008 ns` |
+| **Flip-Flops (Registers)** | 35,200 | $\le$ 29,920 | 12,048 (34.23%) | `0` Latches |
+| **Block RAM (RAMB36 Equivalents)** | 60 | $\le$ 51 | 9 (15.00%) | `0` Failing Endpoints |
+| **DSP48E1 Slices** | 80 | $\le$ 68 | 0 (0.00%) | — |
 
 ---
 
@@ -295,9 +286,9 @@ ufmg/soc/proj/
 
 | Deliverable | Format | Status | Location |
 |---|:---:|:---:|---|
-| **VHDL Source Code** | `.vhdl` | Scaffold Complete | [`cora7z/app/hw/src/`](cora7z/app/hw/src/) (`lzss_accel.vhdl`, `aes_accel.vhdl`) |
-| **VUnit Testbenches** | `.vhdl` | Verified (Simulation) | [`cora7z/app/hw/test/`](cora7z/app/hw/test/) (`tb_lzss_accel.vhdl`, `tb_aes_accel.vhdl`) |
-| **C/C++ Firmware** | `.c`, `.h` | Scaffold Complete | [`cora7z/app/sw/src/`](cora7z/app/sw/src/) and [`esp32/main/`](esp32/main/) |
+| **VHDL Source Code** | `.vhdl` | Synthesized & Verified | [`cora7z/app/hw/src/`](cora7z/app/hw/src/) (`lzss_accel.vhdl`, `aes_accel.vhdl`) |
+| **VUnit Testbenches** | `.vhdl` | 12/12 PASS (GHDL) | [`cora7z/app/hw/test/`](cora7z/app/hw/test/) (`tb_lzss_accel.vhdl`, `tb_aes_accel.vhdl`) |
+| **C/C++ Firmware** | `.c`, `.h` | HIL Verified (`30/30` bursts) | [`cora7z/app/sw/src/`](cora7z/app/sw/src/) and [`esp32/main/`](esp32/main/) |
 | **Block Diagram** | `.png`, `.jpg` | Complete | [`docs/diagrams/cora7z_top.png`](docs/diagrams/cora7z_top.png) (3200 $\times$ 1800) |
-| **Final Report** | `.pdf` | Pending HIL Benchmarks | In preparation; metrics pending physical execution |
+| **Final Report** | `.pdf` | In Formatting Review | Empirical HIL metrics consolidated in [`Matriz_de_Testes_e_Métricas.csv`](utils/plan/Matriz_de_Testes_e_Métricas.csv) |
 | **GitHub Repository** | Git URL | Active | [git@github.com:luishrmc/soc-proj.git](https://github.com/luishrmc/soc-proj) |
