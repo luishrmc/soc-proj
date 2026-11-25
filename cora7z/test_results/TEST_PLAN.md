@@ -32,7 +32,7 @@ This document defines the unified static verification, simulation, and Hardware-
 | **Scenario 3: Offload Cifragem** | SW LZSS + PL AES-CTR | Pending standalone synthesis isolate |
 | **Scenario 4: Aceleração HW Total** | PL LZSS + PL AES-CTR | `8,810 LUTs / 12,048 FFs / 9 BRAMs` |
 
-Each scenario is measured across all 3 Entropy Profiles (`Quiescent`, `Dynamic`, `Chaotic`) at `1024 B`, forming the 12-row matrix tracked in [Matriz_de_Testes_e_Métricas.csv](../../../utils/plan/Matriz_de_Testes_e_Métricas.csv).
+Each scenario is measured across all 3 Entropy Profiles (`Quiescent`, `Dynamic`, `Chaotic`) at `1024 B`, forming the 12-row matrix tracked in [Matriz_de_Testes_e_Métricas.csv](../../../utils/plan/Matriz_de_Testes_e_Métricas.csv) and documented with full methodology and statistical findings in [BENCHMARK_RESULTS.md](BENCHMARK_RESULTS.md).
 
 ---
 
